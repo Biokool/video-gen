@@ -1,0 +1,30 @@
+# Entorno virtual
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Datos locales del panel (incluye las claves API guardadas en SQLite)
+panel.db
+panel.db-journal
+panel.db-wal
+panel.db-shm
+
+# Artefactos pesados de los jobs
+jobs/**/audio/
+jobs/**/video/
+*.mp4
+*.mov
+*.mkv
+*.mp3
+*.wav
+*.m4a
+
+# Miniaturas generadas
+thumbnails/*.png
+
+# Varios
+*.log
+.DS_Store
+Thumbs.db
+_streamlit/
