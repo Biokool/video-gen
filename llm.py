@@ -66,7 +66,7 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 # cuando hay key; si el descubrimiento falla, se prueban en este orden).
 PREFERRED = {
     "gemini": ["gemini-2.5-flash", "gemini-2.0-flash", "gemma-3-27b-it"],
-    "groq": ["qwen/qwen3.6-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b"],
+    "groq": ["qwen/qwen3.8-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b"],
     "cerebras": ["zai-glm-4.7", "gpt-oss-120b", "llama-3.3-70b"],
     "openrouter": [
         "nvidia/nemotron-3-super-120b-a12b:free",
@@ -87,10 +87,18 @@ class LLMError(Exception):
 
 
 # ---------- HTTP ----------
+# Cloudflare (Groq) bloquea el User-Agent por defecto de urllib -> HTTP 403/1010.
+_UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                     "AppleWebKit/537.36 (KHTML, like Gecko) "
+                     "Chrome/124.0 Safari/537.36"}
+
+
 def _post_json(url, payload, headers=None, timeout=300):
     data = json.dumps(payload).encode()
-    req = urllib.request.Request(url, data=data,
-                                 headers=headers or {"Content-Type": "application/json"})
+    hdrs = dict(_UA)
+    hdrs.update(headers or {})
+    hdrs.setdefault("Content-Type", "application/json")
+    req = urllib.request.Request(url, data=data, headers=hdrs)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read().decode())
@@ -102,7 +110,9 @@ def _post_json(url, payload, headers=None, timeout=300):
 
 
 def _get_json(url, headers=None, timeout=30):
-    req = urllib.request.Request(url, headers=headers or {})
+    hdrs = dict(_UA)
+    hdrs.update(headers or {})
+    req = urllib.request.Request(url, headers=hdrs)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read().decode())
@@ -147,7 +157,7 @@ def _openai_chat(base, api_key, model, prompt, system=""):
     out = _post_json(
         f"{base}/chat/completions",
         {"model": model, "messages": messages,
-         "temperature": 0.7, "max_tokens": 4096},
+         "temperature": 0.7, "max_tokens": 8192},
         headers={"Content-Type": "application/json",
                  "Authorization": f"Bearer {api_key}"},
     )
@@ -157,12 +167,18 @@ def _openai_chat(base, api_key, model, prompt, system=""):
         raise LLMError(f"Respuesta inesperada de {model}: {str(out)[:200]}")
 
 
+# Modelos que NO sirven para escribir (ASR, guardia, embeddings, TTS).
+_NON_CHAT = ("whisper", "prompt-guard", "orpheus", "safeguard", "embed",
+             "embedding", "moderation")
+
+
 def _openai_models(base, api_key):
     """Descubre modelos vía GET {base}/models. [] si falla."""
     try:
         out = _get_json(f"{base}/models",
                         headers={"Authorization": f"Bearer {api_key}"})
-        return [m["id"] for m in out.get("data", []) if m.get("id")]
+        return [m["id"] for m in out.get("data", []) if m.get("id")
+                and not any(b in m["id"].lower() for b in _NON_CHAT)]
     except LLMError:
         return []
 
@@ -190,7 +206,7 @@ def _openrouter_generate(model, prompt, system, api_key):
 def _gemini_generate(api_key, model, prompt, system=""):
     body = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.7, "maxOutputTokens": 4096},
+        "generationConfig": {"temperature": 0.7, "maxOutputTokens": 8192},
     }
     if system:
         body["systemInstruction"] = {"parts": [{"text": system}]}
@@ -314,7 +330,8 @@ def backend_options():
 def model_options(backend, keys=None):
     """Opciones para el combo según backend (descubrimiento si hay key)."""
     if backend == "ollama":
-        return list_ollama_models()
+        # Fuera modelos de embeddings: no sirven para chat/guiones.
+        return [m for m in list_ollama_models() if "embed" not in m.lower()]
     if backend in BACKEND_ORDER:
         return resolve_chain(backend, "", keys or {})
     return []

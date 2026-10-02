@@ -8,8 +8,10 @@ pipeline por proyecto con 3 puertas de aprobación, configuración por video
 ## Requisitos
 
 - Python 3.10+
+- Manim (viene en `requirements.txt`): renderiza la animación. Es la
+  dependencia pesada del paquete (~200 MB con sus librerías).
 - Ollama corriendo en `localhost:11434` si quieres usar modelos locales
-- FFmpeg (para recortes de shorts)
+- FFmpeg + ffprobe en el PATH (TTS, ensamblado y recortes)
 - Claves (opcionales según uso): `GEMINI_API_KEY`, `GROQ_API_KEY`,
   `CEREBRAS_API_KEY`, `OPENROUTER_API_KEY`, `MISTRAL_API_KEY`,
   `COHERE_API_KEY`, `YOUTUBE_API_KEY` — se guardan en el SQLite local
@@ -18,22 +20,46 @@ pipeline por proyecto con 3 puertas de aprobación, configuración por video
 
 ## Instalación y arranque
 
+**Windows (repo video-gen):** doble clic en `INICIAR.bat` — crea el entorno,
+instala dependencias, siembra la base y abre el panel.
+
+**Manual (cualquier sistema):**
+
 ```bash
-cd ~/workspace/zenn-factory/panel
+python3 -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 python3 seed.py        # una sola vez: carga el piloto ya producido
 streamlit run app.py  # abre http://localhost:8501
 ```
+
+## El flujo (así de simple)
+
+1. **📥 Bandeja**: añade un tema (manual o generado) y pulsa **Aprobar**.
+   Se crea el proyecto (puerta: tema).
+2. **🎬 Proyectos** → abre el proyecto → pulsa **▶ Correr todo**.
+   El pipeline avanza solo, etapa por etapa, en orden:
+   investigación → guion → verificación → storyboard → TTS →
+   miniaturas → paquete.
+3. Se **detiene solo** cuando te necesita:
+   - **Puerta 1 · Guion**: el borrador queda generado; léelo y pulsa
+     «Aprobar guion». Después vuelve a «Correr todo».
+   - **Etapas manuales** (animación Manim, ensamblado): hazlas y pulsa
+     «✔ Marcar hecho» en su etapa.
+   - **Puerta 2 · Miniatura**: elige una de las 3 miniaturas ilustradas
+     antes de cerrar el paquete.
+4. Arriba del tablero siempre verás **«Siguiente paso»**: qué toca ahora
+   y por qué. Las etapas van numeradas (1/10, 2/10…) en su orden real.
 
 ## Qué hace cada vista
 
 - **📥 Bandeja de temas**: añade temas manuales o genera 8 propuestas con el
   modelo elegido en el combo. Aprobar crea el proyecto (puerta 1: tema).
 - **🎬 Proyectos**: lista con tipo y progreso. El detalle muestra el tablero
-  de etapas (▶ ejecutar lo automático, ✔ marcar hecho lo manual),
-  la puerta 2 (guion: leer, aprobar, pedir cambios o reescribir con crítica)
-  y la puerta 3 (elegir miniatura entre las generadas).
-- **⚙️ Configuración**: voz/idioma por defecto y claves.
+  de etapas numerado (▶ ejecutar una, ✔ marcar hecho lo manual),
+  el botón «Correr todo», la puerta del guion (leer, aprobar, pedir cambios
+  o reescribir con crítica) y la puerta de miniatura (elegir entre las
+  generadas).
+- **⚙️ Configuración**: voz/idioma por defecto y claves de los 7 backends.
 
 ## Tipos de proyecto
 
@@ -68,9 +94,12 @@ si uno falla (404/429/límite), intenta el siguiente de la cadena.
 - Consumo real del pipeline: ~5–10 llamadas por video (borrador, crítico,
   temas amortizados). Cualquiera de estos tiers sobra para 2 videos/semana.
 
-## Convenciones de `jobs/<slug>/`
+## Convenciones de `jobs/<id>/`
 
-- `GUION.md` — guion aprobado (la puerta 2 lo lee de aquí).
+- `INVESTIGACION.md` — informe con fuentes (etapa 2).
+- `GUION.md` — borrador y guion aprobado (la Puerta 1 lo lee de aquí).
+- `STORYBOARD.md` — escenas numeradas con descripción visual.
+- `PAQUETE.md` — título, descripción, capítulos y tags de publicación.
 - `vo.json` — `[{"id":"s01","text":"..."}]` para el TTS automático.
 - `audio/`, `video/` — artefactos que el panel referencia.
 - `scripts/*.py` — escenas Manim (la animación se marca manual: el código
@@ -78,8 +107,16 @@ si uno falla (404/429/límite), intenta el siguiente de la cadena.
 
 ## Notas honestas
 
-- Las etapas marcadas `manual`/`asistida` no se ejecutan solas: el panel las
-  rastrea y te deja marcarlas. Lo automático real hoy: TTS, verificación de
-  referencias (DOI/PMID), miniaturas y recorte vertical.
-- La calidad del guion no la garantiza ningún modelo: sale del proceso
-  borrador → crítico → tu aprobación (puerta 2).
+- Automático real hoy: investigación, borrador de guion, verificación de
+  referencias (DOI/PMID), storyboard, TTS (crea `vo.json` solo desde el
+  storyboard), **animación** (el LLM genera el código Manim escena por
+  escena y lo renderiza, con autorreparación si una escena falla),
+  **ensamblado** (el audio manda; genera `final.mp4`, `final.srt` y
+  `final_con_subtitulos.mp4`), miniaturas ilustradas, recorte vertical
+  y paquete de publicación.
+- La animación de un video largo tarda: renderizar 15–40 escenas puede
+  tomar varios minutos según tu CPU. Las escenas ya renderizadas se
+  omiten al reintentar.
+- La calidad del guion y de las escenas no la garantiza ningún modelo:
+  sale del proceso borrador → crítico → tu aprobación (Puerta 1) y de
+  revisar el storyboard antes de animar.

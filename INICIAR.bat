@@ -13,9 +13,6 @@ echo.
 set "PY=%~dp0.venv\Scripts\python.exe"
 set "ST=%~dp0.venv\Scripts\streamlit.exe"
 
-REM ----------------------------------------------------------
-REM [1/3] Entorno virtual + dependencias (solo si falta)
-REM ----------------------------------------------------------
 if exist "%PY%" goto env_ok
 
 echo [1/3] Creando entorno virtual e instalando dependencias...
@@ -32,6 +29,7 @@ if not errorlevel 1 (
     py -3 -m venv .venv
     if errorlevel 1 goto fail
     "%PY%" -m pip install --upgrade pip
+    if errorlevel 1 goto fail
     "%PY%" -m pip install -r requirements.txt
     if errorlevel 1 goto fail
     goto env_ok
@@ -45,10 +43,13 @@ goto fail
 
 :env_ok
 echo [1/3] Entorno OK  (%PY%)
+"%PY%" -c "import manim" >nul 2>nul
+if errorlevel 1 (
+    echo       Instalando dependencias faltantes ^(Manim y demas^)...
+    "%PY%" -m pip install -r requirements.txt
+    if errorlevel 1 goto fail
+)
 
-REM ----------------------------------------------------------
-REM [2/3] Base de datos (seed solo la primera vez)
-REM ----------------------------------------------------------
 if exist "%~dp0panel.db" goto db_ok
 echo [2/3] Creando base de datos (seed)...
 "%PY%" seed.py
@@ -59,19 +60,16 @@ goto db_done
 echo [2/3] Base de datos ya existe (panel.db)
 
 :db_done
-REM ----------------------------------------------------------
-REM [3/3] Comprobaciones opcionales
-REM ----------------------------------------------------------
 where ffmpeg >nul 2>nul
 if errorlevel 1 (
-    echo [3/3] AVISO: ffmpeg no esta en el PATH - el recorte de shorts no funcionara.
+    echo [3/3] AVISO: ffmpeg no esta en el PATH - el ensamblado y los shorts no funcionaran.
 ) else (
     echo [3/3] ffmpeg OK
 )
 
 curl -s -m 2 http://localhost:11434/api/tags >nul 2>nul
 if errorlevel 1 (
-    echo       INFO: Ollama no responde en localhost:11434  ^(opcional, modelos locales^).
+    echo       INFO: Ollama no responde en localhost:11434 ^(opcional, modelos locales^).
 ) else (
     echo       Ollama OK
 )

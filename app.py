@@ -2,9 +2,13 @@
 """Panel Zenn Factory — tablero visual del pipeline de videos.
 
 Uso:
-    cd ~/workspace/zenn-factory/panel
     pip install -r requirements.txt
-    streamlit run app.py
+    python3 seed.py        # solo la primera vez
+    streamlit run app.py  # abre http://localhost:8501
+
+Flujo: Bandeja (aprobar tema) → Proyectos → "Correr todo" avanza solo
+y se detiene cuando necesita tu decisión (aprobar guion o miniatura)
+o una etapa manual (animación, ensamblado).
 """
 import sys
 from pathlib import Path
@@ -15,13 +19,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import db
 import llm
 import pipeline
-from pipeline import (stages_for, count_words, estimate_minutes,
+from pipeline import (BASE, stages_for, count_words, estimate_minutes,
                       propose_topics, draft_script, critic_review,
-                      run_tts, run_thumbnails, cut_vertical)
+                      cut_vertical, execute_stage, run_all, stage_label,
+                      STAGE_HINTS)
 
-BASE = Path(__file__).resolve().parent.parent
-
-st.set_page_config(page_title="Zenn Factory", layout="wide")
+st.set_page_config(page_title="Zenn Factory · El Porqué", layout="wide")
 
 conn = db.connect()
 db.init_db()
@@ -42,22 +45,22 @@ def project_kind_label(kind):
 
 
 def stage_badge(status):
-    return {"pendiente": "⚪", "en-curso": "🔵", "ok": "🟢",
-            "fallo": "🔴", "omitido": "⚫", "manual": "🟡"}.get(status, "❔")
-
-
-def make_generate_fn(backend, model):
-    keys = {b: get(llm.BACKENDS[b]["setting"])
-            for b in llm.BACKENDS if llm.BACKENDS[b]["setting"]}
-    def fn(prompt, system=""):
-        return llm.generate(prompt, backend=backend, model=model,
-                             system=system, keys=keys)
-    return fn
+    return {"pendiente": "⚪", "en-curso": "🟡",
+            "ok": "🟢", "fallo": "🔴", "omitido": "⚫",
+            "manual": "✅"}.get(status, "❔")
 
 
 def all_keys():
     return {b: get(llm.BACKENDS[b]["setting"])
             for b in llm.BACKENDS if llm.BACKENDS[b]["setting"]}
+
+
+def make_generate_fn(backend, model):
+    keys = all_keys()
+    def fn(prompt, system=""):
+        return llm.generate(prompt, backend=backend, model=model,
+                            system=system, keys=keys)
+    return fn
 
 
 # ---------- sidebar: modelo (combo) ----------
@@ -71,7 +74,8 @@ backend = st.sidebar.selectbox(
     key="backend")
 bmeta = llm.BACKENDS[backend]
 if bmeta["setting"] and not get(bmeta["setting"]):
-    st.sidebar.info(f"Sin {bmeta['env']} — ponla en Configuración.")
+    st.sidebar.warning(f"Sin {bmeta['env']} — ponla en Configuración "
+                       "o elige Ollama local.")
 else:
     st.sidebar.caption(f"Gratis: {bmeta['free']}")
 models = llm.model_options(backend, all_keys())
@@ -79,7 +83,8 @@ if backend == "ollama" and not models:
     st.sidebar.warning("Ollama no responde en localhost:11434. Revisa `ollama serve`.")
 default_model = get("default_model_id", "")
 idx = models.index(default_model) if default_model in models else 0
-model_id = st.sidebar.selectbox("Modelo", models or ["(sin modelos)"], index=idx if models else 0)
+model_id = st.sidebar.selectbox("Modelo", models or ["(sin modelos)"],
+                                index=idx if models else 0)
 if st.sidebar.button("Guardar como predeterminado"):
     db.set_setting(conn, "backend", backend)
     db.set_setting(conn, "default_model_id", model_id)
@@ -89,51 +94,19 @@ st.sidebar.divider()
 view = st.sidebar.radio("Vista", ["📥 Bandeja de temas", "🎬 Proyectos",
                                   "⚙️ Configuración"])
 
-# ============================================================ EJECUTORES
-def execute_stage(p, stage):
-    """Devuelve (ok, log, artifacts)."""
-    pid = p["id"]
-    job = Path(p["job_dir"]) if p["job_dir"] else BASE / f"jobs/{pid}"
-    try:
-        if stage == "tts":
-            ok, log = run_tts(job, p["voice"], p["language"])
-            arts = [str(a) for a in (job / "audio").glob("*.mp3")] if ok else []
-            return ok, log, arts
-        if stage == "miniatura":
-            ok, log = run_thumbnails(pid)
-            arts = [str(a) for a in (BASE / "thumbnails").glob(f"thumb_{pid}_*.png")]
-            return ok, log, arts
-        if stage == "verificacion":
-            sp = find_script(p)
-            if not sp:
-                return False, "Sin guion para verificar.", []
-            from pipeline import extract_references
-            dois, pmids = extract_references(Path(sp).read_text(encoding="utf-8"))
-            log = f"DOIs: {len(dois)}, PMIDs: {len(pmids)}\n" + "\n".join(dois + [f"PMID:{x}" for x in pmids])
-            return True, log, []
-        return False, f"Etapa '{stage}': sin ejecutor automático todavía. Usa 'Marcar hecho'.", []
-    except Exception as e:
-        return False, f"Error: {e}", []
+gen_fn = make_generate_fn(backend, model_id)
 
 
-def find_script(p):
-    job = Path(p["job_dir"]) if p["job_dir"] else BASE / f"jobs/{p['id']}"
-    for name in ("GUION_PILOTO.md", "GUION.md", "guion.md"):
-        c = job / name
-        if c.exists():
-            return str(c)
-    cands = sorted(job.glob("*.md"))
-    return str(cands[0]) if cands else ""
-
-
-def script_out_path(p):
-    job = Path(p["job_dir"]) if p["job_dir"] else BASE / f"jobs/{p['id']}"
-    return job / "GUION.md"
+def apply_stage_result(pid, stage, ok, log, arts, sugg):
+    db.set_stage(conn, pid, stage, sugg or ("ok" if ok else "fallo"),
+                 log, arts)
 
 
 # ============================================================ BANDEJA
 if view == "📥 Bandeja de temas":
     st.title("📥 Bandeja de temas")
+    st.caption("Paso 1 del flujo: aprueba un tema y se crea el proyecto. "
+               "Después, en Proyectos, pulsa «Correr todo».")
     c1, c2 = st.columns([3, 1])
     with c1:
         with st.form("nuevo_tema"):
@@ -149,7 +122,7 @@ if view == "📥 Bandeja de temas":
         if st.button("🤖 Generar 8 propuestas (LLM)"):
             try:
                 with st.spinner("Generando..."):
-                    topics = propose_topics(make_generate_fn(backend, model_id))
+                    topics = propose_topics(gen_fn)
                 for t in topics:
                     db.add_topic(conn, t["question"], t["angle"],
                                  t["source"], t["signals"])
@@ -185,8 +158,11 @@ if view == "📥 Bandeja de temas":
                     db.ensure_stages(conn, pid, [s for s, _, _ in stages_for(kind)])
                     db.ensure_approvals(conn, pid)
                     db.set_approval(conn, pid, "tema", "aprobado")
+                    db.set_stage(conn, pid, "tema", "ok",
+                                 "Tema aprobado en la bandeja.")
                     db.set_topic_status(conn, t["id"], "aprobado")
-                    st.success(f"Proyecto #{pid} creado ({kind}).")
+                    st.success(f"Proyecto #{pid} creado ({kind}). "
+                               "Ve a 🎬 Proyectos y pulsa «Correr todo».")
                     rerun()
             with b2:
                 st.selectbox("Tipo", ["largo", "corto-recorte", "corto-standalone"],
@@ -209,7 +185,6 @@ elif view == "🎬 Proyectos":
             st.info("Sin proyectos. Aprueba un tema en la bandeja.")
         for p in projs:
             done, total = db.stage_progress(conn, p["id"])
-            g = db.get_approval(conn, p["id"], "guion")
             cols = st.columns([5, 2, 2, 1])
             cols[0].write(f"**#{p['id']} {p['title']}**")
             cols[1].write(project_kind_label(p["kind"]))
@@ -225,7 +200,71 @@ elif view == "🎬 Proyectos":
             rerun()
         st.title(f"#{p['id']} {p['title']}")
         st.caption(f"{project_kind_label(p['kind'])} · voz {p['voice']} · "
-                   f"{p['language']} · {p['model_backend']}/{p['model_id'] or 'auto'}")
+                   f"{p['language']} · modelo del sidebar: "
+                   f"{llm.BACKENDS[backend]['label']} / {model_id}")
+
+        stages = db.list_stages(conn, pid)
+        total = len(stages)
+        done_n, _ = db.stage_progress(conn, pid)
+        st.progress(done_n / max(total, 1),
+                    text=f"Progreso: {done_n}/{total} etapas")
+
+        # ---- siguiente paso ----
+        def next_step():
+            for i, s in enumerate(stages):
+                if s["status"] in ("ok", "manual", "omitido"):
+                    continue
+                name = s["stage"]
+                if name == "guion" and s["status"] == "en-curso" and \
+                        db.get_approval(conn, pid, "guion")["status"] != "aprobado":
+                    return ("👉 **Siguiente paso:** el borrador del guion está "
+                            "listo. Léelo y apruébalo en la **Puerta 1** (abajo).")
+                if name == "miniatura" and s["status"] == "ok" and \
+                        db.get_approval(conn, pid, "miniatura")["status"] != "aprobado":
+                    return ("👉 **Siguiente paso:** elige una miniatura en la "
+                            "**Puerta 2** (abajo) para poder cerrar el paquete.")
+                hint = STAGE_HINTS.get(name, "")
+                return (f"👉 **Siguiente paso:** etapa {i + 1}/{total} · "
+                        f"**{stage_label(p['kind'], name)}**. {hint}")
+            return "🎉 **Proyecto completo.** Todas las etapas están cerradas."
+
+        st.info(next_step())
+
+        # ---- correr todo ----
+        if "run_msg" in st.session_state:
+            kind_msg, txt = st.session_state.pop("run_msg")
+            (st.success if kind_msg == "ok" else st.warning)(txt)
+        if st.button("▶ Correr todo (avanza solo y se detiene si te necesita)",
+                     type="primary"):
+            box = st.empty()
+            lines = []
+
+            def on_step(name, ok, log):
+                lines.append(f"{'✅' if ok else '❌'} {stage_label(p['kind'], name)}")
+                box.write("\n\n".join(lines))
+
+            reason, detail = run_all(conn, p, gen_fn, on_step=on_step)
+            if reason == "done":
+                msg = ("ok", "✅ Todo ejecutado. Revisa el paquete de publicación.")
+            elif reason == "gate" and detail == "guion":
+                msg = ("warn", "⏸ Detenido en la **Puerta 1 (guion)**: el borrador "
+                               "está generado. Léelo abajo y pulsa «Aprobar guion».")
+            elif reason == "gate" and detail == "miniatura":
+                msg = ("warn", "⏸ Detenido en la **Puerta 2 (miniatura)**: elige "
+                               "una miniatura abajo para cerrar el paquete.")
+            elif reason == "manual":
+                msg = ("warn", f"⏸ Detenido en etapa manual: "
+                               f"**{stage_label(p['kind'], detail)}**. "
+                               f"{STAGE_HINTS.get(detail, '')} "
+                               "Cuando la termines, pulsa «Marcar hecho» en su etapa "
+                               "y vuelve a «Correr todo».")
+            elif reason == "error":
+                msg = ("warn", f"❌ Falló la etapa **{stage_label(p['kind'], detail)}**. "
+                               "Abre esa etapa para ver el error exacto.")
+            else:
+                msg = ("warn", f"Detenido: {reason} {detail}")
+            st.session_state["run_msg"] = msg
+            rerun()
 
         # ---- config rápida ----
         with st.expander("⚙️ Configuración del proyecto"):
@@ -238,12 +277,17 @@ elif view == "🎬 Proyectos":
                 st.success("Guardado.")
                 rerun()
 
-        # ---- tablero de etapas ----
-        st.subheader("Pipeline")
-        for s in db.list_stages(conn, pid):
-            sname = dict((x[0], x[1]) for x in stages_for(p["kind"])).get(s["stage"], s["stage"])
+        # ---- tablero de etapas (numerado, en orden) ----
+        st.subheader("Pipeline · se ejecuta en este orden")
+        for i, s in enumerate(stages):
+            sname = stage_label(p["kind"], s["stage"])
             auto = dict((x[0], x[2]) for x in stages_for(p["kind"])).get(s["stage"], "?")
-            with st.expander(f"{stage_badge(s['status'])} {sname}  ·  `{auto}`"):
+            titulo = (f"**{i + 1}/{total}** {stage_badge(s['status'])} "
+                      f"{sname} · `{auto}` · {s['status']}")
+            with st.expander(titulo):
+                hint = STAGE_HINTS.get(s["stage"])
+                if hint:
+                    st.caption("💡 " + hint)
                 if s["log"]:
                     st.code(s["log"][-1500:], language="text")
                 arts = db.artifacts_of(s)
@@ -252,9 +296,10 @@ elif view == "🎬 Proyectos":
                 c1, c2, c3 = st.columns(3)
                 with c1:
                     if st.button("▶ Ejecutar", key=f"run{pid}{s['stage']}"):
-                        ok, log, arts = execute_stage(p, s["stage"])
-                        db.set_stage(conn, pid, s["stage"],
-                                     "ok" if ok else "fallo", log, arts)
+                        ok, log, arts2, sugg = execute_stage(p, s["stage"], gen_fn)
+                        apply_stage_result(pid, s["stage"], ok, log, arts2, sugg)
+                        if not ok:
+                            st.error(log)
                         rerun()
                 with c2:
                     if st.button("✔ Marcar hecho", key=f"man{pid}{s['stage']}"):
@@ -269,7 +314,7 @@ elif view == "🎬 Proyectos":
         # ---- puerta: guion ----
         st.subheader("🚪 Puerta 1 · Guion")
         gate = db.get_approval(conn, pid, "guion")
-        script_path = find_script(p)
+        script_path = pipeline.find_script(p)
         if script_path:
             text = Path(script_path).read_text(encoding="utf-8", errors="replace")
             words = count_words(text)
@@ -283,7 +328,7 @@ elif view == "🎬 Proyectos":
                 if st.button("✅ Aprobar guion"):
                     db.set_approval(conn, pid, "guion", "aprobado")
                     db.set_stage(conn, pid, "guion", "ok", "Guion aprobado por humano.")
-                    st.success("Guion aprobado.")
+                    st.success("Guion aprobado. Puedes seguir con «Correr todo».")
                     rerun()
             with g2:
                 if st.button("🔁 Pedir cambios"):
@@ -293,45 +338,36 @@ elif view == "🎬 Proyectos":
             with g3:
                 if st.button("🤖 Reescribir con crítica"):
                     try:
-                        with st.spinner("Crítico + reescritura..."):
-                            crit, _ = critic_review(
-                                make_generate_fn(p["model_backend"], p["model_id"] or model_id),
-                                text)
-                            new, _ = draft_script(
-                                make_generate_fn(p["model_backend"], p["model_id"] or model_id),
-                                p["title"], "", target_words=words)
+                        with st.spinner("Crítico + reescritura (puede tardar)..."):
+                            crit, _ = critic_review(gen_fn, text)
+                            new, used = draft_script(
+                                gen_fn, p["title"],
+                                pipeline.prompt_maestro() +
+                                "\n\nCRÍTICA A CORREGIR:\n" + crit,
+                                target_words=words)
+                        outp = pipeline.job_dir_of(p) / "GUION.md"
+                        outp.write_text(new, encoding="utf-8")
+                        db.set_approval(conn, pid, "guion", "pendiente")
+                        db.set_stage(conn, pid, "guion", "en-curso",
+                                     f"Reescrito con {used} tras crítica. "
+                                     "Pendiente tu aprobación.",
+                                     [str(outp)])
                         st.session_state["critic"] = crit
-                        st.success("Borrador regenerado (revísalo abajo).")
+                        st.success("Guion reescrito y guardado en GUION.md. "
+                                   "Revísalo y apruébalo.")
+                        rerun()
                     except Exception as e:
                         st.error(str(e))
             if "critic" in st.session_state:
                 with st.expander("Veredicto del crítico"):
                     st.text(st.session_state["critic"])
         else:
-            st.info("Sin guion todavía. Genéralo en la etapa 'guion'.")
-            if st.button("🤖 Generar borrador de guion"):
-                pm = (BASE / "PROMPT_MAESTRO.md").read_text(encoding="utf-8", errors="replace")
-                try:
-                    with st.spinner("Escribiendo..."):
-                        target = 150 if p["kind"] != "largo" else 1300
-                        txt, used = draft_script(
-                            make_generate_fn(p["model_backend"], p["model_id"] or model_id),
-                            p["title"], pm, target_words=target)
-                    out = script_out_path(p)
-                    out.parent.mkdir(parents=True, exist_ok=True)
-                    out.write_text(txt, encoding="utf-8")
-                    db.set_stage(conn, pid, "guion", "en-curso",
-                                 f"Borrador generado con {used}. Pendiente tu aprobación.",
-                                 [str(out)])
-                    st.success(f"Borrador guardado en {out}. Revísalo arriba.")
-                    rerun()
-                except Exception as e:
-                    st.error(str(e))
+            st.info("Sin guion todavía: pulsa «Correr todo» o ejecuta la etapa 3 (Guion).")
 
         # ---- puerta: miniatura ----
         st.subheader("🚪 Puerta 2 · Miniatura")
         mgate = db.get_approval(conn, pid, "miniatura")
-        thumbs = sorted((BASE / "thumbnails").glob(f"thumb_{pid}_*.png"))
+        thumbs = sorted(pipeline.thumbs_dir().glob(f"thumb_{pid}_*.png"))
         if thumbs:
             cols = st.columns(min(3, len(thumbs)))
             for i, th in enumerate(thumbs[:3]):
@@ -342,10 +378,11 @@ elif view == "🎬 Proyectos":
                 db.set_setting(conn, f"thumb_choice_{pid}", choice)
                 db.set_approval(conn, pid, "miniatura", "aprobado", choice)
                 db.set_stage(conn, pid, "miniatura", "ok", f"Elegida: {choice}")
-                st.success(f"Miniatura elegida: {choice}")
+                st.success(f"Miniatura elegida: {choice}. "
+                           "Ya puedes cerrar el paquete con «Correr todo».")
                 rerun()
         else:
-            st.info("Sin miniaturas. Ejecuta la etapa 'miniatura'.")
+            st.info("Sin miniaturas todavía: pulsa «Correr todo» o ejecuta la etapa 9 (Miniaturas).")
         st.caption(f"Estado puerta miniatura: {mgate['status']}")
 
         # ---- corto-recorte: herramienta ----
@@ -358,7 +395,7 @@ elif view == "🎬 Proyectos":
                                    [f"#{s['id']} {s['title']}" for s in largos])
                 src_id = int(src.split()[0][1:])
                 sp = db.get_project(conn, src_id)
-                vids = sorted(Path(sp["job_dir"]).glob("video/*.mp4")) if sp["job_dir"] else []
+                vids = sorted(pipeline.job_dir_of(sp).glob("video/*.mp4")) if sp["job_dir"] else []
                 vids += [BASE / "jobs/piloto/video/piloto_completo.mp4"]
                 vids = [v for v in vids if Path(v).exists()]
                 if vids:

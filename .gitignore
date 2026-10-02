@@ -13,6 +13,7 @@ panel.db-shm
 # Artefactos pesados de los jobs
 jobs/**/audio/
 jobs/**/video/
+jobs/**/media/
 *.mp4
 *.mov
 *.mkv

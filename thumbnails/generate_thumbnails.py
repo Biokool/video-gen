@@ -1,207 +1,457 @@
 #!/usr/bin/env python3
-"""Genera miniaturas 1280x720 para los proyectos del panel Zenn Factory.
+"""Genera miniaturas 1280x720 ILUSTRADAS para los proyectos del panel.
 
 Uso:
-    python generate_thumbnails.py            # todos los proyectos sin miniatura
+    python generate_thumbnails.py            # proyectos sin miniatura
     python generate_thumbnails.py <id>       # miniaturas del proyecto <id>
 
-Salida: <BASE>/thumbnails/thumb_<id>_<variante>.png  (a, b, c)
-Lee el titulo y el guion del proyecto en el SQLite del panel y pinta 3
-variantes de miniatura con Pillow. Lo invoca el panel desde la etapa
-"miniatura" (pipeline.run_thumbnails).
+Salida: thumb_<id>_a/b/c.png junto a este script.
+Diseño: texto corto y enorme a la izquierda + ilustración grande a la
+derecha (monigote + objeto del tema), estilo dibujado a mano (jitter).
+Los conceptos (texto/objeto) vienen de concepts_<id>.json si existe
+(lo escribe pipeline.run_thumbnails vía LLM); si no, heurística local.
 """
+import json
+import math
 import os
+import random
+import re
 import sqlite3
 import sys
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-HERE = Path(__file__).resolve().parent          # <panel>/thumbnails
-PANEL_DIR = HERE.parent                         # carpeta del panel (video-gen)
-BASE = PANEL_DIR.parent                         # raiz del proyecto (zenn-factory)
+HERE = Path(__file__).resolve().parent
 W, H = 1280, 720
-FONT_NAMES = ["segoeuib.ttf", "arialbd.ttf", "verdanab.ttf", "calibrib.ttf",
-              "segoeui.ttf", "arial.ttf", "verdana.ttf"]
-FONTS_DIR = Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts"
 
-STYLES = [
-    {"bg": (15, 18, 32), "fg": (255, 255, 255), "accent": (255, 197, 61),
-     "sub": (168, 176, 196), "label": "EL PORQUE"},
-    {"bg": (245, 241, 232), "fg": (20, 20, 20), "accent": (232, 68, 46),
-     "sub": (92, 88, 80), "label": "EL PORQUE"},
-    {"bg_top": (27, 16, 53), "bg_bottom": (74, 26, 97), "fg": (255, 255, 255),
-     "accent": (92, 225, 230), "sub": (205, 196, 228), "label": "EL PORQUE"},
-]
+WHITE = (255, 255, 255)
+BLACK = (17, 17, 17)
+YELLOW = (255, 199, 0)
+ORANGE = (255, 122, 0)
+RED = (230, 57, 70)
+TEAL = (42, 157, 143)
+BLUE = (64, 140, 255)
+GREEN = (74, 190, 110)
+PINK = (255, 170, 190)
+GOLD = (255, 190, 40)
+
+rng = random.Random(20261001)
 
 
-def find_db():
-    for c in (PANEL_DIR / "panel.db", HERE / "panel.db", BASE / "panel.db",
-              BASE / "video-gen" / "panel.db"):
+# ---------- fuente ----------
+def _font_file():
+    for c in (HERE / "fonts" / "GochiHand.ttf",
+              HERE.parent / "fonts" / "GochiHand.ttf",
+              HERE.parent.parent / "fonts" / "GochiHand.ttf"):
         if c.exists():
             return c
+    wd = Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts"
+    for n in ("segoeuib.ttf", "arialbd.ttf", "verdanab.ttf"):
+        if (wd / n).exists():
+            return wd / n
     return None
 
 
-def out_dir(db_path):
-    """Carpeta de salida: <raiz>/thumbnails (la que lee el panel)."""
-    return db_path.resolve().parent.parent / "thumbnails"
+FONT_FILE = _font_file()
 
 
-def load_font(size):
-    for name in FONT_NAMES:
-        p = FONTS_DIR / name
-        if p.exists():
-            try:
-                return ImageFont.truetype(str(p), size)
-            except OSError:
-                continue
-    return ImageFont.load_default()
+def font(size):
+    if FONT_FILE:
+        return ImageFont.truetype(str(FONT_FILE), size)
+    try:
+        return ImageFont.load_default(size)
+    except TypeError:
+        return ImageFont.load_default()
 
 
-def wrap_lines(draw, text, font, max_w):
+# ---------- primitivas dibujadas a mano ----------
+def jline(d, pts, width, fill):
+    out = []
+    for (x1, y1), (x2, y2) in zip(pts, pts[1:]):
+        n = max(2, int(math.hypot(x2 - x1, y2 - y1) / 7) + 1)
+        for i in range(n):
+            t = i / n
+            out.append((x1 + (x2 - x1) * t + rng.uniform(-2.4, 2.4),
+                        y1 + (y2 - y1) * t + rng.uniform(-2.4, 2.4)))
+    out.append(pts[-1])
+    d.line(out, fill=fill, width=width, joint="curve")
+
+
+def hcircle(d, cx, cy, r, width, fill, ry_scale=1.0):
+    pts = []
+    n = 56
+    for i in range(n + 1):
+        a = 2 * math.pi * i / n
+        rr = r * (1 + rng.uniform(-0.035, 0.035))
+        pts.append((cx + rr * math.cos(a), cy + rr * math.sin(a) * ry_scale))
+    d.line(pts, fill=fill, width=width, joint="curve")
+
+
+def hfill_circle(d, cx, cy, r, fill, outline, ow):
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=fill)
+    hcircle(d, cx, cy, r, ow, outline)
+
+
+def stick(d, x, y, s, pose="point", stroke=BLACK, lw=12):
+    """Monigote: x,y = pies; s = altura total."""
+    hr = s / 8.0
+    hcy = y - s + hr
+    shy = y - s * 0.70
+    hip = y - s * 0.40
+    hcircle(d, x, hcy, hr, lw, stroke)
+    if pose == "run":
+        shx = x + 0.06 * s
+        jline(d, [(shx, shy), (x, hip)], lw, stroke)
+        jline(d, [(shx, shy), (x + 0.24 * s, shy + 0.10 * s),
+                  (x + 0.32 * s, shy - 0.04 * s)], lw, stroke)
+        jline(d, [(shx, shy), (x - 0.18 * s, shy + 0.12 * s),
+                  (x - 0.30 * s, shy + 0.04 * s)], lw, stroke)
+        jline(d, [(x, hip), (x + 0.22 * s, hip + 0.22 * s),
+                  (x + 0.36 * s, y - 0.01 * s)], lw, stroke)
+        jline(d, [(x, hip), (x - 0.14 * s, hip + 0.20 * s),
+                  (x - 0.36 * s, y - 0.03 * s)], lw, stroke)
+    elif pose == "think":
+        jline(d, [(x, shy), (x, hip)], lw, stroke)
+        jline(d, [(x, shy), (x + 0.16 * s, shy + 0.20 * s),
+                  (x + 0.09 * s, hcy + hr * 0.9)], lw, stroke)
+        jline(d, [(x, shy), (x - 0.12 * s, shy + 0.24 * s)], lw, stroke)
+        jline(d, [(x, hip), (x - 0.10 * s, y)], lw, stroke)
+        jline(d, [(x, hip), (x + 0.12 * s, y)], lw, stroke)
+    else:  # point
+        jline(d, [(x, shy), (x, hip)], lw, stroke)
+        jline(d, [(x, shy), (x + 0.30 * s, shy - 0.10 * s),
+                  (x + 0.44 * s, shy - 0.12 * s)], lw, stroke)
+        jline(d, [(x, shy), (x - 0.12 * s, shy + 0.22 * s)], lw, stroke)
+        jline(d, [(x, hip), (x - 0.10 * s, y)], lw, stroke)
+        jline(d, [(x, hip), (x + 0.12 * s, y)], lw, stroke)
+    return (x, hcy, hr)
+
+
+# ---------- objetos del tema (props) ----------
+def prop_reloj(d, cx, cy, r, lw=11):
+    hfill_circle(d, cx - r * 0.78, cy - r * 0.98, r * 0.28, YELLOW, BLACK, lw)
+    hfill_circle(d, cx + r * 0.78, cy - r * 0.98, r * 0.28, YELLOW, BLACK, lw)
+    jline(d, [(cx - r * 0.58, cy - r * 0.82), (cx - r * 0.34, cy - r * 1.04)], lw, BLACK)
+    jline(d, [(cx + r * 0.58, cy - r * 0.82), (cx + r * 0.34, cy - r * 1.04)], lw, BLACK)
+    for sx in (-1, 1):
+        for i in range(2):
+            x0 = cx + sx * r * (1.05 + i * 0.22)
+            jline(d, [(x0, cy - r * 1.25), (x0 + sx * 22, cy - r * 1.45)], 8, ORANGE)
+    jline(d, [(cx - r * 0.5, cy + r * 0.85), (cx - r * 0.68, cy + r * 1.28)], lw, BLACK)
+    jline(d, [(cx + r * 0.5, cy + r * 0.85), (cx + r * 0.68, cy + r * 1.28)], lw, BLACK)
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=YELLOW)
+    hcircle(d, cx, cy, r, lw + 2, BLACK)
+    d.ellipse([cx - r * 0.78, cy - r * 0.78, cx + r * 0.78, cy + r * 0.78], fill=WHITE)
+    hcircle(d, cx, cy, r * 0.78, lw - 2, BLACK)
+    for ang in range(0, 360, 30):
+        a = math.radians(ang)
+        d.line([(cx + r * 0.68 * math.cos(a), cy + r * 0.68 * math.sin(a)),
+                (cx + r * 0.60 * math.cos(a), cy + r * 0.60 * math.sin(a))],
+               fill=BLACK, width=6)
+    jline(d, [(cx, cy), (cx - r * 0.35, cy - r * 0.30)], 10, BLACK)
+    jline(d, [(cx, cy), (cx + r * 0.15, cy - r * 0.55)], 10, BLACK)
+    d.ellipse([cx - 9, cy - 9, cx + 9, cy + 9], fill=BLACK)
+
+
+def prop_calendario(d, cx, cy, w, h, lw=10):
+    x, y = cx - w / 2, cy - h / 2
+    d.rectangle([x, y, x + w, y + h], fill=WHITE)
+    jline(d, [(x, y), (x + w, y), (x + w, y + h), (x, y + h), (x, y)], lw, BLACK)
+    strip = h * 0.18
+    d.rectangle([x, y, x + w, y + strip], fill=BLACK)
+    for rx in (x + w * 0.28, x + w * 0.72):
+        hfill_circle(d, rx, y + strip * 0.45, 12, WHITE, WHITE, 4)
+    top, bot = y + strip + 12, y + h - 14
+    left, right = x + 14, x + w - 14
+    cols, rows = 4, 3
+    for i in range(cols + 1):
+        xx = left + (right - left) * i / cols
+        d.line([(xx, top), (xx, bot)], fill=BLACK, width=4)
+    for j in range(rows + 1):
+        yy = top + (bot - top) * j / rows
+        d.line([(left, yy), (right, yy)], fill=BLACK, width=4)
+    ccx = left + (right - left) * 2.5 / cols
+    ccy = top + (bot - top) * 1.5 / rows
+    cw, chh = (right - left) / cols / 2 - 8, (bot - top) / rows / 2 - 8
+    d.rectangle([ccx - cw, ccy - chh, ccx + cw, ccy + chh], fill=RED)
+
+
+def prop_cerebro(d, cx, cy, r, lw=10):
+    d.ellipse([cx - r, cy - r * 0.92, cx + r, cy + r * 0.92], fill=PINK)
+    hcircle(d, cx, cy, r, lw, BLACK, ry_scale=0.92)
+    # pliegues: arcos internos con jitter
+    for (ox, oy, rr) in [(-0.42, -0.30, 0.34), (0.40, -0.34, 0.30),
+                         (-0.34, 0.34, 0.30), (0.42, 0.30, 0.34),
+                         (0.0, 0.0, 0.26)]:
+        hcircle(d, cx + ox * r, cy + oy * r, rr * r, 6, BLACK, ry_scale=0.7)
+    jline(d, [(cx, cy - r * 0.9), (cx, cy + r * 0.9)], 6, BLACK)
+
+
+def prop_tierra(d, cx, cy, r, lw=10):
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=BLUE)
+    for (ox, oy, rx, ry) in [(-0.35, -0.30, 0.34, 0.26), (0.30, -0.05, 0.28, 0.38),
+                             (0.05, 0.42, 0.36, 0.24), (-0.48, 0.28, 0.20, 0.18)]:
+        d.ellipse([cx + (ox - rx) * r, cy + (oy - ry) * r,
+                   cx + (ox + rx) * r, cy + (oy + ry) * r], fill=GREEN)
+    hcircle(d, cx, cy, r, lw, BLACK)
+
+
+def prop_cohete(d, cx, cy, s, lw=10):
+    # s = altura total
+    w = s * 0.42
+    top, bot = cy - s / 2, cy + s / 2
+    d.polygon([(cx - w / 2, bot - s * 0.22), (cx - w * 0.78, bot),
+               (cx - w / 2, bot)], fill=RED)
+    d.polygon([(cx + w / 2, bot - s * 0.22), (cx + w * 0.78, bot),
+               (cx + w / 2, bot)], fill=RED)
+    d.rectangle([cx - w / 2, top + s * 0.18, cx + w / 2, bot], fill=WHITE)
+    jline(d, [(cx - w / 2, top + s * 0.18), (cx - w / 2, bot),
+              (cx + w / 2, bot), (cx + w / 2, top + s * 0.18)], lw, BLACK)
+    d.polygon([(cx - w / 2, top + s * 0.18), (cx, top), (cx + w / 2, top + s * 0.18)],
+              fill=RED)
+    hfill_circle(d, cx, cy - s * 0.12, w * 0.26, BLUE, BLACK, 7)
+    for i, fx in enumerate((-0.12, 0.0, 0.12)):
+        jline(d, [(cx + fx * s, bot), (cx + fx * s * 1.4, bot + s * (0.16 + 0.05 * (i % 2)))],
+              9, ORANGE)
+    jline(d, [(cx - w / 2, bot), (cx + w / 2, bot)], lw, BLACK)
+
+
+def prop_bombilla(d, cx, cy, r, lw=10):
+    for ang in range(0, 360, 45):
+        a = math.radians(ang)
+        jline(d, [(cx + r * 1.18 * math.cos(a), cy + r * 1.18 * math.sin(a)),
+                  (cx + r * 1.42 * math.cos(a), cy + r * 1.42 * math.sin(a))],
+              8, ORANGE)
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=YELLOW)
+    hcircle(d, cx, cy, r, lw, BLACK)
+    d.rectangle([cx - r * 0.34, cy + r * 0.95, cx + r * 0.34, cy + r * 1.45],
+                fill=(150, 150, 150))
+    jline(d, [(cx - r * 0.34, cy + r * 0.95), (cx - r * 0.34, cy + r * 1.45),
+              (cx + r * 0.34, cy + r * 1.45), (cx + r * 0.34, cy + r * 0.95)],
+          7, BLACK)
+
+
+def prop_corazon(d, cx, cy, s, lw=10):
+    r = s * 0.30
+    d.ellipse([cx - s / 2, cy - s * 0.42, cx - s / 2 + 2 * r, cy - s * 0.42 + 2 * r],
+              fill=RED)
+    d.ellipse([cx + s / 2 - 2 * r, cy - s * 0.42, cx + s / 2, cy - s * 0.42 + 2 * r],
+              fill=RED)
+    d.polygon([(cx - s / 2 + 4, cy - s * 0.10), (cx + s / 2 - 4, cy - s * 0.10),
+               (cx, cy + s * 0.52)], fill=RED)
+    hcircle(d, cx - s / 2 + r, cy - s * 0.42 + r, r, lw, BLACK)
+    hcircle(d, cx + s / 2 - r, cy - s * 0.42 + r, r, lw, BLACK)
+    jline(d, [(cx - s / 2 + 4, cy - s * 0.10), (cx, cy + s * 0.52),
+              (cx + s / 2 - 4, cy - s * 0.10)], lw, BLACK)
+
+
+def prop_libro(d, cx, cy, w, h, lw=10):
+    x, y = cx - w / 2, cy - h / 2
+    d.rectangle([x, y, x + w, y + h], fill=RED)
+    jline(d, [(x, y), (x + w, y), (x + w, y + h), (x, y + h), (x, y)], lw, BLACK)
+    d.rectangle([x + 16, y + 16, x + w - 16, y + h - 16], fill=WHITE)
+    jline(d, [(x + 16, y + 16), (x + w - 16, y + 16), (x + w - 16, y + h - 16),
+              (x + 16, y + h - 16), (x + 16, y + 16)], 5, BLACK)
+    for i in range(4):
+        yy = y + 56 + i * (h - 110) / 3
+        jline(d, [(x + 44, yy), (x + w - 44, yy)], 6, BLACK)
+
+
+def prop_moneda(d, cx, cy, r, lw=10):
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=GOLD)
+    hcircle(d, cx, cy, r, lw, BLACK)
+    hcircle(d, cx, cy, r * 0.78, 6, BLACK)
+    d.text((cx, cy), "$", font=font(int(r * 1.15)), fill=BLACK, anchor="mm")
+
+
+def prop_pregunta(d, cx, cy, r, fg=RED):
+    hcircle(d, cx, cy, r, 12, fg)
+    d.text((cx, cy - r * 0.06), "?", font=font(int(r * 1.5)), fill=fg, anchor="mm")
+
+
+def prop_agujero(d, cx, cy, r):
+    """Hoyo negro: disco de acreción naranja + centro negro brillante."""
+    # estrellas
+    for (ox, oy) in [(-1.35, -0.85), (1.3, -0.65), (-1.15, 0.75),
+                     (1.4, 0.5), (0.15, -1.2), (-0.5, 1.15)]:
+        d.ellipse([cx + ox * r - 7, cy + oy * r - 7,
+                   cx + ox * r + 7, cy + oy * r + 7], fill=ORANGE)
+    box = [cx - r * 1.5, cy - r * 0.44, cx + r * 1.5, cy + r * 0.44]
+    d.ellipse(box, outline=ORANGE, width=30)
+    d.ellipse(box, outline=YELLOW, width=12)
+    # centro negro
+    d.ellipse([cx - r * 0.62, cy - r * 0.62, cx + r * 0.62, cy + r * 0.62],
+              fill=BLACK)
+    hcircle(d, cx, cy, r * 0.62, 8, YELLOW)
+    # arco frontal del disco (pasa POR DELANTE del centro)
+    d.arc(box, start=0, end=180, fill=ORANGE, width=30)
+    d.arc(box, start=0, end=180, fill=YELLOW, width=12)
+
+
+PROPS = {
+    "reloj": lambda d, cx, cy: prop_reloj(d, cx, cy, 150),
+    "calendario": lambda d, cx, cy: prop_calendario(d, cx, cy, 330, 300),
+    "cerebro": lambda d, cx, cy: prop_cerebro(d, cx, cy, 165),
+    "tierra": lambda d, cx, cy: prop_tierra(d, cx, cy, 165),
+    "cohete": lambda d, cx, cy: prop_cohete(d, cx, cy, 380),
+    "bombilla": lambda d, cx, cy: prop_bombilla(d, cx, cy, 130),
+    "corazon": lambda d, cx, cy: prop_corazon(d, cx, cy, 330),
+    "libro": lambda d, cx, cy: prop_libro(d, cx, cy, 300, 360),
+    "moneda": lambda d, cx, cy: prop_moneda(d, cx, cy, 160),
+    "pregunta": lambda d, cx, cy: prop_pregunta(d, cx, cy, 170),
+    "agujero": lambda d, cx, cy: prop_agujero(d, cx, cy, 165),
+}
+
+STYLES = [
+    {"bg": YELLOW, "fg": BLACK, "stroke": BLACK, "pose": "run"},
+    {"bg": BLACK, "fg": WHITE, "stroke": WHITE, "pose": "point"},
+    {"bg": WHITE, "fg": BLACK, "stroke": BLACK, "pose": "think"},
+]
+
+
+def wrap(draw, text, fnt, max_w):
     lines, cur = [], ""
     for word in text.split():
         cand = (cur + " " + word).strip()
-        if draw.textlength(cand, font=font) <= max_w:
+        if draw.textlength(cand, font=fnt) <= max_w or not cur:
             cur = cand
         else:
-            if cur:
-                lines.append(cur)
+            lines.append(cur)
             cur = word
     if cur:
         lines.append(cur)
     return lines
 
 
-def fit_font(draw, text, max_w, max_h, start=104, min_size=38, step=6):
+def fit_text(draw, text, max_w, max_h, start=170):
     size = start
-    while True:
-        font = load_font(size)
-        lines = wrap_lines(draw, text, font, max_w)
-        if len(lines) * size * 1.18 <= max_h or size <= min_size:
-            max_lines = max(1, int(max_h / (size * 1.18)))
-            if len(lines) > max_lines:
-                lines = lines[:max_lines]
-                while lines and draw.textlength(lines[-1] + "...", font=font) > max_w:
-                    lines[-1] = lines[-1][:-1]
-                if lines:
-                    lines[-1] += "..."
-            return font, lines, size
-        size -= step
+    while size >= 40:
+        f = font(size)
+        lines = wrap(draw, text, f, max_w)
+        if len(lines) * size * 1.12 <= max_h and len(lines) <= 3:
+            return f, lines, size
+        size -= 8
+    f = font(40)
+    return f, wrap(draw, text, f, max_w)[:3], 40
 
 
-def job_dir_for(row):
-    jd = row["job_dir"] or f"jobs/{row['id']}"
-    for c in (Path(jd), PANEL_DIR / jd, BASE / jd, HERE / jd):
-        if c.exists():
-            return c
-    return PANEL_DIR / jd
-
-
-def subtitle_for(job):
-    for name in ("GUION.md", "GUION_PILOTO.md", "guion.md"):
-        f = job / name
-        if f.exists():
-            text = f.read_text(encoding="utf-8", errors="replace")
-            for para in text.split("\n"):
-                para = para.strip()
-                if len(para) > 40:
-                    return para if len(para) <= 130 else para[:127] + "..."
-    return ""
-
-
-def gradient(top, bottom):
-    img = Image.new("RGB", (W, H))
+def render(concept, style, path, seed):
+    rng.seed(seed)
+    img = Image.new("RGB", (W, H), style["bg"])
     d = ImageDraw.Draw(img)
-    for y in range(H):
-        t = y / max(H - 1, 1)
-        d.line([(0, y), (W, y)], fill=tuple(
-            int(top[i] + (bottom[i] - top[i]) * t) for i in range(3)))
-    return img
-
-
-def render(title, subtitle, style, path):
-    if "bg_top" in style:
-        img = gradient(style["bg_top"], style["bg_bottom"])
-    else:
-        img = Image.new("RGB", (W, H), style["bg"])
-    d = ImageDraw.Draw(img, "RGBA")
-
-    acc = style["accent"]
-    d.rectangle([0, 0, 18, H], fill=acc)
-    d.rectangle([0, 0, W, 8], fill=acc)
-    d.ellipse([W - 300, -140, W + 140, 300], fill=acc + (36,))
-    d.ellipse([W - 210, H - 190, W + 60, H + 80], fill=acc + (26,))
-
-    label_font = load_font(30)
-    d.text((64, 54), style["label"], font=label_font, fill=acc)
-    d.text((64 + d.textlength(style["label"], font=label_font) + 18, 60),
-           "·  video nuevo", font=load_font(24), fill=style["sub"])
-
-    top, bottom = 140, H - (170 if subtitle else 110)
-    font, lines, size = fit_font(d, title, W - 160, bottom - top)
-    line_h = size * 1.18
-    y = top + ((bottom - top) - len(lines) * line_h) / 2
+    fg, stroke = style["fg"], style["stroke"]
+    # suelo
+    jline(d, [(690, 648), (1245, 648)], 8, stroke)
+    # monigote señalando al objeto
+    stick(d, 790, 648, 330, pose=style["pose"], stroke=stroke)
+    # objeto del tema, grande
+    PROPS.get(concept.get("prop", "pregunta"),
+              PROPS["pregunta"])(d, 1085, 325)
+    # texto enorme a la izquierda
+    f, lines, size = fit_text(d, concept["text"].upper(), 560, 430)
+    y = 150 + (430 - len(lines) * size * 1.12) / 2
     for ln in lines:
-        d.text((80, y), ln, font=font, fill=style["fg"])
-        y += line_h
-
-    if subtitle:
-        sfont = load_font(30)
-        slines = wrap_lines(d, subtitle, sfont, W - 200)[:2]
-        sy = H - 118
-        d.rectangle([80, sy - 22, 88, sy + 10], fill=acc)
-        for i, sl in enumerate(slines):
-            d.text((108, sy + i * 36), sl, font=sfont, fill=style["sub"])
-
+        d.text((64, y), ln, font=f, fill=fg,
+               stroke_width=2, stroke_fill=fg)
+        y += size * 1.12
+    # marca del canal
+    d.text((64, H - 62), "EL PORQUÉ", font=font(40), fill=fg,
+           stroke_width=1, stroke_fill=fg)
     img.save(path, "PNG")
     return path
 
 
-def projects(db_path, wanted=None):
+# ---------- conceptos (fallback sin LLM) ----------
+_KEYWORD_PROPS = [
+    (("hoyo negro", "agujero negro", "agujero"), "agujero"),
+    (("tiempo", "reloj", "edad", "envejec"), "reloj"),
+    (("calendario", "año", "mes"), "calendario"),
+    (("cerebro", "mente", "memoria", "sueño"), "cerebro"),
+    (("tierra", "planeta", "clima", "océano"), "tierra"),
+    (("espacio", "luna", "marte", "universo"), "cohete"),
+    (("idea", "luz", "invento"), "bombilla"),
+    (("salud", "corazón", "cuerpo"), "corazon"),
+    (("historia", "libro", "antigu"), "libro"),
+    (("dinero", "precio", "cuesta"), "moneda"),
+]
+
+
+_STOPWORDS = {"qué", "que", "cómo", "como", "por", "si", "pasaría", "pasaria",
+              "en", "un", "una", "el", "la", "los", "las", "de", "del", "al",
+              "a", "y", "o", "es", "son", "cuándo", "cuando", "dónde", "donde"}
+
+
+def fallback_concepts(title):
+    t = title.lower()
+    prop = "pregunta"
+    for keys, name in _KEYWORD_PROPS:
+        if any(k in t for k in keys):
+            prop = name
+            break
+    clean = re.sub(r"[¿?¡!]", " ", title).lower().strip()
+    clean = re.sub(r"^(por qué|porque)\s+", "", clean)
+    words = [w for w in clean.split() if w not in _STOPWORDS] or clean.split()
+    text = " ".join(words[:5]).upper() or "EL PORQUÉ"
+    return [{"text": text, "prop": prop},
+            {"text": text, "prop": "pregunta"},
+            {"text": text, "prop": prop}]
+
+
+def find_db():
+    for c in (HERE.parent / "panel.db", HERE.parent / "panel" / "panel.db",
+              HERE / "panel.db"):
+        if c.exists():
+            return c
+    return None
+
+
+def project_title(db_path, pid):
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
-    rows = conn.execute(
-        "SELECT id, title, job_dir FROM projects ORDER BY created_at DESC"
-    ).fetchall()
+    row = conn.execute("SELECT title FROM projects WHERE id=?", (pid,)).fetchone()
     conn.close()
-    if wanted is not None:
-        return [r for r in rows if r["id"] == wanted]
-    return rows
+    return row["title"] if row else ""
+
+
+def all_project_ids(db_path):
+    conn = sqlite3.connect(str(db_path))
+    rows = conn.execute("SELECT id FROM projects ORDER BY id").fetchall()
+    conn.close()
+    return [r[0] for r in rows]
 
 
 def main():
-    db_path = find_db()
-    if not db_path:
-        print("No encuentro el panel.db del panel (video-gen/panel.db).", file=sys.stderr)
-        return 1
-
     wanted = int(sys.argv[1]) if len(sys.argv) > 1 else None
-    outdir = out_dir(db_path)
-    outdir.mkdir(parents=True, exist_ok=True)
-    rows = projects(db_path, wanted)
-    if wanted is not None and not rows:
-        print(f"No existe el proyecto #{wanted}.", file=sys.stderr)
-        return 1
-    if not rows:
-        print("Sin proyectos: nada que generar.")
-        return 0
-
+    db_path = find_db()
     if wanted is None:
-        pendientes = [r for r in rows
-                      if not list(outdir.glob(f"thumb_{r['id']}_*.png"))]
-        rows = pendientes or rows[:1]
-
-    for r in rows:
-        for old in outdir.glob(f"thumb_{r['id']}_*.png"):
+        if not db_path:
+            print("Sin panel.db y sin id: nada que generar.", file=sys.stderr)
+            return 1
+        ids = [i for i in all_project_ids(db_path)
+               if not list(HERE.glob(f"thumb_{i}_*.png"))]
+        ids = ids or all_project_ids(db_path)[:1]
+    else:
+        ids = [wanted]
+    for pid in ids:
+        cfile = HERE / f"concepts_{pid}.json"
+        concepts = None
+        if cfile.exists():
+            try:
+                concepts = json.loads(cfile.read_text(encoding="utf-8"))
+            except Exception:
+                concepts = None
+        if not concepts:
+            title = project_title(db_path, pid) if db_path else ""
+            concepts = fallback_concepts(title or "El Porqué")
+        for old in HERE.glob(f"thumb_{pid}_*.png"):
             old.unlink()
-        title = r["title"].strip() or "Video sin titulo"
-        sub = subtitle_for(job_dir_for(r))
-        for style, suffix in zip(STYLES, ("a", "b", "c")):
-            out = outdir / f"thumb_{r['id']}_{suffix}.png"
-            render(title, sub, style, out)
-        print(f"Proyecto #{r['id']}: 3 miniaturas -> {outdir}")
+        for style, suffix, concept in zip(STYLES, ("a", "b", "c"), concepts):
+            out = HERE / f"thumb_{pid}_{suffix}.png"
+            render(concept, style, out, seed=20261001 + pid * 10 + ord(suffix))
+            kb = out.stat().st_size / 1024
+            print(f"{out.name}: 1280x720, {kb:.0f} KB "
+                  f"[texto='{concept['text']}' objeto={concept['prop']}]")
     return 0
 
 
