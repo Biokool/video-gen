@@ -100,8 +100,8 @@ def execute_stage(p, stage):
             arts = [str(a) for a in (job / "audio").glob("*.mp3")] if ok else []
             return ok, log, arts
         if stage == "miniatura":
-            ok, log = run_thumbnails()
-            arts = [str(a) for a in (BASE / "thumbnails").glob("thumb_*.png")]
+            ok, log = run_thumbnails(pid)
+            arts = [str(a) for a in (BASE / "thumbnails").glob(f"thumb_{pid}_*.png")]
             return ok, log, arts
         if stage == "verificacion":
             sp = find_script(p)
@@ -331,7 +331,7 @@ elif view == "🎬 Proyectos":
         # ---- puerta: miniatura ----
         st.subheader("🚪 Puerta 2 · Miniatura")
         mgate = db.get_approval(conn, pid, "miniatura")
-        thumbs = sorted((BASE / "thumbnails").glob("thumb_*.png"))
+        thumbs = sorted((BASE / "thumbnails").glob(f"thumb_{pid}_*.png"))
         if thumbs:
             cols = st.columns(min(3, len(thumbs)))
             for i, th in enumerate(thumbs[:3]):

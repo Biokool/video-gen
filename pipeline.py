@@ -116,8 +116,19 @@ def run_tts(job_dir, voice="avocado_v2:MAI_01", language="es"):
 
 
 # ---------- miniaturas (automático) ----------
-def run_thumbnails():
-    return run(["python3", "thumbnails/generate_thumbnails.py"], timeout=300)
+def run_thumbnails(project_id=None):
+    """Genera miniaturas 1280x720 en BASE/thumbnails con el Python del panel."""
+    import sys
+    here = Path(__file__).resolve().parent
+    script = next((s for s in (here / "thumbnails" / "generate_thumbnails.py",
+                               BASE / "thumbnails" / "generate_thumbnails.py")
+                   if s.exists()), None)
+    if script is None:
+        return False, "No encuentro thumbnails/generate_thumbnails.py."
+    cmd = [sys.executable, str(script)]
+    if project_id:
+        cmd.append(str(project_id))
+    return run(cmd, cwd=BASE, timeout=300)
 
 
 # ---------- recorte vertical para shorts (automático) ----------
