@@ -72,11 +72,10 @@ if errorlevel 1 (
     echo [3/3] ffmpeg OK
 )
 
-curl -s -m 2 http://localhost:11434/api/tags >nul 2>nul
-if errorlevel 1 (
-    echo       INFO: Ollama no responde en localhost:11434  ^(opcional, modelos locales^).
+if exist "%~dp0ARRANCAR_OLLAMA.bat" (
+    call "%~dp0ARRANCAR_OLLAMA.bat"
 ) else (
-    echo       Ollama OK
+    echo       INFO: sin ARRANCAR_OLLAMA.bat  ^(opcional, modelos locales^).
 )
 
 echo.

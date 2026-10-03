@@ -69,6 +69,30 @@ Orden de preferencia del router (con fallback automático en cadena):
   escenas Manim, tus mejores locales son `qwen3.6` y
   `video-factory-qwen`.
 
+### Modelos locales instalados (validados 2026-10-02)
+
+Lánzalos con **`ARRANCAR_OLLAMA.bat`** (o desde `INICIAR.bat`, que lo
+llama solo): fuerza `OLLAMA_LLM_LIBRARY=cpu`, porque el driver NVIDIA
+546.29 de 2023 no compila el PTX de los builds CUDA actuales →
+*"PTX JIT compilation failed"* y **ningún modelo arranca**. Con driver
+560+ puedes borrar esas dos líneas y usar la GTX 1050.
+
+| Modelo | Peso | Generación | Para qué sirve |
+|---|---|---|---|
+| `qwen3.5:4b` | 3,2 GB (4,7B) | ~5,9 tok/s | el más rápido: borradores, ideas, resúmenes |
+| `gemma4:e4b` / `gemma4` | 8,9 GB (8B) | ~5,3–5,8 tok/s | guiones y texto general (buena calidad ES) |
+| `gemma-test` | 8,9 GB (8B) | ~5,8 tok/s | alias de prueba de gemma4 |
+| `gemma4:12b` | 7,0 GB (11,9B) | ~2,3 tok/s | mejor calidad, pero lento |
+| `qwen3.6` | 22,3 GB (36B MoE) | ~3,6 tok/s (+78 s de carga) | escenas Manim; solo para llamadas puntuales |
+| `video-factory-qwen` | 8,9 GB (8B) | ~5,6 tok/s | fine-tune: devuelve JSON `scene_description`/`narration`, **no** texto libre |
+| `nomic-embed-text` | 0,3 GB | — | embeddings; no aparece en el combo |
+
+Cómo usarlos desde la app: **sidebar 🎛 Modelo → Backend «Ollama ·
+local» → Modelo** (el combo lista lo instalado, menos embeddings) →
+«Guardar como predeterminado» → «Correr todo». El panel les pide
+`think: false`: sin eso los modelos híbridos (qwen3.x/gemma4) se
+piensen la respuesta entera y `content` vuelve vacío.
+
 ## 3. Voces: que suene humano (y hombre o mujer)
 
 La voz del proyecto es un *spec* `motor:voz`, elegido en
