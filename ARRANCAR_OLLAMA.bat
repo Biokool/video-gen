@@ -15,7 +15,7 @@ if not errorlevel 1 (
     echo Ollama ya esta corriendo en localhost:11434
     echo Si los modelos fallan con "PTX JIT compilation failed", cierra
     echo el Ollama actual y vuelve a lanzar este .bat.
-    goto end_ok
+    exit /b 0
 )
 
 echo Arrancando Ollama en modo CPU (el primer modelo tarda en cargar)...
@@ -29,11 +29,11 @@ if not errorlevel 1 goto ready
 set /a intentos+=1
 if %intentos% lss 20 goto wait
 echo AVISO: Ollama no respondio en 40s. Revisa que "ollama" este en el PATH.
-goto end_ok
+exit /b 0
 
 :ready
 echo Listo: los modelos locales ya se pueden elegir en el panel
 echo   (sidebar Modelo ^> Backend ^> Ollama - local).
 
-:end_ok
 endlocal
+exit /b 0
