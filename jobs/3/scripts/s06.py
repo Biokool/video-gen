@@ -3,60 +3,73 @@ from zenn_rig import *
 
 class S06(Scene):
     def construct(self):
-        # VOZ: Pero en 1970, Vera Rubin observó algo que no encajaba.
-        # VISUAL: clock_montage
-        # El error "AttributeError: 'tuple' object has no attribute 'shift'"
-        # indica que 'clock_montage' devuelve una tupla de Mobjects, no un solo Mobject (como un VGroup).
-        # Para aplicar .shift(), necesitamos agrupar los Mobjects de la tupla en un VGroup.
-        clock_obj = VGroup(*clock_montage(radius=1.8)).shift(UP*0.5)
-        self.play(Create(clock_obj))
-        self.wait(1)
-
-        c1970 = callout("1970", color=YELLOW).to_edge(UP)
-        self.play(FadeOut(clock_obj), FadeIn(c1970))
-        self.wait(1)
-
-        vera = stick_idle(pos=LEFT*4, height=2.2)
-        self.play(FadeOut(c1970), Create(vera))
-        self.wait(1)
-
-        # VOZ: Midó la velocidad de las estrellas en las galaxias y descubrió que las del borde giraban tan rápido como las del centro.
-        # Create a simple galaxy representation
-        galaxy_center = Dot(ORIGIN, color=WHITE, radius=0.1)
-        galaxy_disk = Circle(radius=1.5, color=TEAL, fill_opacity=0.2)
-        star_inner = Dot(0.5*RIGHT, color=YELLOW)
-        star_outer = Dot(1.5*RIGHT, color=YELLOW)
+        self.add(fondo(INK))
         
-        galaxy = VGroup(galaxy_center, galaxy_disk, star_inner, star_outer).shift(RIGHT*2)
+        # Renombrar la variable para evitar conflicto con la función 'estrellas'
+        grupo_estrellas = estrellas(20)
+        self.add(grupo_estrellas)
         
-        self.play(Create(galaxy))
-        self.play(stick_point(vera, galaxy_disk))
-        self.wait(1.5)
-
-        # VOZ: La curva de rotación era plana, no descendente.
-        # Represent speeds with arrows of equal length
-        arrow_inner = Arrow(star_inner.get_center(), star_inner.get_center() + UP*0.5, color=RED, buff=0)
-        arrow_outer = Arrow(star_outer.get_center(), star_outer.get_center() + UP*0.5, color=RED, buff=0)
+        # Renombrar la variable 'luna' a 'luna_obj' para evitar conflicto con la función 'luna'
+        luna_obj = luna(pos=UP * 3 + RIGHT * 4, radio=0.5, bg=INK)
+        self.play(FadeIn(luna_obj), run_time=1.0)
         
-        self.play(Create(arrow_inner), Create(arrow_outer))
-        self.wait(1.5)
-
-        flat_curve_text = callout("Velocidad Constante", color=ORANGE, font_size=72).to_edge(DOWN)
-        self.play(FadeIn(flat_curve_text))
-        self.wait(2.5) # Increased wait for narration
-        self.play(FadeOut(flat_curve_text), FadeOut(arrow_inner), FadeOut(arrow_outer))
-
-        # VOZ: Para que esto funcione, debe haber mucha más masa en la galaxia de la que podemos ver.
-        # Esa masa adicional forma un halo invisible que abarca toda la galaxia y más allá.
-        # Represent the invisible halo
-        halo = Circle(radius=3.0, color=INK, fill_opacity=0.1, stroke_opacity=0.5).move_to(galaxy.get_center())
-        self.play(Create(halo))
-
-        dark_matter_text = callout("Halo Invisible", color=YELLOW, font_size=72).to_edge(UP)
-        self.play(FadeIn(dark_matter_text))
-        self.wait(3.5) # Increased wait for narration
-        self.play(FadeOut(dark_matter_text))
-
-        # Clean up
-        self.play(FadeOut(vera), FadeOut(galaxy), FadeOut(halo))
+        titulo = Text("1970: La Curva de Rotación", color=WHITE, font_size=56)
+        self.play(FadeIn(titulo), run_time=1.0)
+        self.wait(1.0)
+        self.play(FadeOut(titulo), run_time=0.5)
+        
+        fig = stick_idle(pos=LEFT * 3, height=2.2, color=WHITE)
+        self.play(FadeIn(fig), run_time=1.0)
+        expresion(fig, "preocupado")
+        
+        planeta = planeta(pos=ORIGIN, radio=1.5, color=YELLOW)
+        self.play(FadeIn(planeta), run_time=1.5)
+        
+        halo = VGroup(
+            Circle(radius=2.5, color=ORANGE, stroke_width=2, stroke_opacity=0.5),
+            Circle(radius=3.5, color=ORANGE, stroke_width=2, stroke_opacity=0.3),
+            Circle(radius=4.5, color=ORANGE, stroke_width=2, stroke_opacity=0.15)
+        ).move_to(planeta)
+        self.play(FadeIn(halo), run_time=2.0)
+        
+        curva = curva(pos=RIGHT * 2 + DOWN * 2, ancho=3, alto=2)
+        self.play(FadeIn(curva), run_time=1.5)
+        
+        callout1 = callout("Velocidad constante", color=ORANGE, font_size=48)
+        callout1.move_to(UP * 2 + RIGHT * 1)
+        self.play(FadeIn(callout1), run_time=1.0)
+        self.wait(1.0)
+        
+        self.play(FadeOut(callout1), run_time=0.5)
+        
+        stick_point(fig, planeta)
+        self.wait(1.0)
+        
+        callout2 = callout("Masa invisible", color=YELLOW, font_size=48)
+        callout2.move_to(DOWN * 2 + LEFT * 2)
+        self.play(FadeIn(callout2), run_time=1.0)
+        self.wait(1.0)
+        
+        reloj = clock_montage(radius=1.0)
+        reloj.move_to(UP * 2.5 + LEFT * 3)
+        self.play(FadeIn(reloj), run_time=1.5)
+        self.wait(2.0)
+        
+        self.play(FadeOut(callout2), FadeOut(reloj), run_time=1.0)
+        
+        callout3 = callout("Halo de materia oscura", color=ORANGE, font_size=48)
+        callout3.move_to(DOWN * 2.5)
+        self.play(FadeIn(callout3), run_time=1.0)
+        self.wait(2.0)
+        
+        self.play(
+            FadeOut(callout3), 
+            FadeOut(halo), 
+            FadeOut(curva), 
+            FadeOut(planeta), 
+            FadeOut(fig), 
+            FadeOut(luna_obj), 
+            FadeOut(grupo_estrellas), 
+            run_time=1.5
+        )
         self.wait(0.5)

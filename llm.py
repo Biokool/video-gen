@@ -27,6 +27,8 @@ Nada aquí garantiza un guion "perfecto": la calidad sale del proceso
 Sin dependencias extra: todo va por urllib (REST directo).
 """
 import json
+import re
+import time
 import urllib.request
 import urllib.error
 
@@ -186,18 +188,61 @@ def _ollama_generate(model, prompt, system=""):
         "prompt": prompt,
         "system": system,
         "stream": False,
+        # Modelos híbridos (qwen3.x/gemma4): sin esto se "piensen" la
+        # respuesta entera en el canal de razonamiento y content sale vacío.
+        "think": False,
         "options": {"temperature": 0.7, "num_ctx": 8192},
     }
     try:
         out = _post_json(f"{OLLAMA_URL}/api/generate", payload, timeout=600)
     except LLMError as e:
-        raise LLMError(f"Ollama no responde en {OLLAMA_URL} ({e}). "
-                       "¿Está corriendo `ollama serve`?")
-    return (out.get("response") or "").strip()
+        if "think" not in str(e).lower():
+            raise LLMError(f"Ollama no responde en {OLLAMA_URL} ({e}). "
+                           "¿Está corriendo `ollama serve`?")
+        payload.pop("think", None)   # modelo sin modo razonamiento
+        try:
+            out = _post_json(f"{OLLAMA_URL}/api/generate", payload,
+                             timeout=600)
+        except LLMError as e2:
+            raise LLMError(f"Ollama no responde en {OLLAMA_URL} ({e2}). "
+                           "¿Está corriendo `ollama serve`?")
+    text = (out.get("response") or "").strip()
+    if not text and out.get("thinking"):
+        raise LLMError("El modelo local solo devolvió razonamiento "
+                       "(vacío). Elige otro modelo o ponlo en modo no "
+                       "pensante.")
+    return text
+
+
+# Límite de salida por minuto (OTPM) de Groq: pedir más de 1.000 tokens
+# de golpe devuelve 400 aunque el modelo lo necesite. El resto de backends
+# usan el máximo por defecto.
+MAX_TOKENS = {"groq": 950}
+
+
+def _is_rate_limit(msg):
+    m = (msg or "").lower()
+    if "too large for model" in m:
+        return False   # error duro de cuota: reintentar no arregla nada
+    return ("rate limit" in m or "too many requests" in m or
+            " 429" in m or "output tokens per minute" in m or
+            "requests per minute" in m)
+
+
+def _rate_wait(msg, default=30.0):
+    """Segundos que el proveedor pide esperar (o el default)."""
+    m = re.search(r"(?:try again in|in)\s+(\d+(?:\.\d+)?)s", msg or "")
+    if m:
+        return min(float(m.group(1)) + 2.0, 120.0)
+    m = re.search(r"retry in (\d+(?:\.\d+)?)", msg or "")
+    if m:
+        return min(float(m.group(1)) + 2.0, 120.0)
+    return default
 
 
 # ---------- openai-compatible (groq / cerebras / mistral) ----------
-def _openai_chat(base, api_key, model, prompt, system=""):
+def _openai_chat(base, api_key, model, prompt, system="",
+                 max_tokens=8192):
     messages = []
     if system:
         messages.append({"role": "system", "content": system})
@@ -205,7 +250,7 @@ def _openai_chat(base, api_key, model, prompt, system=""):
     out = _post_json(
         f"{base}/chat/completions",
         {"model": model, "messages": messages,
-         "temperature": 0.7, "max_tokens": 8192},
+         "temperature": 0.7, "max_tokens": max_tokens},
         headers={"Content-Type": "application/json",
                  "Authorization": f"Bearer {api_key}"},
     )
@@ -353,24 +398,32 @@ def generate(prompt, backend="gemini", model="", system="", keys=None,
             f"'{BACKENDS[backend]['label']}'. Ponla en Configuración.")
 
     chain = resolve_chain(backend, model, keys)
+    max_tokens = MAX_TOKENS.get(backend, 8192)
     errors = []
     for m in chain:
-        try:
-            if backend == "gemini":
-                text = _gemini_generate(key, m, prompt, system)
-            elif backend == "cohere":
-                text = _cohere_chat(key, m, prompt, system)
-            elif backend == "openrouter":
-                text = _openrouter_generate(m, prompt, system, key)
-            else:  # groq, cerebras, mistral, tokenharbor, freellmapi,
-                    # deepseek
-                text = _openai_chat(_base(backend, keys), key, m,
-                                    prompt, system)
-            if not text:
-                raise LLMError("respuesta vacía")
-            return text, m
-        except LLMError as e:
-            errors.append(f"{m}: {e}")
+        for attempt in range(3):  # 3 intentos si el proveedor pide esperar
+            try:
+                if backend == "gemini":
+                    text = _gemini_generate(key, m, prompt, system)
+                elif backend == "cohere":
+                    text = _cohere_chat(key, m, prompt, system)
+                elif backend == "openrouter":
+                    text = _openrouter_generate(m, prompt, system, key)
+                else:  # groq, cerebras, mistral, tokenharbor, freellmapi,
+                        # deepseek
+                    text = _openai_chat(_base(backend, keys), key, m,
+                                        prompt, system,
+                                        max_tokens=max_tokens)
+                if not text:
+                    raise LLMError("respuesta vacía")
+                return text, m
+            except LLMError as e:
+                if _is_rate_limit(str(e)) and attempt < 2:
+                    wait = _rate_wait(str(e))
+                    time.sleep(wait)   # cuota por minuto: se libera sola
+                    continue
+                errors.append(f"{m}: {e}")
+                break
     raise LLMError(f"Ningún modelo de '{backend}' respondió.\n" +
                    "\n".join(errors))
 
