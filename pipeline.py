@@ -520,12 +520,39 @@ Reglas de calidad visual:
 Devuelve SOLO el código, sin explicaciones ni ```."""
 
 FIX_PROMPT = """Este código Manim falló al renderizar. Corrígelo y devuelve el archivo COMPLETO, solo código.
+Respeta al carácter las firmas REALES del rig: si un parámetro no aparece ahí, no existe (inventarlo vuelve a fallar).
+
+{rig}
 
 ERROR:
 {error}
 
 CÓDIGO:
 {code}"""
+
+
+def _rig_api_text(rig_file=None):
+    """RIG_API + firmas reales del rig, para que el modelo no invente kwargs."""
+    sigs = []
+    try:
+        p = Path(rig_file) if rig_file else None
+        if p and p.exists():
+            import ast
+            tree = ast.parse(p.read_text(encoding="utf-8", errors="replace"))
+            for node in tree.body:
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) \
+                        and not node.name.startswith("_"):
+                    try:
+                        sigs.append(f"{node.name}({ast.unparse(node.args)})")
+                    except Exception:
+                        pass
+    except Exception:
+        sigs = []
+    if not sigs:
+        return RIG_API
+    bloque = ("Firmas REALES del rig (respétalas; NO inventes parámetros):\n"
+              + "\n".join("- " + s for s in sigs) + "\n\n")
+    return bloque + RIG_API
 
 
 def _probe_duration(path):
@@ -598,6 +625,7 @@ def run_animacion(generate_fn, p, job):
     vdir = job / "video" / "scenes"
     vdir.mkdir(parents=True, exist_ok=True)
     media = job / "media"
+    rig_text = _rig_api_text(sdir / "zenn_rig.py")
 
     logs, arts, fallos = [], [], []
     for sc in scenes:
@@ -615,14 +643,15 @@ def run_animacion(generate_fn, p, job):
             try:
                 if intento == 0:
                     prompt = SCENE_PROMPT.format(
-                        cls=cls, rig=RIG_API, sid=cls, voz=sc["voz"],
+                        cls=cls, rig=rig_text, sid=cls, voz=sc["voz"],
                         visual=sc["visual"] or sc["voz"][:80], secs=secs)
                     code, _ = generate_fn(
                         prompt, system="Eres programador experto en Manim. "
                                        "Devuelves solo código Python válido.")
                 else:
                     fixed, _ = generate_fn(
-                        FIX_PROMPT.format(error=err[-1500:], code=code),
+                        FIX_PROMPT.format(error=err[-1500:], code=code,
+                                          rig=rig_text),
                         system="Eres programador experto en Manim. "
                                "Devuelves solo código Python válido.")
                     code = fixed

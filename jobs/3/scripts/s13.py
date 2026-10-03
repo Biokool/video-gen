@@ -1,93 +1,54 @@
+from manim import *
 from zenn_rig import *
 
 class S13(Scene):
     def construct(self):
-        rig = Rig(self)
+        # Fondo espacial/nocturno para dar contexto cósmico
+        self.add(fondo(INK))
         
-        # Fondo espacial oscuro
-        fondo_rect = Rectangle(
-            width=14.22, 
-            height=8, 
-            color=BLACK, 
-            fill_opacity=1
-        )
-        self.add(fondo_rect)
+        # Elementos de fondo: estrellas y luna
+        stars = estrellas(50)
+        moon = luna(UP * 3 + RIGHT * 4, 0.8, INK)
+        self.play(FadeIn(stars), FadeIn(moon))
+
+        # Crear el monigote principal (astrónomo observador)
+        fig = stick_idle(RIGHT * 3, height=2.5, color=WHITE)
+        cara = expresion(fig, "preocupado") # Dudando/sorprendido ante lo invisible
+        
+        # Añadir props: un telescopio o indicador de luz
+        telescope = curva(LEFT * 2 + DOWN * 1, 1, 0.5) # Representación abstracta del telescopio
+        telescope.set_color(YELLOW)
+        
+        self.play(FadeIn(fig), FadeIn(cara))
         self.wait(0.5)
+
+        # Narración: "La gravedad curva el espacio"
+        # Visualizamos la trayectoria de la luz doblándose
+        straight_arrow = arrow(LEFT * 5 + UP * 2, LEFT * 1 + UP * 2, color=YELLOW)
         
-        # Estrellas de fondo
-        stars = VGroup()
-        for _ in range(15):
-            dot = Dot(
-                point=random.uniform(-7, 7) * RIGHT + random.uniform(-4, 4) * UP,
-                radius=0.02,
-                color=WHITE,
-                opacity=0.8
-            )
-            stars.add(dot)
-        self.play(FadeIn(stars, run_time=1.0))
+        # Objeto masivo (agujero negro o galaxia) en el centro
+        # Corrección: Usar Circle para representar el objeto masivo ya que 'esfera' no está definido en el rig estándar/Manim básico
+        mass_obj = Circle(radius=1, color=RED)
+        mass_accent = red_accent(mass_obj)
+
+        self.play(FadeIn(straight_arrow))
+        self.wait(0.5)
+
+        # Efecto de curvatura: la flecha cambia de dirección al pasar cerca del objeto masivo
+        # Como no tenemos CurvedPath explícito en el rig, usaremos una transformación visual simple
+        # Dibujamos una flecha curva manualmente con líneas si fuera necesario, 
+        # pero usaremos callout para reforzar la idea de "gravedad" y "espacio".
         
-        # Monigote con expresión de sorpresa usando rig
-        fig = rig.get_character("stick_idle")
-        fig.move_to(LEFT * 5)
-        self.play(FadeIn(fig, run_time=0.8))
+        self.play(Transform(straight_arrow, arrow(LEFT * 5 + UP * 2, LEFT * 1 + DOWN * 2, color=YELLOW))) # Curvatura simulada
         
-        # Galaxia lejana usando rig
-        galaxia = rig.get_prop("galaxy")
-        galaxia.move_to(RIGHT * 5 + UP * 1)
-        self.play(FadeIn(galaxia, run_time=1.0))
+        # Callout clave: "GRAVEDAD CURVA EL ESPACIO"
+        callout_text = callout("ESPACIO CURVO", TEAL)
+        self.play(FadeIn(callout_text))
         
-        # Objeto masivo usando rig
-        objeto_masivo = rig.get_prop("sun")
-        objeto_masivo.move_to(ORIGIN)
-        self.play(FadeIn(objeto_masivo, run_time=1.0))
+        # El monigote reacciona
+        stick_think(fig, "?")
+        self.wait(2)
         
-        # Trayectoria recta de la luz
-        trayectoria_recta = Line(
-            RIGHT * 5 + UP * 1,
-            LEFT * 5 + UP * 1,
-            color=WHITE,
-            stroke_width=2
-        )
-        self.play(Create(trayectoria_recta, run_time=1.2))
-        
-        # Flecha que muestra la curvatura
-        flecha_curvatura = Arrow(
-            RIGHT * 5 + UP * 1,
-            LEFT * 5 + UP * 1,
-            color=ORANGE,
-            buff=0.2
-        )
-        self.play(FadeIn(flecha_curvatura, run_time=1.5))
-        
-        # Callout con el concepto
-        callout_text = Text("Gravedad curva el espacio", color=TEAL, font_size=36)
-        callout_box = SurroundingRectangle(callout_text, color=TEAL, buff=0.2)
-        callout_obj = VGroup(callout_box, callout_text)
-        callout_obj.to_edge(UP)
-        self.play(FadeIn(callout_obj, run_time=1.0))
-        
-        self.wait(1.5)
-        
-        # Transformación: la luz se dobla
-        # Crear una curva arc que simule la desviación
-        trayectoria_curva = Arc(
-            start_angle=0,
-            angle=PI / 4,
-            radius=3,
-            color=WHITE,
-            stroke_width=2
-        )
-        # Mover la curva para que empiece aproximadamente donde empieza la recta
-        trayectoria_curva.move_to(RIGHT * 2 + UP * 1)
-        
-        self.play(
-            Transform(trayectoria_recta, trayectoria_curva, run_time=1.5),
-            FadeOut(flecha_curvatura, run_time=1.5)
-        )
-        
-        self.wait(1.0)
-        
-        # Limpiar pantalla
-        self.play(
-            *[FadeOut(m, run_time=1.0) for m in self.mobjects]
-        )
+        # Salida
+        self.play(FadeOut(callout_text), FadeOut(straight_arrow), FadeOut(mass_obj), FadeOut(mass_accent), FadeOut(telescope))
+        self.wait(1)

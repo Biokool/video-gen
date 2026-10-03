@@ -1,91 +1,75 @@
 from manim import *
 from zenn_rig import *
 
+def estrellas(n=50):
+    """Crea un VGroup con n estrellas (pequeños círculos blancos) aleatorios."""
+    stars = VGroup()
+    for _ in range(n):
+        star = Dot(
+            np.random.uniform(-7, 7), 
+            np.random.uniform(-4, 4), 
+            color=WHITE,
+            scale=0.1
+        )
+        stars.add(star)
+    return stars
+
 class S22(Scene):
     def construct(self):
-        # 1. Setup: Fondo espacial oscuro
+        # Escenario nocturno/especial para "materia oscura"
         self.add(fondo(INK))
-        estrellas = estrellas(30)
-        self.play(FadeIn(estrellas), run_time=1.0)
-
-        # 2. Título corto de capítulo
-        titulo = title_card("Masa Cósmica", color=YELLOW)
-        self.play(FadeIn(titulo, scale=1.2), run_time=0.8)
-        self.wait(0.5)
-        self.play(FadeOut(titulo), run_time=0.5)
-
-        # 3. Split Screen: Izquierda (Materia Oscura) vs Derecha (Materia Ordinaria)
-        # Izquierda: Monigote con aura oscura/planeta
-        fig_izq = stick_idle(pos=LEFT * 4, height=2.0, color=WHITE)
-        planeta_oscuro = planeta(pos=LEFT * 4 + DOWN * 2.5, radio=0.8, color=INK)
-        # Añadimos un borde para que se vea sobre fondo oscuro
-        borde_planeta = Circle(radius=0.8, color=RED, stroke_width=2)
-        borde_planeta.move_to(planeta_oscuro)
         
-        # Derecha: Monigote "normal" con sol/materia ordinaria
-        fig_der = stick_idle(pos=RIGHT * 4, height=2.0, color=YELLOW)
-        sol_brig = sol()
-        sol_brig.move_to(RIGHT * 4 + DOWN * 2.5)
-        sol_brig.scale(0.8)
+        # Estrellas de fondo
+        estrellas_obj = estrellas(n=50)
+        self.play(FadeIn(estrellas_obj, run_time=1.5))
 
-        self.play(
-            FadeIn(fig_izq),
-            FadeIn(fig_der),
-            Create(planeta_oscuro),
-            Create(borde_planeta),
-            FadeIn(sol_brig),
-            run_time=1.5
-        )
-        self.wait(0.5)
-
-        # 4. Expresiones y Callouts
-        # Expresión de sorpresa/realización en ambos
-        self.play(
-            expresion(fig_izq, "sorpresa"),
-            expresion(fig_der, "sorpresa"),
-            run_time=0.5
-        )
-
-        # Callout Izquierda: 95% Materia Oscura
-        callout_izq = callout("95% Materia Oscura", color=RED, font_size=48)
-        callout_izq.move_to(LEFT * 4 + UP * 2.5)
+        # Split screen: Lado Izquierdo (Cosmos/Materia Oscura)
+        lado_izq = VGroup()
+        fig_derecho = stick_idle(LEFT * 3, height=2.5, color=WHITE)
+        expresion_derecho = expresion(fig_derecho, "sorpresa")
         
-        # Callout Derecha: 100% Materia Ordinaria
-        callout_der = callout("100% Materia Ordinaria", color=YELLOW, font_size=48)
-        callout_der.move_to(RIGHT * 4 + UP * 2.5)
-
-        self.play(
-            Write(callout_izq),
-            Write(callout_der),
-            run_time=1.5
-        )
-        self.wait(0.5)
-
-        # 5. Acciones: Señalar
-        # El de la izquierda señala su planeta oscuro (su "masa" dominante)
-        self.play(
-            stick_point(fig_izq, planeta_oscuro),
-            run_time=0.8
-        )
+        # Elementos cósmicos abstractos para el lado izquierdo
+        esfera_oscura = Esfera(radius=1.5, color=PURPLE_E, opacity=0.3)
+        esfera_oscura.move_to(LEFT * 6 + UP * 1)
         
-        # El de la derecha señala su sol (su "ser" biológico)
-        self.play(
-            stick_point(fig_der, sol_brig),
-            run_time=0.8
-        )
-        self.wait(0.5)
+        lado_izq.add(fig_derecho, expresion_derecho, esfera_oscura)
+        
+        # Split screen visual divider
+        linea_division = Line(UP*4, DOWN*4, color=WHITE, stroke_width=2)
+        self.play(Create(linea_division))
+        
+        # Lado Derecho (Biología/Materia Ordinaria)
+        fig_izquierdo = stick_idle(RIGHT * 3, height=2.5, color=YELLOW)
+        expresion_izquierdo = expresion(fig_izquierdo, "normal")
+        
+        # Prop biológico: ADN simplificado o célula (usamos una esfera brillante)
+        celula = Circle(radius=1.2, color=GREEN_E, fill_opacity=0.5)
+        celula.move_to(RIGHT * 6 + UP * 1)
+        
+        self.add(fig_izquierdo, expresion_izquierdo, celula)
 
-        # 6. Cierre: Transformación sutil para reforzar el contraste
-        # Hacemos que el planeta oscuro pulse y el sol brille (escala)
-        self.play(
-            planeta_oscuro.animate.scale(1.1),
-            borde_planeta.animate.scale(1.1),
-            sol_brig.animate.scale(1.1),
-            run_time=0.8
-        )
-        self.play(
-            planeta_oscuro.animate.scale(1/1.1),
-            borde_planeta.animate.scale(1/1.1),
-            sol_brig.animate.scale(1/1.1),
-            run_time=0.8
-        )
+        # Transición: El personaje de la derecha se acerca al centro para explicar
+        self.play(fig_izquierdo.animate.next_to(linea_division, RIGHT, buff=0.5),
+                  expresion_izquierdo.animate.next_to(fig_izquierdo, UP))
+        
+        # Callout principal: "95% Materia Oscura"
+        callout_1 = callout("95% MATERIA OSCURA", color=PURPLE_E)
+        callout_1.move_to(LEFT * 6 + DOWN * 2.5)
+        
+        self.play(FadeIn(callout_1))
+        self.wait(3)
+
+        # Cambio de expresión a "sorpresa" en el personaje de la derecha para enfatizar
+        self.play(Transform(expresion_izquierdo, expresion(fig_izquierdo, "miedo")))
+        
+        # Callout 2: "100% Materia Ordinaria"
+        callout_2 = callout("100% MATERIA ORDINARIA", color=GREEN_E)
+        callout_2.move_to(RIGHT * 6 + DOWN * 2.5)
+        
+        self.play(FadeIn(callout_2))
+        
+        # Animación final: Los dos grupos se miran
+        self.play(fig_derecho.animate.look_at(fig_izquierdo),
+                  fig_izquierdo.animate.look_at(fig_derecho))
+        
+        self.wait(3)

@@ -1,64 +1,68 @@
 from manim import *
-from zenn_rig import *
 
 class S18(Scene):
     def construct(self):
-        # Fondo oscuro espacial
-        self.add(fondo(INK))
-        estrellas = estrellas(30)
-        self.play(FadeIn(estrellas), run_time=1.0)
-
-        # Título de sección
-        titulo = title_card("Búsqueda Sin Éxito", color=YELLOW)
-        self.play(FadeIn(titulo), run_time=1.0)
-        self.wait(1.0)
-        self.play(FadeOut(titulo), run_time=0.8)
-
-        # Monigote principal (físico preocupado)
-        fig = stick_idle(pos=ORIGIN + 2*LEFT + 0.5*DOWN, height=2.2, color=WHITE)
-        self.play(FadeIn(fig), run_time=1.0)
-
-        # Cara de preocupación
-        cara = expresion(fig, "preocupado")
-        self.play(FadeIn(cara), run_time=0.5)
-
-        # Reloj de pared (pasaje del tiempo sin resultados)
-        reloj = reloj_pared()
-        reloj.move_to(3*RIGHT + 2*UP)
-        self.play(Create(reloj), run_time=1.0)
-
-        # Caja vacía (materia oscura no detectada)
-        caja = caja("0 partículas", pos=2*RIGHT + DOWN)
-        self.play(FadeIn(caja), run_time=1.0)
-
-        # Flecha del monigote hacia la caja vacía
-        flecha = arrow(fig.get_center() + 0.5*RIGHT, caja.get_center())
-        self.play(Create(flecha), run_time=0.8)
-
-        # Callout corto
-        call = callout("Sin detección", color=ORANGE, font_size=72)
-        call.to_edge(UP, buff=0.5)
-        self.play(Write(call), run_time=1.2)
-        self.wait(1.0)
-
-        # El monigote señala la caja
-        self.play(stick_point(fig, caja), run_time=1.0)
+        # Crear elementos básicos que existan en Manim core
+        # Reemplazamos las funciones de zenn_rig por equivalentes o simples
+        
+        # Fondo
+        fondo = Rectangle(
+            width=16, height=9,
+            color=BLACK,
+            stroke_width=0
+        )
+        self.add(fondo)
+        
+        # Estrellas simples
+        estrellas_obj = VGroup(*[
+            Dot(radius=0.05, color=WHITE)
+            for _ in range(20)
+        ])
+        estrellas_obj.arrange_in_grid(4, 5, buff=0.5)
+        self.play(FadeIn(estrellas_obj), run_time=1.5)
         self.wait(0.5)
-
-        # Montaje de reloj (pasaje del tiempo)
-        montage = clock_montage(radius=1.2)
-        montage.move_to(ORIGIN + 1*DOWN)
-        self.play(FadeIn(montage), run_time=1.2)
-        self.wait(1.5)
-
-        # Cambio de expresión a tristeza (frustración)
-        self.play(Transform(cara, expresion(fig, "triste")), run_time=0.8)
+        
+        # Montaje de reloj - usar un círculo simple como representación
+        mont = Circle(radius=3.5, color=YELLOW)
+        self.play(FadeIn(mont, scale=0.8), run_time=1.5)
         self.wait(1.0)
-
-        # Limpieza final
-        self.play(FadeOut(call), run_time=0.8)
-        self.play(FadeOut(flecha), run_time=0.5)
-        self.play(FadeOut(montage), run_time=0.8)
-        self.play(FadeOut(caja, reloj, fig, cara), run_time=1.0)
-        self.play(FadeOut(estrellas), run_time=0.8)
-        self.remove(fondo(INK))
+        
+        # Figura de palo - usar un círculo como cabeza
+        fig = Circle(radius=0.5, color=WHITE)
+        fig.move_to(LEFT * 4.5)
+        self.play(FadeIn(fig), run_time=1.0)
+        
+        # Expresión - texto simple
+        expr = Text("preocupado", font_size=36)
+        expr.next_to(fig, DOWN, buff=0.5)
+        self.play(FadeIn(expr), run_time=0.8)
+        self.wait(1.0)
+        
+        # Dinosaurio - usar un texto simple
+        dino = Text("Dino", color=TEAL, font_size=48)
+        dino.move_to(RIGHT * 4.5)
+        self.play(FadeIn(dino), run_time=1.0)
+        self.wait(1.0)
+        
+        # Callout - texto con fondo
+        call_text = Text("Sin partículas detectadas", color=ORANGE, font_size=48)
+        call = SurroundingRectangle(call_text, color=ORANGE, buff=0.2)
+        call.add(call_text)
+        call.to_edge(UP, buff=0.6)
+        self.play(FadeIn(call, shift=DOWN * 0.3), run_time=1.0)
+        self.wait(2.0)
+        
+        self.play(
+            FadeOut(call),
+            FadeOut(dino),
+            run_time=1.5,
+        )
+        self.wait(1.0)
+        
+        self.play(
+            FadeOut(fig),
+            FadeOut(expr),
+            FadeOut(mont),
+            FadeOut(estrellas_obj),
+            run_time=1.5,
+        )

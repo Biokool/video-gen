@@ -1,90 +1,41 @@
 from manim import *
-import numpy as np
-
-# --- Definiciones de funciones y variables desde zenn_rig (simuladas) ---
-INK = "#1a1a1a"
-
-def fondo(color):
-    return Rectangle(width=15, height=8, fill_color=color, fill_opacity=1)
-
-def stick_idle(pos, color=WHITE, height=2.0):
-    """Crea un monigote simple."""
-    g = VGroup()
-    b = pos
-    h = height
-    head_r = h * 0.13
-    
-    # Cabeza
-    head = Circle(radius=head_r, color=color).move_to(b + np.array([0, h - head_r, 0]))
-    g.add(head)
-    
-    # Cuerpo
-    body = Line(b + np.array([0, h - 2*head_r, 0]), b, color=color)
-    g.add(body)
-    
-    # Brazos
-    arm_len = h * 0.3
-    arm_start = b + np.array([0, h - 2*head_r - h*0.1, 0])
-    left_arm = Line(arm_start, arm_start + np.array([-arm_len*0.7, -arm_len*0.7, 0]), color=color)
-    right_arm = Line(arm_start, arm_start + np.array([arm_len*0.7, -arm_len*0.7, 0]), color=color)
-    g.add(left_arm, right_arm)
-    
-    # Piernas
-    leg_len = h * 0.4
-    left_leg = Line(b, b + np.array([-leg_len*0.5, -leg_len, 0]), color=color)
-    right_leg = Line(b, b + np.array([leg_len*0.5, -leg_len, 0]), color=color)
-    g.add(left_leg, right_leg)
-    
-    return g
-
-def expresion(fig, exp):
-    """Cambia la expresión facial del monigote."""
-    pass # Implementación vacía para este contexto
-
-def caja(texto, pos):
-    """Crea una caja con texto."""
-    box = RoundedRectangle(corner_radius=0.2, width=3, height=1.5, color=WHITE, fill_opacity=0.1)
-    txt = Text(texto, color=WHITE, font_size=30)
-    g = VGroup(box, txt)
-    g.arrange(DOWN, buff=0.2)
-    g.move_to(pos)
-    return g
-
-def red_accent(obj):
-    """Añade un acento rojo."""
-    c = Circle(radius=0.1, color=RED, fill_opacity=1)
-    c.move_to(obj.get_corner(UR))
-    obj.add(c)
-    return obj
-
-def stick_point(fig, target_obj):
-    """Crea una animación de señalar."""
-    # Obtiene la posición del hombro del monigote
-    b = fig[1].get_start()  # Asumiendo que [1] es el body
-    h = 2.0
-    head_r = h * 0.13
-    shoulder = b + np.array([0, h - 2 * head_r - h * 0.06, 0])
-    
-    # Corregido: target_obj.get_center() devuelve np.array, no lista
-    target = np.array(target_obj.get_center(), dtype=float)
-    
-    vec = target - shoulder
-    dist = max(np.linalg.norm(vec[:2]), 1e-6)
-    end = shoulder + vec / dist * (h * 0.34)
-    
-    # Crea el brazo que señala
-    arm = Line(shoulder, end, color=fig[1].get_color())
-    
-    # Animation: mover el brazo del monigote
-    # Simplificado: simplemente dibujamos el brazo
-    return Create(arm)
+from zenn_rig import *
 
 class S17(Scene):
     def construct(self):
-        # Fondo oscuro (bajo la tierra)
-        self.add(fondo(INK))
-        
-        # Título corto
-        callout_txt = Text("Bajo miles de metros", color=WHITE, font_size=60)
-        callout_txt.to_edge(UP)
-        self.play(F
+        detector = caja("XENON", pos=DOWN * 1.6, width=2.4)
+        rock = red_seguridad(width=7.5, height=1.2, pos=UP * 1.9)
+        researcher = stick_idle(pos=LEFT * 4.0 + DOWN * 0.2, height=2.0, color=INK)
+        researcher.add(expresion(researcher, "preocupado"))
+
+        self.play(
+            FadeIn(rock),
+            FadeIn(detector),
+            FadeIn(researcher),
+            run_time=1.5
+        )
+
+        self.play(
+            stick_walk(researcher, RIGHT * 2.0 + DOWN * 0.2, run_time=2.5, steps=7)
+        )
+
+        self.play(stick_point(researcher, detector), run_time=1.0)
+
+        accent = red_accent(detector, scale=1.35)
+        if isinstance(accent, Animation):
+            self.play(accent, run_time=0.8)
+        else:
+            self.play(FadeIn(accent), run_time=0.8)
+
+        label1 = callout("Miles de metros", color=ORANGE, font_size=64)
+        label1.shift(UP * 3.3)
+        self.play(FadeIn(label1), run_time=0.8)
+        self.wait(1.0)
+
+        label2 = callout("Destellos", color=RED, font_size=72)
+        label2.shift(UP * 0.7 + RIGHT * 3.0)
+        self.play(FadeIn(label2), run_time=0.8)
+        self.wait(1.0)
+
+        self.play(stick_think(researcher, "¿Impactos?"), run_time=1.2)
+        self.wait(1.4)

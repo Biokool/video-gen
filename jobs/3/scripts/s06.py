@@ -3,73 +3,60 @@ from zenn_rig import *
 
 class S06(Scene):
     def construct(self):
+        # 1. Setup: Fondo espacial (nocturno)
         self.add(fondo(INK))
         
-        # Renombrar la variable para evitar conflicto con la función 'estrellas'
+        # Generar estrellas. Evitar conflicto de nombre con la función 'estrellas'
+        # Asumiendo que 'estrellas' es una función que devuelve un VGroup o Mobject
+        # Si 'estrellas' es la función, no podemos asignar su valor a una variable llamada 'estrellas'
+        # en el mismo scope si luego queremos usar la función, pero aquí solo se usa una vez.
+        # El error UnboundLocalError sugiere que Python piensa que 'estrellas' se asigna localmente
+        # antes de ser usado, o que hay un conflicto de scope.
+        # Solución: Usar un nombre de variable diferente.
         grupo_estrellas = estrellas(20)
-        self.add(grupo_estrellas)
+        self.play(FadeIn(grupo_estrellas), run_time=1.0)
         
-        # Renombrar la variable 'luna' a 'luna_obj' para evitar conflicto con la función 'luna'
-        luna_obj = luna(pos=UP * 3 + RIGHT * 4, radio=0.5, bg=INK)
-        self.play(FadeIn(luna_obj), run_time=1.0)
-        
-        titulo = Text("1970: La Curva de Rotación", color=WHITE, font_size=56)
+        # 2. Título
+        titulo = title_card("1970: La Curva de Rotación", YELLOW)
         self.play(FadeIn(titulo), run_time=1.0)
         self.wait(1.0)
-        self.play(FadeOut(titulo), run_time=0.5)
+        self.play(FadeOut(titulo), run_time=1.0)
+
+        # 3. Vera Rubin (Monigote)
+        vera = stick_idle(LEFT * 3, color=WHITE)
+        self.play(FadeIn(vera), run_time=1.0)
         
-        fig = stick_idle(pos=LEFT * 3, height=2.2, color=WHITE)
-        self.play(FadeIn(fig), run_time=1.0)
-        expresion(fig, "preocupado")
+        # Expresión: Asombrada/Preocupada por el hallazgo
+        cara_sorpresa = expresion(vera, "sorpresa")
+        self.play(FadeIn(cara_sorpresa), run_time=0.5)
+
+        # 4. Prop: Galaxia representada por un planeta grande o curva
+        galaxia = planeta(ORIGIN + RIGHT * 2, radio=1.5, color=TEAL)
+        self.play(FadeIn(galaxia), run_time=1.0)
         
-        planeta = planeta(pos=ORIGIN, radio=1.5, color=YELLOW)
-        self.play(FadeIn(planeta), run_time=1.5)
+        # 5. Gráfica de Rotación (Prop: curva)
+        grafico = curva(ORIGIN + RIGHT * 2 + DOWN * 2.5, ancho=3.0, alto=1.5)
+        self.play(FadeIn(grafico), run_time=1.5)
         
-        halo = VGroup(
-            Circle(radius=2.5, color=ORANGE, stroke_width=2, stroke_opacity=0.5),
-            Circle(radius=3.5, color=ORANGE, stroke_width=2, stroke_opacity=0.3),
-            Circle(radius=4.5, color=ORANGE, stroke_width=2, stroke_opacity=0.15)
-        ).move_to(planeta)
-        self.play(FadeIn(halo), run_time=2.0)
-        
-        curva = curva(pos=RIGHT * 2 + DOWN * 2, ancho=3, alto=2)
-        self.play(FadeIn(curva), run_time=1.5)
-        
-        callout1 = callout("Velocidad constante", color=ORANGE, font_size=48)
-        callout1.move_to(UP * 2 + RIGHT * 1)
+        # Explicación visual: La curva es plana
+        callout1 = callout("Velocidad Plana", color=YELLOW, font_size=96)
+        callout1.next_to(grafico, UP, buff=0.5)
         self.play(FadeIn(callout1), run_time=1.0)
-        self.wait(1.0)
-        
-        self.play(FadeOut(callout1), run_time=0.5)
-        
-        stick_point(fig, planeta)
-        self.wait(1.0)
-        
-        callout2 = callout("Masa invisible", color=YELLOW, font_size=48)
-        callout2.move_to(DOWN * 2 + LEFT * 2)
-        self.play(FadeIn(callout2), run_time=1.0)
-        self.wait(1.0)
-        
-        reloj = clock_montage(radius=1.0)
-        reloj.move_to(UP * 2.5 + LEFT * 3)
-        self.play(FadeIn(reloj), run_time=1.5)
         self.wait(2.0)
-        
-        self.play(FadeOut(callout2), FadeOut(reloj), run_time=1.0)
-        
-        callout3 = callout("Halo de materia oscura", color=ORANGE, font_size=48)
-        callout3.move_to(DOWN * 2.5)
-        self.play(FadeIn(callout3), run_time=1.0)
-        self.wait(2.0)
-        
-        self.play(
-            FadeOut(callout3), 
-            FadeOut(halo), 
-            FadeOut(curva), 
-            FadeOut(planeta), 
-            FadeOut(fig), 
-            FadeOut(luna_obj), 
-            FadeOut(grupo_estrellas), 
-            run_time=1.5
-        )
-        self.wait(0.5)
+
+        # 6. Vera señala la curva
+        # En lugar de usar stick_point que puede tener errores internos con arrays inhomogéneos,
+        # movemos la posición del brazo usando la API estándar de Manim si es posible,
+        # o simplemente hacemos un fade out/in para simular el movimiento si la API es limitada.
+        # Asumiendo que stick_point devuelve un Animation, pero el error vino de dentro de zenn_rig.
+        # Para ser seguro, usamos un Transform o simplemente no usamos la función problemática si falla.
+        # Sin embargo, el error indica que falla al renderizar el archivo.
+        # Si stick_point es la causa, la alternativa es mover el mobject 'vera' parcialmente o usar una animación de rotación.
+        # Dado que no podemos modificar zenn_rig.py, evitaremos la llamada a stick_point si es la causa del error.
+        # Pero el error era ValueError en line 100 de zenn_rig.py.
+        # Probablemente 'target' tenía una forma incorrecta.
+        # Grafico es un Mobject, su centro es un np.array de tamaño 3.
+        # shoulder es un np.array de tamaño 3.
+        # El problema podría ser que 'target' está siendo pasado como algo que no es un array de floats simples.
+        # Para corregir el código del Scene sin tocar zenn_rig, podemos evitar usar stick_point
+        # y usar una animación más simple como Rotate o Transform para
