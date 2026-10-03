@@ -13,6 +13,11 @@ se intenta el siguiente automáticamente.
   mistral    La Plateforme plan "Experiment" — cuota mensual muy alta.
              OJO: el gratis exige aceptar que Mistral entrene con tus datos.
   cohere     Trial key — 1.000 llamadas/mes.
+  tokenharbor Solo los modelos GRATIS del catálogo (ids que terminan en
+             `:free`; el resto cargan saldo y aquí no se muestran).
+  freellmapi  FreeLLMAPI — GLM/Qwen/Kimi con la bolsa de tokens gratis
+             (10.000 al crear la key).
+  deepseek   DeepSeek oficial (api.deepseek.com) — de pago, con tu key.
   ollama     Modelos locales vía http://localhost:11434 (lista dinámica
              con `ollama list` — aparece lo que Chino tenga instalado).
 
@@ -45,28 +50,64 @@ BACKENDS = {
     "cohere":     {"label": "Cohere (trial)",
                    "setting": "cohere_key", "env": "COHERE_API_KEY",
                    "free": "1.000 llamadas/mes con trial key"},
+    "tokenharbor": {"label": "Token Harbor · solo gratis",
+                    "setting": "tokenharbor_key", "env": "TOKENHARBOR_API_KEY",
+                    "free": "solo ids `:free` (7×24h por cuenta)"},
+    "freellmapi": {"label": "FreeLLMAPI · gratis",
+                   "setting": "freellmapi_key", "env": "FREELLMAPI_API_KEY",
+                   "free": "10.000 tokens al crear la key"},
+    "deepseek":   {"label": "DeepSeek · oficial",
+                   "setting": "deepseek_key", "env": "DEEPSEEK_API_KEY",
+                   "free": "de pago (tarifa por token)"},
     "ollama":     {"label": "Ollama · local",
                    "setting": "", "env": "",
                    "free": "ilimitado (tu hardware)"},
 }
 
 # Orden de preferencia para el combo (calidad ES + cuota + velocidad).
-BACKEND_ORDER = ["gemini", "groq", "cerebras", "openrouter",
-                 "mistral", "cohere", "ollama"]
+BACKEND_ORDER = ["gemini", "groq", "tokenharbor", "freellmapi", "deepseek",
+                 "cerebras", "openrouter", "mistral", "cohere", "ollama"]
+
+# FreeLLMAPI: por defecto el router LOCAL (start-all.bat, puerto 3001).
+# Si prefieres el hosted, cambia esta URL en Configuración.
+FREELLMAPI_BASE = "http://localhost:3001/v1"
 
 # Endpoints OpenAI-compatibles
 OPENAI_BASES = {
     "groq": "https://api.groq.com/openai/v1",
     "cerebras": "https://api.cerebras.ai/v1",
     "mistral": "https://api.mistral.ai/v1",
+    "tokenharbor": "https://tokenharbor.ai/v1",
+    "freellmapi": FREELLMAPI_BASE,
+    "deepseek": "https://api.deepseek.com/v1",
 }
+
+# Backends en los que SOLO se muestran/generan ids con este sufijo:
+# lo demás del catálogo es de pago y no queremos gastar saldo.
+FREE_ONLY = {"tokenharbor": ":free"}
+
+# Alias del router FreeLLMAPI: `auto` deja que su router elija el mejor
+# modelo gratis disponible (auto:smart/auto:fast/auto:cheap = prioridades).
+ROUTER_ALIASES = {"freellmapi": ["auto", "auto:smart", "auto:fast",
+                                 "auto:cheap"]}
+
+# Catálogos enormes (FreeLLMAPI trae cientos de ids): el combo se queda
+# con alias + preferidos + hasta MODEL_CAP descubiertos.
+MODEL_CAP = {"freellmapi": 60}
+
+
+def _base(backend, keys=None):
+    """Base URL del backend (FreeLLMAPI es configurable por la UI)."""
+    if backend == "freellmapi":
+        return (keys or {}).get("freellmapi_base") or FREELLMAPI_BASE
+    return OPENAI_BASES[backend]
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 # Cadenas de preferencia (se intersectan con lo descubierto vía /models
 # cuando hay key; si el descubrimiento falla, se prueban en este orden).
 PREFERRED = {
     "gemini": ["gemini-2.5-flash", "gemini-2.0-flash", "gemma-3-27b-it"],
-    "groq": ["qwen/qwen3.8-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b"],
+    "groq": ["qwen/qwen3.8-27b", "qwen/qwen3.6-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b"],
     "cerebras": ["zai-glm-4.7", "gpt-oss-120b", "llama-3.3-70b"],
     "openrouter": [
         "nvidia/nemotron-3-super-120b-a12b:free",
@@ -77,6 +118,13 @@ PREFERRED = {
     "mistral": ["mistral-small-latest", "mistral-medium-latest",
                 "mistral-large-latest", "open-mistral-7b"],
     "cohere": ["command-a-03-2025", "command-r-plus", "command-r"],
+    # Solo ids gratuitos: con la key, resolve_chain() los sustituye por
+    # los que devuelva /models filtrando el mismo sufijo.
+    "tokenharbor": ["deepseek-v4.1-flash:free", "deepseek-v4-flash:free",
+                    "mimo-v2.5:free", "xiaomi/mimo-v2.5:free"],
+    "freellmapi": ["gemini-2.5-flash", "deepseek-chat", "kimi-k3",
+                   "glm-4.7"],
+    "deepseek": ["deepseek-chat", "deepseek-reasoner"],
 }
 
 OLLAMA_URL = "http://localhost:11434"
@@ -167,18 +215,12 @@ def _openai_chat(base, api_key, model, prompt, system=""):
         raise LLMError(f"Respuesta inesperada de {model}: {str(out)[:200]}")
 
 
-# Modelos que NO sirven para escribir (ASR, guardia, embeddings, TTS).
-_NON_CHAT = ("whisper", "prompt-guard", "orpheus", "safeguard", "embed",
-             "embedding", "moderation")
-
-
 def _openai_models(base, api_key):
     """Descubre modelos vía GET {base}/models. [] si falla."""
     try:
         out = _get_json(f"{base}/models",
                         headers={"Authorization": f"Bearer {api_key}"})
-        return [m["id"] for m in out.get("data", []) if m.get("id")
-                and not any(b in m["id"].lower() for b in _NON_CHAT)]
+        return [m["id"] for m in out.get("data", []) if m.get("id")]
     except LLMError:
         return []
 
@@ -262,11 +304,20 @@ def resolve_chain(backend, model, keys):
         return [model]
     key = (keys or {}).get(backend, "")
     if key and backend in OPENAI_BASES:
-        found = _openai_models(OPENAI_BASES[backend], key)
+        found = _openai_models(_base(backend, keys), key)
+        if backend in FREE_ONLY:  # solo ids gratuitos (p.ej. `:free`)
+            suf = FREE_ONLY[backend]
+            found = [m for m in found if m.endswith(suf)]
         if found:
             pref = PREFERRED[backend]
-            return [m for m in pref if m in found] + \
-                   [m for m in found if m not in pref][:2]
+            ok = [m for m in pref if m in found]
+            chain = ok + [m for m in found if m not in pref][:2]
+            if backend in MODEL_CAP:  # catálogo enorme: alias + tope
+                alias = list(ROUTER_ALIASES.get(backend, ()))
+                rest = [m for m in found if m not in ok][
+                    :max(0, MODEL_CAP[backend] - len(alias) - len(ok))]
+                chain = alias + ok + rest
+            return chain
     if key and backend == "gemini":
         found = _gemini_models(key)
         if found:
@@ -311,8 +362,9 @@ def generate(prompt, backend="gemini", model="", system="", keys=None,
                 text = _cohere_chat(key, m, prompt, system)
             elif backend == "openrouter":
                 text = _openrouter_generate(m, prompt, system, key)
-            else:  # groq, cerebras, mistral
-                text = _openai_chat(OPENAI_BASES[backend], key, m,
+            else:  # groq, cerebras, mistral, tokenharbor, freellmapi,
+                    # deepseek
+                text = _openai_chat(_base(backend, keys), key, m,
                                     prompt, system)
             if not text:
                 raise LLMError("respuesta vacía")

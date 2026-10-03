@@ -314,19 +314,60 @@ def run_storyboard(generate_fn, p, job):
 
 
 # ---------- paquete de publicación (asistida) ----------
-PAQUETE_PROMPT = """Eres el editor de un canal de YouTube de divulgación científica en español.
-Para el video titulado "{title}", genera el paquete de publicación con EXACTAMENTE
-este formato:
-TITULO: <máx 60 caracteres, gancho honesto>
+PAQUETE_PROMPT = """Eres el editor de un canal de YouTube de divulgación científica en español (estilo Zenn).
+Genera el paquete de publicación COMPLETO para el video "{title}", con EXACTAMENTE este formato:
+
+TITULOS:
+1. <opción 1: máx 60 caracteres, palabra clave al frente, gancho honesto>
+2. <opción 2>
+3. <opción 3>
+
 DESCRIPCION:
-<2-3 párrafos + "En este video:" con 3 puntos>
+<2 primeras líneas = el gancho: qué se pregunta el video y qué se lleva el espectador (se ven sin desplegar)>
+<resumen de 2-3 frases con la palabra clave>
+
+LO QUE VERAS:
+- <punto 1>
+- <punto 2>
+- <punto 3>
+- <punto 4>
+
 CAPITULOS:
-<si el guion tiene capítulos: una línea por capítulo "mm:ss Título">
-TAGS: <10 etiquetas separadas por comas>
+<elige 5-8 cortes de la LISTA DE MARCAS de abajo, formato "m:ss Título corto". La primera marca debe ser 0:00. Usa solo marcas de la lista.>
+
+FUENTES:
+<las fuentes reales citadas en el guion/investigación, una por línea>
+
+HASHTAGS: <#tag1 #tag2 #tag3 — máximo 3>
+TAGS: <12-15 etiquetas separadas por comas, primera = frase clave exacta>
+COMENTARIO FIJADO: <una pregunta abierta que invite a responder, sin repetir el título>
+POST COMUNIDAD: <2-3 líneas anunciando el video con la pregunta del tema>
+SHORT SUGERIDO: <escena de la lista (Sxx) que mejor funciona sola en 30-45s y por qué>
+PANTALLA FINAL: <texto y tipo de video a enlazar>
+
+LISTA DE MARCAS (inicio de cada escena, no inventes otras):
+{marks}
 
 GUION (extracto):
 {script}
 """
+
+
+def _scene_marks(job):
+    """Marcas de tiempo reales por escena desde los audios TTS."""
+    vo = job / "vo.json"
+    if not vo.exists():
+        return "(sin audios todavía: capítulos aproximados por escena)"
+    items = json.loads(vo.read_text(encoding="utf-8"))
+    lines, t = [], 0.0
+    for it in items:
+        au = job / "audio" / f"{it['id'].lower()}.mp3"
+        dur = _probe_duration(au) if au.exists() else 0.0
+        m, s = divmod(int(t), 60)
+        lines.append(f"{m}:{s:02d} {it['id'].upper()} — "
+                     f"{it['text'][:60]}...")
+        t += dur
+    return "\n".join(lines)
 
 
 def run_paquete(generate_fn, p, job):
@@ -337,9 +378,14 @@ def run_paquete(generate_fn, p, job):
     script = ""
     if sp:
         script = Path(sp).read_text(encoding="utf-8", errors="replace")[:6000]
+    inv = job / "INVESTIGACION.md"
+    if inv.exists():
+        script += "\n\nINVESTIGACIÓN:\n" + inv.read_text(
+            encoding="utf-8", errors="replace")[:3000]
     try:
         text, model = generate_fn(
-            PAQUETE_PROMPT.format(title=p["title"], script=script),
+            PAQUETE_PROMPT.format(title=p["title"], script=script,
+                                  marks=_scene_marks(job)),
             system="Eres un editor de YouTube preciso y directo.")
     except Exception as e:
         return False, f"Error del modelo: {e}", [], None
@@ -348,33 +394,12 @@ def run_paquete(generate_fn, p, job):
     return True, f"Paquete generado con {model} en {out}.", [str(out)], None
 
 
-# ---------- TTS genérico (automático) ----------
-HATCH_TTS = "/opt/hatch/bin/tts"        # motor original (Linux)
-EDGE_TTS_VOICES = {                     # fallback Windows: edge-tts (neural)
-    "es": "es-ES-ElviraNeural",
-    "es-mx": "es-MX-DaliaNeural",
-    "es-us": "es-US-PonsoNeural",
-    "en": "en-US-AriaNeural",
-    "pt": "pt-BR-FranciscaNeural",
-    "fr": "fr-FR-DeniseNeural",
-    "de": "de-DE-KatjaNeural",
-}
-_EDGE_VOICE_RE = re.compile(r"^[a-z]{2}-[A-Za-z]+-[A-Za-z]+Neural$")
-
-
-def edge_voice(voice, language):
-    """Mapea la voz del panel a una voz neural de edge-tts."""
-    if voice and _EDGE_VOICE_RE.match(str(voice)):
-        return voice
-    lang = (language or "es").lower()
-    return (EDGE_TTS_VOICES.get(lang) or
-            EDGE_TTS_VOICES.get(lang.split("-")[0], EDGE_TTS_VOICES["es"]))
-
-
-def run_tts(job_dir, voice="avocado_v2:MAI_01", language="es"):
+# ---------- TTS multi-motor (automático) ----------
+def run_tts(job_dir, voice="edge:es-MX-DaliaNeural", language="es"):
     """Lee jobs/<slug>/vo.json ([{id, text}]) y genera audio/<id>.mp3.
 
-    Motor: hatch (Linux) si existe; si no, edge-tts (Windows, voz neural).
+    La voz es un spec "<motor>:<voz>" (ver tts_engine.py): edge neural
+    (default, la más humana), kokoro local, piper local o hatch legacy.
     """
     job = Path(job_dir)
     vo_file = job / "vo.json"
@@ -384,35 +409,9 @@ def run_tts(job_dir, voice="avocado_v2:MAI_01", language="es"):
     items = json.loads(vo_file.read_text(encoding="utf-8"))
     if not items:
         return False, f"{vo_file} está vacío."
-    audio_dir = job / "audio"
-    audio_dir.mkdir(parents=True, exist_ok=True)
-    use_hatch = Path(HATCH_TTS).exists()
-    vname = edge_voice(voice, language) if not use_hatch else voice
-    ok, fails = 0, []
-    for it in items:
-        out = audio_dir / f"{it['id'].lower()}.mp3"
-        if use_hatch:
-            p = subprocess.run(
-                [HATCH_TTS, "speak", "--voice", voice,
-                 "--language", language, "--output", str(out), "--text-stdin"],
-                input=it["text"].encode(), capture_output=True, cwd=str(BASE),
-                timeout=300,
-            )
-        else:
-            p = subprocess.run(
-                [sys.executable, "-m", "edge_tts", "--voice", vname,
-                 "--text", it["text"], "--write-media", str(out)],
-                capture_output=True, text=True, cwd=str(BASE), timeout=300,
-            )
-        if p.returncode == 0 and out.exists() and out.stat().st_size > 0:
-            ok += 1
-        else:
-            fails.append(it["id"])
-    engine = "hatch" if use_hatch else f"edge-tts ({vname})"
-    log = f"TTS {ok}/{len(items)} OK con {engine}"
-    if fails:
-        log += f" | fallos: {fails}"
-    return not fails, log
+    sys.path.insert(0, str(HERE))
+    import tts_engine
+    return tts_engine.speak_batch(items, voice, job / "audio", language)
 
 
 # ---------- vo.json automático (desde storyboard o guion) ----------
@@ -470,22 +469,33 @@ def run_tts_stage(p, job):
 
 
 # ---------- animación: LLM genera Manim + render con autorreparación ----------
-RIG_API = """API del rig (zenn_rig.py, ya importado con *):
+RIG_API = """API del rig (zenn_rig.py, ya importado con *). USO OBLIGATORIO:
+los monigotes y objetos se crean SOLO con estas funciones. PROHIBIDO
+construir monigotes con Circle/Line sueltos o redefinir el rig.
 - stick_idle(pos, height=2.2, color=INK) -> monigote quieto
 - stick_walk(fig, target, run_time=2.0) / stick_run(fig, target, run_time=1.5)
-- stick_point(fig, target) -> animación de señalar
-- stick_think(fig, texto) -> monigote pensando con bocadillo
-- stick_group(n, center=ORIGIN, spacing=1.4, height=2.0)
-- title_card(texto, color=YELLOW) / callout(texto, color=ORANGE, font_size=96)
-- arrow(start, end, color=INK) / red_accent(mobject) / split_screen(izq, der)
-- clock_montage(radius=1.6)
-- Props: sol(), calendario(pos, width=2.0), pagina_calendario(), reloj_pared(radius, pos),
-  pastel(pos), red_seguridad(), caja(etiqueta, pos), camino(), casa(pos), oficina(pos), digitos(pos)
-- Colores: WHITE, INK, YELLOW, ORANGE, RED, TEAL. Fondo blanco por defecto.
-- Manim estándar: Scene, Text, FadeIn, FadeOut, Create, Write, Transform, LEFT/RIGHT/UP/DOWN/ORIGIN, self.play(), self.wait()
-PROHIBIDO: Tex/MathTex (no hay LaTeX), rutas de archivos, internet, submódulos fuera de manim/zenn_rig."""
+- stick_point(fig, target) / stick_think(fig, texto) / stick_group(n, ...)
+- expresion(fig, tipo) -> cara sobre la cabeza (añadir tras posicionar):
+  tipos: "normal", "feliz", "preocupado", "sorpresa", "triste", "miedo", "dormido"
+- title_card(texto, color) -> tarjeta de capítulo a pantalla completa
+- callout(texto, color=ORANGE, font_size=96) / arrow(start, end) / red_accent(obj)
+- split_screen(izq, der) / clock_montage(radius)
+- Fondos: fondo(color) pantalla completa; estrellas(n); luna(pos, radio, bg)
+- Props clásicos: sol(), calendario(pos), pagina_calendario(), reloj_pared(),
+  pastel(pos), red_seguridad(), caja(etiqueta, pos), camino(), casa(pos),
+  oficina(pos), digitos(pos)
+- Props con color (v2): perro(pos, color, escala), gato(pos, color, escala),
+  dino(pos, color, escala), fuego(pos, escala), lapida(texto, pos),
+  curva(pos, ancho, alto) [gráfica con punto rojo], planeta(pos, radio, color),
+  casco_vikingo(pos, escala), hueso(pos, escala), vela(pos, escala),
+  moneda_dorada(texto, pos, radio)
+- Colores: WHITE, INK, YELLOW, ORANGE, RED, TEAL. Fondo blanco por defecto;
+  para noche/espacio: self.add(fondo(INK)) al inicio y monigotes color=WHITE.
+- Manim estándar: Scene, Text, FadeIn, FadeOut, Create, Write, Transform,
+  LEFT/RIGHT/UP/DOWN/ORIGIN, self.play(), self.wait()
+PROHIBIDO: Tex/MathTex (no hay LaTeX), archivos, internet, otros módulos."""
 
-SCENE_PROMPT = """Eres programador de animación Manim para un canal de divulgación con monigotes.
+SCENE_PROMPT = """Eres programador de animación Manim para un canal de divulgación estilo Zenn.
 Escribe el archivo Python COMPLETO de UNA escena. Debe contener EXACTAMENTE:
 from manim import *
 from zenn_rig import *
@@ -497,10 +507,16 @@ class {cls}(Scene):
 {rig}
 
 Escena {sid}:
-VOZ (narración, NO se escribe en pantalla salvo callouts cortos): {voz}
+VOZ (narración; en pantalla solo callouts cortos): {voz}
 VISUAL: {visual}
 Duración objetivo: ~{secs} segundos (suma de run_time + waits).
-Estilo: minimalista, 1-3 elementos, movimientos simples. Sin texto largo en pantalla.
+
+Reglas de calidad visual:
+- 2-4 elementos por escena (monigote + props), no un solo objeto flotando.
+- Usa expresion() acorde a la emoción de la narración.
+- Usa props CON COLOR y, si la escena es nocturna/espacial, fondo oscuro.
+- Movimientos simples pero presentes: entradas (FadeIn/Create), caminar,
+  señalar, transformaciones. Nada de pantalla estática todo el tiempo.
 Devuelve SOLO el código, sin explicaciones ni ```."""
 
 FIX_PROMPT = """Este código Manim falló al renderizar. Corrígelo y devuelve el archivo COMPLETO, solo código.
@@ -614,6 +630,14 @@ def run_animacion(generate_fn, p, job):
                 err = str(e)
                 break
             code = _strip_fences(code)
+            # Validación anti-desvío: si el modelo ignora el rig o no
+            # define la clase, no gastamos un render; cuenta como intento.
+            if "zenn_rig" not in code or f"class {cls}" not in code:
+                err = ("El código no usa el rig (falta 'from zenn_rig "
+                       f"import *' o la clase {cls}). Usa SOLO el rig "
+                       "para monigotes y props; no los construyas con "
+                       "Circle/Line sueltos.")
+                continue
             f = sdir / f"{sid}.py"
             f.write_text(code, encoding="utf-8")
             r = subprocess.run(
@@ -657,6 +681,23 @@ def _srt_time(sec):
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
 
+def _wrap_card(txt, width=44):
+    """Parte una tarjeta larga en 2 líneas equilibradas."""
+    if len(txt) <= width:
+        return txt
+    words = txt.split()
+    lines, cur = [], ""
+    for w in words:
+        if len(cur) + len(w) + 1 <= width or not cur:
+            cur = (cur + " " + w).strip()
+        else:
+            lines.append(cur)
+            cur = w
+    if cur:
+        lines.append(cur)
+    return "\n".join(lines[:2])
+
+
 def _build_srt(items, durations):
     """SRT a nivel de frase: reparte la duración por caracteres."""
     cards, t = [], 0.0
@@ -668,7 +709,7 @@ def _build_srt(items, durations):
         cur = t
         for s in sents:
             d = dur * len(s) / total
-            cards.append((cur, cur + d, s))
+            cards.append((cur, cur + d, _wrap_card(s)))
             cur += d
         t += dur
     out = []
@@ -737,7 +778,8 @@ def run_ensamblado(p, job):
     sub = vout / "final_con_subtitulos.mp4"
     r = subprocess.run(
         ["ffmpeg", "-v", "error", "-y", "-i", "final.mp4", "-vf",
-         "subtitles='final.srt':force_style='FontName=Gochi Hand,FontSize=24'",
+         "subtitles='final.srt':force_style='FontName=Gochi Hand,"
+         "FontSize=17,Outline=2,Shadow=0,MarginV=26,Alignment=2'",
          "-c:v", "libx264", "-preset", "medium", "-crf", "20",
          "-c:a", "copy", "final_con_subtitulos.mp4"],
         cwd=str(vout), capture_output=True, text=True, timeout=1800)
@@ -755,7 +797,8 @@ def run_ensamblado(p, job):
 
 # ---------- miniaturas (automático) ----------
 THUMB_PROPS = ["reloj", "calendario", "cerebro", "tierra", "cohete",
-               "bombilla", "corazon", "libro", "moneda", "pregunta", "agujero"]
+               "bombilla", "corazon", "libro", "moneda", "pregunta", "agujero",
+               "perro", "dino", "dragon", "curva", "lapida", "luna"]
 
 THUMB_CONCEPT_PROMPT = """Eres diseñador de miniaturas de YouTube para un canal de divulgación científica.
 Video: "{title}"

@@ -43,10 +43,15 @@ goto fail
 
 :env_ok
 echo [1/3] Entorno OK  (%PY%)
-"%PY%" -c "import manim" >nul 2>nul
+"%PY%" -c "import manim, edge_tts, piper" >nul 2>nul
 if errorlevel 1 (
-    echo       Instalando dependencias faltantes ^(Manim y demas^)...
-    "%PY%" -m pip install -r requirements.txt
+    echo       Instalando dependencias faltantes ^(Manim, voces y demas^)...
+    where uv >nul 2>nul
+    if not errorlevel 1 (
+        uv pip install --python "%PY%" -r requirements.txt
+    ) else (
+        "%PY%" -m pip install -r requirements.txt
+    )
     if errorlevel 1 goto fail
 )
 
@@ -69,7 +74,7 @@ if errorlevel 1 (
 
 curl -s -m 2 http://localhost:11434/api/tags >nul 2>nul
 if errorlevel 1 (
-    echo       INFO: Ollama no responde en localhost:11434 ^(opcional, modelos locales^).
+    echo       INFO: Ollama no responde en localhost:11434  ^(opcional, modelos locales^).
 ) else (
     echo       Ollama OK
 )

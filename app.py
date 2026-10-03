@@ -51,8 +51,10 @@ def stage_badge(status):
 
 
 def all_keys():
-    return {b: get(llm.BACKENDS[b]["setting"])
+    keys = {b: get(llm.BACKENDS[b]["setting"])
             for b in llm.BACKENDS if llm.BACKENDS[b]["setting"]}
+    keys["freellmapi_base"] = get("freellmapi_base", llm.FREELLMAPI_BASE)
+    return keys
 
 
 def make_generate_fn(backend, model):
@@ -422,10 +424,26 @@ elif view == "🎬 Proyectos":
 elif view == "⚙️ Configuración":
     st.title("⚙️ Configuración")
     st.write("**Valores por defecto para proyectos nuevos**")
-    dv = st.text_input("Voz TTS", get("default_voice", "avocado_v2:MAI_01"))
+    import tts_engine
+    cur_eng, cur_voice = tts_engine.parse_spec(
+        get("default_voice", tts_engine.DEFAULT_SPEC))
+    engs = tts_engine.ENGINES
+    ceng = st.selectbox(
+        "Motor de voz", engs,
+        index=engs.index(cur_eng) if cur_eng in engs else 0,
+        format_func=lambda e: tts_engine.VOICE_CATALOG[e]["label"])
+    vlist = tts_engine.VOICE_CATALOG[ceng]["voices"]
+    vids = [v for v, _ in vlist]
+    cvoice = st.selectbox(
+        "Voz (mujer / hombre · México / España)", vids,
+        index=vids.index(cur_voice) if ceng == cur_eng and cur_voice in vids else 0,
+        format_func=lambda v: dict(vlist)[v])
+    st.caption("Edge = voces neurales de Microsoft, gratis y las más "
+               "humanas (internet). Kokoro/Piper = locales, sin internet "
+               "(Kokoro necesita espeak-ng instalado).")
     dl = st.text_input("Idioma", get("default_language", "es"))
     if st.button("Guardar defaults"):
-        db.set_setting(conn, "default_voice", dv)
+        db.set_setting(conn, "default_voice", f"{ceng}:{cvoice}")
         db.set_setting(conn, "default_language", dl)
         st.success("Guardado.")
 
@@ -441,11 +459,17 @@ elif view == "⚙️ Configuración":
         new_keys[meta["setting"]] = st.text_input(
             meta["env"], get(meta["setting"]), type="password",
             help=f"{meta['label']} · gratis: {meta['free']}")
+    fb = st.text_input(
+        "FREELLMAPI_BASE_URL",
+        get("freellmapi_base", llm.FREELLMAPI_BASE),
+        help="Tu router local es http://localhost:3001/v1 (start-all.bat). "
+             "Si usas el hosted: https://api.freellmapi.ai/v1")
     yk = st.text_input("YOUTUBE_API_KEY", get("youtube_key"), type="password",
                        help="Para sugerencias de temas (conector pendiente)")
     if st.button("Guardar claves"):
         for sname, sval in new_keys.items():
             db.set_setting(conn, sname, sval)
+        db.set_setting(conn, "freellmapi_base", fb)
         db.set_setting(conn, "youtube_key", yk)
         st.success("Guardado localmente.")
 

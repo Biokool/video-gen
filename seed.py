@@ -29,7 +29,7 @@ pid = db.add_project(
     conn,
     "¿Por qué el tiempo pasa más rápido cuando envejeces?",
     topic_id=tid, kind="largo",
-    voice="avocado_v2:MAI_01", language="es",
+    voice="edge:es-MX-DaliaNeural", language="es",
     model_backend="openrouter", model_id="",
     job_dir="jobs/piloto",
 )
@@ -43,7 +43,7 @@ hechas = ["tema", "investigacion", "guion", "verificacion", "storyboard",
 for s in hechas:
     db.set_stage(conn, pid, s, "ok", "Producido en la sesión del 2026-10-01.")
 db.set_approval(conn, pid, "guion", "aprobado", "Guion piloto v1")
-db.set_setting(conn, "default_voice", "avocado_v2:MAI_01")
+db.set_setting(conn, "default_voice", "edge:es-MX-DaliaNeural")
 db.set_setting(conn, "default_language", "es")
 db.set_setting(conn, "backend", "openrouter")
 print(f"Seed OK: proyecto #{pid} con {len(hechas)}/10 etapas en ok.")

@@ -289,6 +289,187 @@ def prop_agujero(d, cx, cy, r):
     d.arc(box, start=0, end=180, fill=YELLOW, width=12)
 
 
+def cara_thumb(d, cx, cy, r, tipo="sorpresa", col=BLACK):
+    """Cara expresiva sobre la cabeza del monigote (ojos grandes, gesto)."""
+    for sx in (-1, 1):
+        ex, ey = cx + sx * r * 0.38, cy - r * 0.08
+        if tipo == "feliz":
+            d.arc([ex - r * 0.20, ey - r * 0.16, ex + r * 0.20, ey + r * 0.20],
+                  start=180, end=360, fill=col, width=7)
+        elif tipo == "sorpresa":
+            d.ellipse([ex - r * 0.21, ey - r * 0.24, ex + r * 0.21,
+                       ey + r * 0.24], fill=WHITE, outline=col, width=5)
+            d.ellipse([ex - r * 0.08, ey - r * 0.02, ex + r * 0.08,
+                       ey + r * 0.14], fill=col)
+        else:
+            d.ellipse([ex - r * 0.10, ey - r * 0.10, ex + r * 0.10,
+                       ey + r * 0.10], fill=col)
+        by = cy - r * 0.52
+        if tipo == "preocupado":
+            d.line([(ex - r * 0.22, by + r * 0.10), (ex + r * 0.22, by - r * 0.12)],
+                   fill=col, width=7)
+        elif tipo == "sorpresa":
+            d.line([(ex - r * 0.22, by - r * 0.14), (ex + r * 0.22, by - r * 0.14)],
+                   fill=col, width=7)
+        else:
+            d.line([(ex - r * 0.22, by), (ex + r * 0.22, by)], fill=col, width=7)
+    my = cy + r * 0.42
+    if tipo == "feliz":
+        d.arc([cx - r * 0.34, my - r * 0.30, cx + r * 0.34, my + r * 0.26],
+              start=20, end=160, fill=col, width=8)
+    elif tipo == "sorpresa":
+        d.ellipse([cx - r * 0.16, my - r * 0.16, cx + r * 0.16, my + r * 0.16],
+                  outline=col, width=7)
+    elif tipo == "preocupado":
+        pts = [(cx - r * 0.3 + i * r * 0.15,
+                my + (r * 0.08 if i % 2 else -r * 0.08)) for i in range(5)]
+        d.line(pts, fill=col, width=7, joint="curve")
+    else:
+        d.line([(cx - r * 0.28, my), (cx + r * 0.28, my)], fill=col, width=7)
+
+
+def prop_perro(d, cx, cy, s):
+    """Cara de perro grande (tipo miniatura '¿por qué los perros...?')."""
+    r = s
+    # orejas caídas
+    for sx in (-1, 1):
+        d.ellipse([cx + sx * r * 0.95 - r * 0.34, cy - r * 0.95,
+                   cx + sx * r * 0.95 + r * 0.34, cy + r * 0.55],
+                  fill=(90, 90, 96), outline=BLACK, width=8)
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(216, 219, 224),
+              outline=BLACK, width=9)
+    # hocico
+    d.ellipse([cx - r * 0.52, cy + r * 0.18, cx + r * 0.52, cy + r * 0.82],
+              fill=WHITE, outline=BLACK, width=6)
+    d.ellipse([cx - r * 0.20, cy + r * 0.22, cx + r * 0.20, cy + r * 0.48],
+              fill=BLACK)
+    d.line([(cx, cy + r * 0.48), (cx, cy + r * 0.62)], fill=BLACK, width=6)
+    d.arc([cx - r * 0.3, cy + r * 0.42, cx + r * 0.3, cy + r * 0.78],
+          start=20, end=160, fill=BLACK, width=6)
+    # ojos grandes
+    for sx in (-1, 1):
+        ex, ey = cx + sx * r * 0.42, cy - r * 0.28
+        d.ellipse([ex - r * 0.17, ey - r * 0.20, ex + r * 0.17, ey + r * 0.20],
+                  fill=WHITE, outline=BLACK, width=5)
+        d.ellipse([ex - r * 0.08, ey - r * 0.04, ex + r * 0.08, ey + r * 0.12],
+                  fill=BLACK)
+        d.line([(ex - r * 0.2, ey - r * 0.38), (ex + r * 0.2, ey - r * 0.30)],
+               fill=BLACK, width=7)
+    # estrella en la frente (dibujada, sin depender de glifos)
+    import math as _m
+    sp = []
+    for i in range(10):
+        ang = -_m.pi / 2 + i * _m.pi / 5
+        rr = r * 0.30 if i % 2 == 0 else r * 0.13
+        sp.append((cx + rr * _m.cos(ang), cy - r * 0.60 + rr * _m.sin(ang)))
+    d.polygon(sp, fill=WHITE, outline=BLACK, width=3)
+
+
+def prop_dino(d, cx, cy, s):
+    """Cabeza de T-Rex de perfil con dientes."""
+    w, h = s * 2.1, s * 1.25
+    x, y = cx - w / 2, cy - h / 2
+    d.rounded_rectangle([x, y, x + w, y + h * 0.62], radius=40,
+                        fill=(139, 94, 60), outline=BLACK, width=9)
+    d.rounded_rectangle([x + w * 0.18, y + h * 0.55, x + w, y + h],
+                        radius=30, fill=(139, 94, 60), outline=BLACK, width=9)
+    for i in range(5):  # dientes superiores
+        tx = x + w * 0.30 + i * w * 0.13
+        d.polygon([(tx, y + h * 0.60), (tx + w * 0.09, y + h * 0.60),
+                   (tx + w * 0.045, y + h * 0.82)], fill=WHITE,
+                  outline=BLACK)
+    for i in range(4):  # dientes inferiores
+        tx = x + w * 0.36 + i * w * 0.13
+        d.polygon([(tx, y + h * 0.98), (tx + w * 0.09, y + h * 0.98),
+                   (tx + w * 0.045, y + h * 0.80)], fill=WHITE,
+                  outline=BLACK)
+    ex, ey = x + w * 0.30, y + h * 0.28
+    d.ellipse([ex - 16, ey - 16, ex + 16, ey + 16], fill=BLACK)
+    d.ellipse([x + w * 0.78, y + h * 0.30, x + w * 0.86, y + h * 0.42],
+              fill=BLACK)  # fosa nasal
+
+
+def prop_dragon(d, cx, cy, s):
+    """Cabeza de dragón verde echando fuego."""
+    # llamas primero (salen de la boca, a la izquierda)
+    for (fx, fy, fw, fh, col) in [
+            (-1.05, 0.25, 0.85, 0.5, ORANGE), (-0.85, 0.18, 0.6, 0.36, YELLOW),
+            (-1.25, 0.42, 0.55, 0.3, RED)]:
+        d.ellipse([cx + (fx - fw / 2) * s, cy + (fy - fh / 2) * s,
+                   cx + (fx + fw / 2) * s, cy + (fy + fh / 2) * s], fill=col)
+    w, h = s * 1.7, s * 1.35
+    x, y = cx - w / 2 + s * 0.25, cy - h / 2
+    d.rounded_rectangle([x, y, x + w, y + h * 0.66], radius=46,
+                        fill=(46, 160, 67), outline=BLACK, width=9)
+    d.rounded_rectangle([x, y + h * 0.58, x + w * 0.82, y + h], radius=34,
+                        fill=(46, 160, 67), outline=BLACK, width=9)
+    for sx in (0.18, 0.52):  # cuernos
+        hx = x + w * sx
+        d.polygon([(hx, y + 6), (hx + w * 0.10, y - s * 0.34),
+                   (hx + w * 0.20, y + 4)], fill=(240, 230, 200),
+                  outline=BLACK)
+    for i in range(4):
+        tx = x + w * 0.08 + i * w * 0.16
+        d.polygon([(tx, y + h * 0.64), (tx + w * 0.10, y + h * 0.64),
+                   (tx + w * 0.05, y + h * 0.84)], fill=WHITE, outline=BLACK)
+    ex, ey = x + w * 0.62, y + h * 0.30
+    d.ellipse([ex - 17, ey - 20, ex + 17, ey + 20], fill=WHITE,
+              outline=BLACK, width=5)
+    d.ellipse([ex - 7, ey - 9, ex + 7, ey + 9], fill=BLACK)
+    d.line([(ex - 26, ey - 42), (ex + 26, ey - 34)], fill=BLACK, width=8)
+
+
+def prop_curva(d, cx, cy, s):
+    """Curva campana con punto rojo y flecha (gráficos virales)."""
+    import math as _m
+    col = WHITE if CURRENT_BG == BLACK else BLACK
+    pts = []
+    for i in range(81):
+        t = -1.6 + 3.2 * i / 80
+        pts.append((cx + t * s * 0.62,
+                    cy + s * 0.55 - s * 0.95 * _m.exp(-(t ** 2) / 0.9)))
+    d.line(pts, fill=col, width=14, joint="curve")
+    d.line([(cx - s * 1.05, cy + s * 0.58), (cx + s * 1.05, cy + s * 0.58)],
+           fill=col, width=8)
+    d.ellipse([cx - 20, cy - s * 0.52, cx + 20, cy - s * 0.52 + 40],
+              fill=RED, outline=BLACK, width=4)
+    d.line([(cx + s * 0.42, cy - s * 0.95), (cx + s * 0.08, cy - s * 0.60)],
+           fill=RED, width=12)
+    d.polygon([(cx + s * 0.02, cy - s * 0.52), (cx + s * 0.20, cy - s * 0.62),
+               (cx + s * 0.05, cy - s * 0.72)], fill=RED)
+
+
+def prop_lapida(d, cx, cy, s):
+    w, h = s * 1.5, s * 1.8
+    x, y = cx - w / 2, cy - h / 2
+    d.rounded_rectangle([x, y, x + w, y + h], radius=int(w * 0.45),
+                        fill=(178, 184, 194), outline=BLACK, width=9)
+    d.text((cx, cy - s * 0.18), "RIP", font=font(int(s * 0.52)), fill=BLACK,
+           anchor="mm")
+    d.line([(x - 14, y + h), (x + w + 14, y + h)], fill=BLACK, width=9)
+    for gx in (-0.55, -0.2, 0.25, 0.6):
+        d.line([(cx + gx * s, y + h), (cx + gx * s + 8, y + h - s * 0.22)],
+               fill=TEAL, width=7)
+
+
+CURRENT_BG = BLACK  # render() lo fija antes de dibujar el prop
+
+
+def prop_luna(d, cx, cy, s):
+    """Luna creciente: círculo amarillo recortado con el color de fondo."""
+    d.ellipse([cx - s, cy - s, cx + s, cy + s], fill=YELLOW,
+              outline=BLACK, width=7)
+    d.ellipse([cx - s * 0.42, cy - s * 1.02, cx + s * 0.98, cy + s * 0.62],
+              fill=CURRENT_BG)
+    d.arc([cx - s, cy - s, cx + s, cy + s], start=100, end=265, fill=BLACK,
+          width=7)
+    for (sx, sy, sr) in [(-0.85, -0.75, 0.10), (0.75, 0.85, 0.08),
+                         (-0.95, 0.45, 0.07)]:
+        ex, ey = cx + sx * s * 1.25, cy + sy * s
+        d.line([(ex - sr * s, ey), (ex + sr * s, ey)], fill=WHITE, width=5)
+        d.line([(ex, ey - sr * s), (ex, ey + sr * s)], fill=WHITE, width=5)
+
+
 PROPS = {
     "reloj": lambda d, cx, cy: prop_reloj(d, cx, cy, 150),
     "calendario": lambda d, cx, cy: prop_calendario(d, cx, cy, 330, 300),
@@ -301,12 +482,21 @@ PROPS = {
     "moneda": lambda d, cx, cy: prop_moneda(d, cx, cy, 160),
     "pregunta": lambda d, cx, cy: prop_pregunta(d, cx, cy, 170),
     "agujero": lambda d, cx, cy: prop_agujero(d, cx, cy, 165),
+    "perro": lambda d, cx, cy: prop_perro(d, cx, cy, 175),
+    "dino": lambda d, cx, cy: prop_dino(d, cx, cy, 165),
+    "dragon": lambda d, cx, cy: prop_dragon(d, cx, cy, 165),
+    "curva": lambda d, cx, cy: prop_curva(d, cx, cy, 165),
+    "lapida": lambda d, cx, cy: prop_lapida(d, cx, cy, 165),
+    "luna": lambda d, cx, cy: prop_luna(d, cx, cy, 165),
 }
 
 STYLES = [
-    {"bg": YELLOW, "fg": BLACK, "stroke": BLACK, "pose": "run"},
-    {"bg": BLACK, "fg": WHITE, "stroke": WHITE, "pose": "point"},
-    {"bg": WHITE, "fg": BLACK, "stroke": BLACK, "pose": "think"},
+    {"bg": YELLOW, "fg": BLACK, "stroke": BLACK, "pose": "run",
+     "expr": "feliz"},
+    {"bg": BLACK, "fg": WHITE, "stroke": WHITE, "pose": "point",
+     "expr": "sorpresa"},
+    {"bg": WHITE, "fg": BLACK, "stroke": BLACK, "pose": "think",
+     "expr": "preocupado"},
 ]
 
 
@@ -337,14 +527,18 @@ def fit_text(draw, text, max_w, max_h, start=170):
 
 
 def render(concept, style, path, seed):
+    global CURRENT_BG
+    CURRENT_BG = style["bg"]
     rng.seed(seed)
     img = Image.new("RGB", (W, H), style["bg"])
     d = ImageDraw.Draw(img)
     fg, stroke = style["fg"], style["stroke"]
     # suelo
     jline(d, [(690, 648), (1245, 648)], 8, stroke)
-    # monigote señalando al objeto
+    # monigote señalando al objeto, con cara expresiva
     stick(d, 790, 648, 330, pose=style["pose"], stroke=stroke)
+    cara_thumb(d, 790, 648 - 330 + 330 / 8.0, 330 / 8.0,
+               style.get("expr", "sorpresa"), stroke)
     # objeto del tema, grande
     PROPS.get(concept.get("prop", "pregunta"),
               PROPS["pregunta"])(d, 1085, 325)
@@ -365,6 +559,12 @@ def render(concept, style, path, seed):
 # ---------- conceptos (fallback sin LLM) ----------
 _KEYWORD_PROPS = [
     (("hoyo negro", "agujero negro", "agujero"), "agujero"),
+    (("perro", "perros", "cachorro", "mascota"), "perro"),
+    (("dinosaurio", "t-rex", "trex", "fósil", "fosil"), "dino"),
+    (("dragón", "dragon", "dragones"), "dragon"),
+    (("tumba", "tumbas", "cementerio", "muerto", "muerte"), "lapida"),
+    (("felicidad", "felices", "feliz"), "curva"),
+    (("vikingo", "noche", "oscuro", "oscuridad", "miedo a la"), "luna"),
     (("tiempo", "reloj", "edad", "envejec"), "reloj"),
     (("calendario", "año", "mes"), "calendario"),
     (("cerebro", "mente", "memoria", "sueño"), "cerebro"),

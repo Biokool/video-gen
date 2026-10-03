@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS projects (
     topic_id INTEGER REFERENCES topics(id),
     title TEXT NOT NULL,
     kind TEXT DEFAULT 'largo',             -- largo | corto-recorte | corto-standalone
-    voice TEXT DEFAULT 'avocado_v2:MAI_01',
+    voice TEXT DEFAULT 'edge:es-MX-DaliaNeural',
     language TEXT DEFAULT 'es',
     model_backend TEXT DEFAULT 'openrouter', -- openrouter | ollama
     model_id TEXT DEFAULT '',
@@ -123,7 +123,7 @@ def set_topic_status(conn, topic_id, status):
 def add_project(conn, title, topic_id=None, kind="largo", voice=None, language="es",
                 model_backend="openrouter", model_id="", job_dir=""):
     if voice is None:
-        voice = get_setting(conn, "default_voice", "avocado_v2:MAI_01")
+        voice = get_setting(conn, "default_voice", "edge:es-MX-DaliaNeural")
     cur = conn.execute(
         "INSERT INTO projects(topic_id, title, kind, voice, language,"
         " model_backend, model_id, job_dir, created_at)"
