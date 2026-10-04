@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Router multi-backend de LLMs del panel Zenn Factory.
 
-Backends con capa gratuita verificada 2026-09/10. Los sets gratuitos
+Backends con capa gratuita verificada 2026-09/10; catálogos de modelos
+gratuitos renovados en vivo el 2026-10-03 (solo ids gratis por
+plataforma, DeepSeek es el único backend de pago). Los sets gratuitos
 rotan en todos los proveedores; el orden de cada cadena es preferencia,
 no garantía de disponibilidad. Si un modelo falla (404/429/límite),
 se intenta el siguiente automáticamente.
@@ -86,7 +88,12 @@ OPENAI_BASES = {
 
 # Backends en los que SOLO se muestran/generan ids con este sufijo:
 # lo demás del catálogo es de pago y no queremos gastar saldo.
-FREE_ONLY = {"tokenharbor": ":free"}
+# (Catálogos verificados en vivo el 2026-10-03.)
+FREE_ONLY = {"tokenharbor": ":free", "openrouter": ":free"}
+
+# Alias que no terminan en el sufijo pero también son gratis y hay que
+# conservar en la cadena (el meta-router de OpenRouter).
+FREE_KEEP = {"openrouter": {"openrouter/free"}}
 
 # Alias del router FreeLLMAPI: `auto` deja que su router elija el mejor
 # modelo gratis disponible (auto:smart/auto:fast/auto:cheap = prioridades).
@@ -107,26 +114,33 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 # Cadenas de preferencia (se intersectan con lo descubierto vía /models
 # cuando hay key; si el descubrimiento falla, se prueban en este orden).
+# Solo modelos GRATIS por plataforma; DeepSeek queda como único de pago.
 PREFERRED = {
-    "gemini": ["gemini-2.5-flash", "gemini-2.0-flash", "gemma-3-27b-it"],
-    "groq": ["qwen/qwen3.8-27b", "qwen/qwen3.6-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b"],
+    "gemini": ["gemini-2.5-flash", "gemini-flash-latest", "gemini-3.5-flash",
+               "gemini-3.8-flash", "gemini-2.5-flash-lite"],
+    "groq": ["openai/gpt-oss-120b", "openai/gpt-oss-20b",
+             "qwen/qwen3.8-27b", "llama-3.3-70b-versatile"],
     "cerebras": ["zai-glm-4.7", "gpt-oss-120b", "llama-3.3-70b"],
     "openrouter": [
+        "qwen/qwen3.8-27b:free",
         "nvidia/nemotron-3-super-120b-a12b:free",
         "google/gemma-4-31b-it:free",
-        "meta-llama/llama-3.3-70b-instruct:free",
+        "thinkingmachines/inkling:free",
+        "nvidia/nemotron-3-ultra-550b-a55b:free",
         "openrouter/free",  # meta-router: elige un :free disponible
     ],
     "mistral": ["mistral-small-latest", "mistral-medium-latest",
-                "mistral-large-latest", "open-mistral-7b"],
+                "magistral-small-latest", "ministral-14b-latest"],
     "cohere": ["command-a-03-2025", "command-r-plus", "command-r"],
     # Solo ids gratuitos: con la key, resolve_chain() los sustituye por
     # los que devuelva /models filtrando el mismo sufijo.
-    "tokenharbor": ["deepseek-v4.1-flash:free", "deepseek-v4-flash:free",
-                    "mimo-v2.5:free", "xiaomi/mimo-v2.5:free"],
-    "freellmapi": ["gemini-2.5-flash", "deepseek-chat", "kimi-k3",
-                   "glm-4.7"],
-    "deepseek": ["deepseek-chat", "deepseek-reasoner"],
+    "tokenharbor": ["deepseek-v4.1-flash:free", "qwen3.8-flash:free",
+                    "mimo-v2.6-flash:free", "deepseek-v4-flash:free",
+                    "mimo-v2.5:free"],
+    "freellmapi": ["gemini-2.5-flash", "glm-4.7", "kimi-k3",
+                   "qwen3.8-flash", "deepseek-v4-flash"],
+    # Único backend de pago (sin FREE_ONLY): ids vigentes 2026-10-03.
+    "deepseek": ["deepseek-flash", "deepseek-v4-pro"],
 }
 
 OLLAMA_URL = "http://localhost:11434"
@@ -369,7 +383,8 @@ def resolve_chain(backend, model, keys):
         found = _openai_models(_base(backend, keys), key)
         if backend in FREE_ONLY:  # solo ids gratuitos (p.ej. `:free`)
             suf = FREE_ONLY[backend]
-            found = [m for m in found if m.endswith(suf)]
+            keep = FREE_KEEP.get(backend, set())
+            found = [m for m in found if m.endswith(suf) or m in keep]
         if found:
             pref = PREFERRED[backend]
             ok = [m for m in pref if m in found]

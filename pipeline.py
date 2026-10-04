@@ -240,8 +240,11 @@ CRITIC_PROMPT = """Eres el editor crítico de un canal de divulgación. Revisa e
 1. Palabras de narración (número aproximado).
 2. ¿Responde UNA sola pregunta? (sí/no + cuál)
 3. Fuentes citadas: ¿parecen reales y verificables? (lista las que dudes)
-4. Hook: ¿los primeros 20 segundos enganchan? (1 línea)
-5. Fallos concretos a corregir (lista corta, sin rodeos).
+4. APERTURA: ¿tiene el saludo fijo del canal + hook en los primeros 20 segundos? (1 línea)
+5. RETENCIÓN: ¿hay 3-4 picos de información marcados? ¿cada bloque termina en open loop? (sí/no + dónde faltan)
+6. CIERRE: ¿tiene la despedida fija del canal? (sí/no)
+7. ORTOGRAFÍA: lista palabras con tildes mal puestas o caracteres raros (è, ò, à, ù no existen en español).
+8. Fallos concretos a corregir (lista corta, sin rodeos).
 
 GUION:
 """
@@ -280,9 +283,17 @@ def run_guion_draft(generate_fn, p, job, kind="largo"):
 
 
 # ---------- storyboard (asistida) ----------
-STORYBOARD_PROMPT = """Eres director de animación de un canal de divulgación con monigotes minimalistas.
+STORYBOARD_PROMPT = """Eres director de animación de un canal de divulgación con dibujos
+minimalistas de colores vivos (estilo Zenn / Memorias de Pez).
 Divide este guion en escenas numeradas. Por escena: el texto de narración LITERAL
-y una descripción visual de 1 línea (qué monigote u objeto se ve).
+y una descripción visual de 1 línea (qué personaje u objeto se ve, con qué
+expresión y colores).
+
+REGLAS:
+- La PRIMERA escena es la bienvenida: tarjeta_canal() + el saludo del guion.
+- La ÚLTIMA escena es la despedida del guion (tono cálido, cierre del canal).
+- Cada escena: 2-4 elementos, nada encimado, nada cortado por los bordes,
+  nada de texto en la franja inferior (ahí van los subtítulos).
 
 Formato EXACTO por escena:
 ### S01
@@ -542,8 +553,17 @@ construir monigotes con Circle/Line sueltos o redefinir el rig.
   curva(pos, ancho, alto) [gráfica con punto rojo], planeta(pos, radio, color),
   casco_vikingo(pos, escala), hueso(pos, escala), vela(pos, escala),
   moneda_dorada(texto, pos, radio)
-- Colores: WHITE, INK, YELLOW, ORANGE, RED, TEAL. Fondo blanco por defecto;
-  para noche/espacio: self.add(fondo(INK)) al inicio y monigotes color=WHITE.
+- Texto SEGURO (v3, auto-ajustado: nunca se sale del encuadre):
+  banda_titulo(texto, color) -> banda superior con texto que se encoge solo;
+  titulo_seguro(texto, color) -> título auto-escalado;
+  etiqueta(texto, (x, y)) -> etiqueta pequeña (nunca baja a subtítulos);
+  tarjeta_canal() -> tarjeta de apertura/cierre "EL PORQUÉ"
+- Personajes ilustrados (v3): personaje(pos, cuerpo, altura, expresion_tipo)
+  [cuerpo de color + cara: normal/feliz/preocupado/sorpresa/triste/miedo],
+  pez(pos, color, escala), matraz(pos, escala, liquido), ojo_grande(pos, escala)
+- Paleta: MOSTAZA, CORAL, AZUL_MARINO, CREMA, además de WHITE, INK, YELLOW,
+  ORANGE, RED, TEAL. Fondo blanco por defecto; para noche/espacio:
+  self.add(fondo(INK)) al inicio y monigotes color=WHITE.
 - Manim estándar: Scene, Text, FadeIn, FadeOut, Create, Write, Transform,
   LEFT/RIGHT/UP/DOWN/ORIGIN, self.play(), self.wait()
 PROHIBIDO: Tex/MathTex (no hay LaTeX), archivos, internet, otros módulos."""
@@ -571,6 +591,19 @@ Reglas de calidad visual:
 - Movimientos simples pero presentes: entradas (FadeIn/Create), caminar,
   señalar, transformaciones. Nada de pantalla estática todo el tiempo.
 - Código COMPACTO (~40-70 líneas): nada de comentarios largos.
+
+COMPOSICIÓN — OBLIGATORIO (la cámara mide 14.22 x 8: x de -7.1 a 7.1,
+y de -4 a 4):
+- ZONA DE SUBTÍTULOS: entre y=-2.4 y y=-4 van los subtítulos quemados.
+  NUNCA pongas texto, títulos, bandas ni elementos importantes ahí.
+- Títulos y bandas: usa SIEMPRE banda_titulo() o titulo_seguro()
+  (se auto-ajustan; PROHIBIDO Text() gigante manual que se salga).
+- Etiquetas: usa etiqueta(texto, (x, y)) con y >= -1.9.
+- SEPARACIÓN: un elemento grande por zona (izquierda/derecha,
+  arriba/abajo); deja >=1.5 unidades entre elementos; NADA puede tapar
+  a otro: ni bocadillos sobre texto, ni figuras sobre etiquetas,
+  ni círculos/flechas sobre subtítulos.
+- Todo el texto en pantalla entre y=-2.2 y y=3.4.
 Devuelve SOLO el código, sin explicaciones ni ```."""
 
 FIX_PROMPT = """Este código Manim falló al renderizar. Corrígelo y devuelve el archivo COMPLETO, solo código.
@@ -1070,10 +1103,17 @@ def execute_stage(p, stage, generate_fn=None, progress=None):
             sp = find_script(p)
             if not sp:
                 return False, "Sin guion para verificar.", [], None
-            dois, pmids = extract_references(
-                Path(sp).read_text(encoding="utf-8"))
+            gtext = Path(sp).read_text(encoding="utf-8")
+            dois, pmids = extract_references(gtext)
+            # Aviso ortográfico: è/ò/à/ù no existen en español (típico
+            # error del LLM que luego se quema en los subtítulos).
+            sospechosas = sorted(set(re.findall(
+                r"[A-Za-zÁÉÍÓÚáéíóúñÑ]*[èòàù][A-Za-zÁÉÍÓÚáéíóúñÑ]*", gtext)))
             log = (f"DOIs: {len(dois)}, PMIDs: {len(pmids)}\n" +
                    "\n".join(dois + [f"PMID:{x}" for x in pmids]))
+            if sospechosas:
+                log += ("\n\n⚠️ POSIBLES ERRORES DE TILDE (revísalos en el "
+                        "guion antes del TTS): " + ", ".join(sospechosas[:20]))
             return True, log, [], None
         if stage == "storyboard":
             return run_storyboard(generate_fn, p, job)
@@ -1159,13 +1199,25 @@ def run_all(conn, p, generate_fn, on_step=None, on_progress=None):
 
 
 # ---------- propuestas de temas (asistida por LLM) ----------
-TOPIC_PROMPT = """Propón 8 temas para videos de curiosidad científica al estilo del canal de YouTube Zenn:
-una sola pregunta por video, 8-12 minutos, animación minimalista de monigotes.
-Público: hispanohablantes curiosos, tono claro y directo, sin sensacionalismo.
+TOPIC_PROMPT = """Propón 8 temas para videos de curiosidad científica al estilo de los canales
+Zenn y Memorias de Pez: una sola pregunta por video, 8-12 minutos, dibujos
+simples y coloridos. Público: hispanohablantes curiosos.
+
+MEZCLA estos 3 tipos:
+- 4 CURIOSIDADES CIENTÍFICAS con hueco de curiosidad ("verdades que casi nadie
+  conoce", datos que rompen una creencia común).
+- 2 de CULTURA ALTERNATIVA: lo que cree la cultura popular / mitos / historia
+  poco contada, contrastado con lo que dice la ciencia.
+- 2 PREGUNTAS COTIDIANAS con respuesta sorprendente ("¿por qué...?" de la
+  vida diaria que nadie se había planteado).
+
+Cada tema debe funcionar como TÍTULO de alto CTR: pregunta directa, palabra
+clave al frente, promesa concreta (nada de títulos vagos).
+
 Para cada tema devuelve EXACTAMENTE este formato, sin texto extra:
 
 PREGUNTA: <la pregunta del video>
-ANGULO: <1 línea: por qué engancha>
+ANGULO: <1 línea: por qué engancha / qué creencia rompe>
 SENAL: <1 línea: evidencia de interés: búsquedas, tendencia o dato>
 
 Repite el bloque 8 veces."""

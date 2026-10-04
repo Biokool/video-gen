@@ -291,5 +291,28 @@ video-gen/
   el modelo ya no inventa parámetros.
 - Selector de **voz amable** también en la config de cada proyecto.
 
-*Versión del panel: v5 (progreso con ETA, cuotas inteligentes, pacing
-Groq, rig con firmas reales, backends Token Harbor/FreeLLMAPI/DeepSeek).*
+## 12. Cambios v6 (2026-10-03)
+
+- **Composición anti-encimados:** el rig trae `banda_titulo()`,
+  `titulo_seguro()` y `etiqueta()` con **auto-ajuste** (el texto se encoge
+  solo: imposible que se corte en los bordes) y `etiqueta()` nunca baja a
+  la zona de subtítulos (y ≥ −1.85). El prompt de escenas incluye reglas
+  de COMPOSICIÓN obligatorias: zona de subtítulos reservada (y < −2.4),
+  un elemento grande por zona, ≥1.5 unidades de separación, nada tapa nada.
+- **Estilo más ilustrado** (referencia Memorias de Pez): `personaje()`
+  (cuerpo de color + cara), `pez()`, `matraz()`, `ojo_grande()`,
+  `tarjeta_canal()` para apertura/cierre, y paleta MOSTAZA/CORAL/
+  AZUL_MARINO/CREMA.
+- **Guion con retención:** PROMPT_MAESTRO v2 — saludo fijo de apertura +
+  hook en 15 s, 3–4 picos de información, open loops por bloque, matices
+  de narración, mezcla ciencia + cultura alternativa, despedida fija
+  ("...para resolver el siguiente porqué"). El storyboard usa la primera
+  escena para la bienvenida y la última para la despedida; la crítica
+  revisa apertura, picos, cierre y **ortografía** (tildes).
+- **Aviso ortográfico automático:** la verificación lista palabras con
+  è/ò/à/ù (no existen en español) antes del TTS.
+- **Temas:** el generador mezcla curiosidades científicas, cultura
+  alternativa y preguntas cotidianas, con formato de título de alto CTR.
+
+*Versión del panel: v6 (composición segura, estilo ilustrado, guion con
+retención, saludo/despedida fijos).*
