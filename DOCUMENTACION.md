@@ -364,5 +364,50 @@ video-gen/
   `docs/ANALISIS_CANALES.md`. Diferenciadores: español (hueco vacío),
   fuentes reales citadas, ritmo 8–12s, playera por tema.
 
-*Versión del panel: v7 (protagonista oficial, miniaturas con personaje,
-temas con fórmulas ganadoras).*
+## 16. Cambios v7.1 (2026-10-04)
+
+- **Protagonista alargado** (rig v4.1, más fiel a las character sheets):
+  piernas y brazos largos, torso estrecho, cuello negro, mangas pequeñas.
+  Proporciones: cabeza 40% de la altura, piernas ~38%.
+- **Contrato `playera` por string:** el LLM puede usar
+  `playera="naranja"` / `"azul"` / `"verde"` / `"roja"` / `"amarilla"` /
+  `"rosa"` / `"teal"` / `"morada"` / `"negra"` / `"blanca"`
+  (también valen las constantes `PLAYERA_*`). El RIG_API del prompt de
+  escenas ya documenta el string en español.
+- **Miniaturas PIL** con las mismas proporciones alargadas.
+
+## 17. Cambios v7.2 (2026-10-04)
+
+- **Sin mangas:** la playera es torso redondeado limpio, brazos negros
+  directos al hombro (las mangas separadas se veían raras).
+- **Cara con más definición:** ojos más grandes y juntos (como las
+  sheets), pupilas y brillo mayores, bocas ~20% más grandes y más bajas
+  (la boca abierta ya no tapa las pupilas), cejas más gruesas.
+- Miniaturas PIL igual: sin mangas, ojos más grandes.
+
+## 18. Cambios v8 (2026-10-04)
+
+**Anti-encimados (garantizado por construcción):**
+- El validador de código de escena rechaza por AST más de UNA llamada a
+  `banda_titulo()/titulo_seguro()/title_card()/tarjeta_canal()/callout()`
+  por escena → cuenta como intento y dispara autorreparación. Las bandas
+  ya no pueden taparse entre sí.
+- El protagonista (`protagonista()`/`version_prota()`) ahora sí es
+  obligatorio por construcción: el código sin él se rechaza.
+- `callout()` y `split_screen()` ahora auto-ajustan el texto (antes
+  `callout` podía salirse de la pantalla y cortarse en los bordes).
+
+**Reloj maestro y duración garantizada:**
+- La etapa 8 (Ensamblado) compara el storyboard contra los mp4 existentes:
+  si falta alguna escena, FALLA con la lista exacta en vez de construir
+  un video corto en silencio.
+- Aviso cuando un video de escena dura <30% de su audio (el ensamblado
+  rellena con imagen congelada; conviene regenerar esa escena).
+
+**Re-animar una escena:**
+- Nuevo botón en la etapa 7: escribe `S07` y re-anima solo esa escena.
+  Con «Regenerar código con LLM» activado gasta tokens de 1 escena;
+  desactivado re-renderiza el `.py` existente con CERO tokens (ideal tras
+  actualizar el rig). Después re-ejecuta la etapa 8.
+
+*Versión del panel: v8 (anti-encimados, duración garantizada, re-animar escena).*

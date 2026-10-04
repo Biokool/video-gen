@@ -1,0 +1,358 @@
+[
+ {
+  "id": "s01",
+  "text": "¡Hola! Bienvenidos a El Porqué, donde cada video responde una pregunta que quizás nunca te habías hecho... pero deberías."
+ },
+ {
+  "id": "s02",
+  "text": "¿Alguna vez te has detenido a pensar cómo se ve el mundo si pudieras encoger hasta el tamaño de una bacteria o estirarte hasta el tamaño de una galaxia?"
+ },
+ {
+  "id": "s03",
+  "text": "La respuesta te volará la cabeza."
+ },
+ {
+  "id": "s04",
+  "text": "La ciencia dice que nuestra visión no es un espejo perfecto de la realidad."
+ },
+ {
+  "id": "s05",
+  "text": "Es una construcción activa de nuestro cerebro."
+ },
+ {
+  "id": "s06",
+  "text": "Y la calidad de esa construcción cambia brutalmente según la distancia."
+ },
+ {
+  "id": "s07",
+  "text": "Imagina que miras una hormiga a un centímetro de ti."
+ },
+ {
+  "id": "s08",
+  "text": "Ves cada pelito de sus patas, cada detalle de su cuerpo diminuto."
+ },
+ {
+  "id": "s09",
+  "text": "¡Increíble, verdad?"
+ },
+ {
+  "id": "s10",
+  "text": "Esa nitidez, esa capacidad de ver detalles minúsculos, es lo que llamamos agudeza visual."
+ },
+ {
+  "id": "s11",
+  "text": "Y nuestro cerebro es un maestro en procesarla."
+ },
+ {
+  "id": "s12",
+  "text": "Pero, ¿qué pasa si esa hormiga se aleja un poco?"
+ },
+ {
+  "id": "s13",
+  "text": "A un metro, ya no ves esos pelitos."
+ },
+ {
+  "id": "s14",
+  "text": "Ves la forma general, su color."
+ },
+ {
+  "id": "s15",
+  "text": "La información detallada se pierde."
+ },
+ {
+  "id": "s16",
+  "text": "Y a 100 metros, es solo un puntito."
+ },
+ {
+  "id": "s17",
+  "text": "Esto sucede porque nuestros ojos, y sobre todo nuestro cerebro, están optimizados para ver bien a distancias intermedias."
+ },
+ {
+  "id": "s18",
+  "text": "Como cuando interactuamos con otras personas o herramientas."
+ },
+ {
+  "id": "s19",
+  "text": "La agudeza máxima se da a unos pocos metros."
+ },
+ {
+  "id": "s20",
+  "text": "Pero aquí viene lo raro: si intentaras ver una célula humana a esa misma distancia, ¡sería imposible!"
+ },
+ {
+  "id": "s21",
+  "text": "Necesitas un microscopio."
+ },
+ {
+  "id": "s22",
+  "text": "¿Por qué?"
+ },
+ {
+  "id": "s23",
+  "text": "Porque la luz que rebota en una célula es demasiado sutil para que tus ojos la capten con detalle a distancia."
+ },
+ {
+  "id": "s24",
+  "text": "Y si te acercas tanto, al mundo microscópico, ¿qué ves?"
+ },
+ {
+  "id": "s25",
+  "text": "Un universo completamente distinto, lleno de estructuras que ni imaginas."
+ },
+ {
+  "id": "s26",
+  "text": "Tu cerebro, que está acostumbrado a ver el mundo grande, tiene que reconfigurarse por completo."
+ },
+ {
+  "id": "s27",
+  "text": "Es como aprender un nuevo idioma visual."
+ },
+ {
+  "id": "s28",
+  "text": "Cuando usamos un microscopio, entramos en un reino invisible."
+ },
+ {
+  "id": "s29",
+  "text": "Aquí, las \"cosas\" que vemos no son objetos sólidos como mesas o árboles, sino células, moléculas, átomos."
+ },
+ {
+  "id": "s30",
+  "text": "Una célula humana, por ejemplo, mide entre 10 y 100 micrómetros."
+ },
+ {
+  "id": "s31",
+  "text": "Un micrómetro es una millonésima parte de un metro. ¡Imagínate lo diminuto que es eso!"
+ },
+ {
+  "id": "s32",
+  "text": "Dentro de esa célula, hay organelos: el núcleo, las mitocondrias, el retículo endoplasmático."
+ },
+ {
+  "id": "s33",
+  "text": "Cada uno con su forma y función."
+ },
+ {
+  "id": "s34",
+  "text": "Ves membranas, ves procesos ocurriendo."
+ },
+ {
+  "id": "s35",
+  "text": "Es un mundo de ingeniería biológica a escala nanométrica."
+ },
+ {
+  "id": "s36",
+  "text": "La ciencia, con herramientas como el microscopio electrónico, nos permite ver hasta el ADN, las proteínas, las moléculas que forman la vida."
+ },
+ {
+  "id": "s37",
+  "text": "Y lo que vemos es un caos organizado, un ballet de partículas moviéndose y reaccionando."
+ },
+ {
+  "id": "s38",
+  "text": "Pero, ¿qué pasa si intentas aplicar la misma lógica visual a algo mucho más grande?"
+ },
+ {
+  "id": "s39",
+  "text": "¿A un planeta?"
+ },
+ {
+  "id": "s40",
+  "text": "Tu cerebro, acostumbrado a ver detalles a escala humana, se enfrenta a un problema completamente nuevo."
+ },
+ {
+  "id": "s41",
+  "text": "Aquí es donde la cosa se pone realmente rara."
+ },
+ {
+  "id": "s42",
+  "text": "Cuando miramos al espacio, nuestra percepción cambia radicalmente."
+ },
+ {
+  "id": "s43",
+  "text": "Las estrellas, que parecen puntos brillantes, son en realidad soles gigantescos."
+ },
+ {
+  "id": "s44",
+  "text": "La estrella más cercana a nosotros, Próxima Centauri, está a más de 4 años luz de distancia."
+ },
+ {
+  "id": "s45",
+  "text": "Un año luz es la distancia que la luz viaja en un año. ¡Son unos 9.46 billones de kilómetros!"
+ },
+ {
+  "id": "s46",
+  "text": "A esa distancia, ¿qué vemos de Próxima Centauri?"
+ },
+ {
+  "id": "s47",
+  "text": "Un punto de luz."
+ },
+ {
+  "id": "s48",
+  "text": "Nuestro cerebro no puede procesar el tamaño real, la temperatura, la composición de una estrella así solo con la vista."
+ },
+ {
+  "id": "s49",
+  "text": "Y si pensamos en galaxias, como nuestra propia Vía Láctea, son estructuras de cientos de miles de millones de estrellas."
+ },
+ {
+  "id": "s50",
+  "text": "Vistas desde fuera, son remolinos gigantescos de luz."
+ },
+ {
+  "id": "s51",
+  "text": "La ciencia, con telescopios potentes, nos permite ver más allá de esos puntos de luz."
+ },
+ {
+  "id": "s52",
+  "text": "Podemos estudiar la luz que emiten, analizar su espectro, entender su composición."
+ },
+ {
+  "id": "s53",
+  "text": "Pero nuestra visión directa sigue limitada a lo que la luz nos permite ver."
+ },
+ {
+  "id": "s54",
+  "text": "Lo fascinante es cómo la ciencia nos permite \"ver\" estas realidades."
+ },
+ {
+  "id": "s55",
+  "text": "No es que nuestros ojos de repente se vuelvan más potentes, sino que usamos herramientas que extienden nuestras capacidades."
+ },
+ {
+  "id": "s56",
+  "text": "Aquí está el truco: tu cerebro siempre intenta darle sentido al mundo basándose en lo que conoce."
+ },
+ {
+  "id": "s57",
+  "text": "Y lo que conoce es la escala humana."
+ },
+ {
+  "id": "s58",
+  "text": "Cuando ves algo muy grande, como una montaña, tu cerebro lo interpreta como \"grande\", pero no puede dimensionar realmente lo inmenso que es."
+ },
+ {
+  "id": "s59",
+  "text": "Lo mismo pasa con lo muy pequeño."
+ },
+ {
+  "id": "s60",
+  "text": "La agudeza visual humana, esa capacidad de ver detalles, es máxima a pocos metros."
+ },
+ {
+  "id": "s61",
+  "text": "Westheimer, en su estudio sobre el cerebro visual, explica cómo esta optimización nos permite interactuar con nuestro entorno inmediato de forma eficiente."
+ },
+ {
+  "id": "s62",
+  "text": "Pero la ciencia nos muestra que el mundo real opera en escalas que van desde lo subatómico hasta lo cósmico."
+ },
+ {
+  "id": "s63",
+  "text": "Y nuestra percepción natural solo capta una pequeña fracción de eso."
+ },
+ {
+  "id": "s64",
+  "text": "Piensa en las células. Alberts y colaboradores, en su libro \"Molecular Biology of the Cell\", describen la complejidad interna de estas unidades básicas de vida."
+ },
+ {
+  "id": "s65",
+  "text": "Son estructuras que nuestros ojos no pueden percibir sin ayuda."
+ },
+ {
+  "id": "s66",
+  "text": "Y Carl Sagan, en \"Cosmos\", nos hablaba de la inmensidad del universo, de cómo somos un \"grano de polvo suspendido en un rayo de sol\"."
+ },
+ {
+  "id": "s67",
+  "text": "Esa perspectiva cósmica desafía nuestra comprensión natural de la escala."
+ },
+ {
+  "id": "s68",
+  "text": "Entonces, ¿cómo se ve el mundo en cada nivel de visión?"
+ },
+ {
+  "id": "s69",
+  "text": "Se ve como nuestro cerebro puede interpretarlo, limitado por nuestras herramientas y nuestra biología."
+ },
+ {
+  "id": "s70",
+  "text": "Aquí es donde la ciencia se vuelve nuestro superpoder."
+ },
+ {
+  "id": "s71",
+  "text": "No es que nuestros ojos cambien, es que creamos extensiones para ellos."
+ },
+ {
+  "id": "s72",
+  "text": "Un microscopio no hace que tus ojos vean mejor, te pone una lente delante."
+ },
+ {
+  "id": "s73",
+  "text": "Te permite acercarte tanto que las células y moléculas se vuelven visibles."
+ },
+ {
+  "id": "s74",
+  "text": "Es como si tu ojo pudiera \"tocar\" ese mundo."
+ },
+ {
+  "id": "s75",
+  "text": "De la misma manera, un telescopio no te da super-vista para el espacio."
+ },
+ {
+  "id": "s76",
+  "text": "Captura la luz de objetos lejanos, la amplifica, nos permite analizarla."
+ },
+ {
+  "id": "s77",
+  "text": "Nos da información que nuestros ojos solos jamás obtendrían."
+ },
+ {
+  "id": "s78",
+  "text": "Lo que vemos en cada nivel depende de la \"herramienta\" que usemos, ya sea nuestro propio ojo, un microscopio o un telescopio."
+ },
+ {
+  "id": "s79",
+  "text": "La ciencia nos da esas herramientas."
+ },
+ {
+  "id": "s80",
+  "text": "El mundo microscópico se ve como un intrincado ballet de moléculas y estructuras celulares."
+ },
+ {
+  "id": "s81",
+  "text": "El mundo a escala humana, con todos sus detalles y texturas."
+ },
+ {
+  "id": "s82",
+  "text": "Y el mundo cósmico, como vastos paisajes de estrellas y galaxias, aunque nuestra visión directa sea limitada."
+ },
+ {
+  "id": "s83",
+  "text": "La verdadera maravilla no es solo ver, sino comprender."
+ },
+ {
+  "id": "s84",
+  "text": "La ciencia nos permite desvelar realidades que escapan a nuestra percepción natural."
+ },
+ {
+  "id": "s85",
+  "text": "Es como si tuviéramos un visor que nos muestra todas las capas ocultas de la realidad."
+ },
+ {
+  "id": "s86",
+  "text": "La próxima vez que mires una foto de una galaxia o de una célula, recuerda: lo que ves es solo la punta del iceberg."
+ },
+ {
+  "id": "s87",
+  "text": "Tu cerebro, con la ayuda de la ciencia, está construyendo una imagen de la realidad que va mucho más allá de lo que tus ojos pueden captar directamente."
+ },
+ {
+  "id": "s88",
+  "text": "Eres un explorador visual, y la ciencia es tu mapa y tu brújula para los universos invisibles."
+ },
+ {
+  "id": "s89",
+  "text": "Esto fue El Porqué. Nos vemos en el próximo video... para resolver el siguiente porqué. ¡Suscríbete para no perderte ninguna curiosidad!"
+ }
+]

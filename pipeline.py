@@ -24,6 +24,7 @@ import re
 import subprocess
 import sys
 import time
+import ast
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -560,8 +561,10 @@ construir personajes con Circle/Line sueltos o redefinir el rig.
 PERSONAJE PRINCIPAL — "EL PORQUÉ" (protagonista en TODAS las escenas):
   protagonista(pos, playera, altura=3.0, expresion, pose) -> el conductor:
   cabezón de ojos grandes, playera de color, extremidades negras simples.
-  playera: PLAYERA_NARANJA (default/intro), AZUL, VERDE, ROJA, AMARILLA,
-    ROSA, TEAL, MORADA, NEGRA, BLANCA. Cambia el color por bloque temático.
+  playera: "naranja" (default/intro), "azul", "verde", "roja", "amarilla",
+    "rosa", "teal", "morada", "negra", "blanca" (strings en español;
+    también valen las constantes PLAYERA_NARANJA/AZUL/...).
+    Cambia el color por bloque temático.
   expresion: feliz, alegria_pura, triste, enojado, sorpresa,
     mente_explotada, pensando, confundido, miedo, decidido, euforico,
     cansado, dormido, nervioso, sarcastico.
@@ -632,6 +635,12 @@ y de -4 a 4):
   NUNCA pongas texto, títulos, bandas ni elementos importantes ahí.
 - Títulos y bandas: usa SIEMPRE banda_titulo() o titulo_seguro()
   (se auto-ajustan; PROHIBIDO Text() gigante manual que se salga).
+- UNA SOLA banda/título/callout por escena: PROHIBIDO llamar más de una
+  vez en la misma escena a banda_titulo(), titulo_seguro(), title_card(),
+  tarjeta_canal() o callout() (se enciman y tapan todo). Si la escena
+  necesita dos ideas, usa split_screen() o etiquetas pequeñas.
+- PROHIBIDO Text() con font_size mayor a 60: para títulos usa
+  banda_titulo()/titulo_seguro(); para datos destacados, callout().
 - Etiquetas: usa etiqueta(texto, (x, y)) con y >= -1.9.
 - SEPARACIÓN: un elemento grande por zona (izquierda/derecha,
   arriba/abajo); deja >=1.5 unidades entre elementos; NADA puede tapar
@@ -697,6 +706,50 @@ def _strip_fences(text):
     return t.strip()
 
 
+# Llamadas que pintan banda/título grande: solo UNA por escena (si no,
+# se enciman, como pasó en producción).
+_BANDAS = {"banda_titulo", "titulo_seguro", "title_card", "tarjeta_canal",
+           "callout"}
+
+
+def _validar_escena(code, cls):
+    """Garantías por construcción del código de UNA escena.
+
+    1) Usa el rig y define la clase pedida.
+    2) El protagonista aparece (obligatorio en todas las escenas).
+    3) UNA sola banda/título/callout (no se pueden encimar).
+    Devuelve "" si pasa, o el mensaje de error (cuenta como intento y
+    dispara la autorreparación con FIX_PROMPT).
+    """
+    if "zenn_rig" not in code or f"class {cls}" not in code:
+        return (f"El código no usa el rig (falta 'from zenn_rig import *' o "
+                f"la clase {cls}). Usa SOLO el rig para monigotes y props; "
+                "no los construyas con Circle/Line sueltos.")
+    try:
+        tree = ast.parse(code)
+    except SyntaxError as e:
+        return f"Error de sintaxis en el código: {e}"
+    llamadas = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            f = node.func
+            if isinstance(f, ast.Attribute):
+                llamadas.append(f.attr)
+            elif isinstance(f, ast.Name):
+                llamadas.append(f.id)
+    if not any(n in ("protagonista", "version_prota") for n in llamadas):
+        return ("Falta el protagonista: TODA escena debe incluir "
+                "protagonista(...) o version_prota(n, ...) como conductor. "
+                "Sin excepción.")
+    bandas = [n for n in llamadas if n in _BANDAS]
+    if len(bandas) > 1:
+        return (f"La escena llama {len(bandas)} veces a banda/título "
+                f"({', '.join(bandas)}): solo se permite UNA por escena "
+                "porque se enciman. Quita las demás o usa etiqueta() para "
+                "ideas secundarias.")
+    return ""
+
+
 def _rig_source():
     for c in (HERE / "scripts" / "zenn_rig.py", BASE / "scripts" / "zenn_rig.py",
               BASE / "panel" / "scripts" / "zenn_rig.py"):
@@ -718,6 +771,83 @@ def _parse_storyboard(job):
                        "voz": vm.group(1).strip() if vm else "",
                        "visual": xm.group(1).strip() if xm else ""})
     return scenes
+
+
+def _es_fallo_quota(err):
+    return any(w in (err or "").lower() for w in
+               ("rate limit", "quota", "429", "tokens per day", "tpd",
+                "too many requests"))
+
+
+def _generar_y_renderizar_escena(generate_fn, sdir, media, vdir, job, sc,
+                                 rig_text, solo_render=False):
+    """Genera (LLM) + valida + renderiza UNA escena, con autorreparación.
+
+    solo_render=True: no llama al LLM (cero tokens); re-renderiza el
+    scripts/{sid}.py que ya existe.
+    Devuelve (ok: bool, err: str, es_quota: bool).
+    """
+    sid, cls = sc["id"], sc["id"].upper()
+    out = vdir / f"{sid}.mp4"
+    f = sdir / f"{sid}.py"
+    adur = _probe_duration(job / "audio" / f"{sid}.mp3")
+    secs = round(adur) if adur else max(4, len(sc["voz"].split()) // 3)
+    code, err = None, ""
+    intentos = 1 if solo_render else 3
+    for intento in range(intentos):
+        if solo_render:
+            if not f.exists():
+                return False, f"No hay código previo {sid}.py para re-renderizar.", False
+            code = f.read_text(encoding="utf-8", errors="replace")
+        else:
+            try:
+                if intento == 0:
+                    prompt = SCENE_PROMPT.format(
+                        cls=cls, rig=rig_text, sid=cls, voz=sc["voz"],
+                        visual=sc["visual"] or sc["voz"][:80], secs=secs)
+                    code, _ = generate_fn(
+                        prompt, system="Eres programador experto en Manim. "
+                                       "Devuelves solo código Python válido.")
+                else:
+                    fixed, _ = generate_fn(
+                        FIX_PROMPT.format(error=err[-1500:], code=code,
+                                          rig=rig_text),
+                        system="Eres programador experto en Manim. "
+                               "Devuelves solo código Python válido.")
+                    code = fixed
+            except Exception as e:
+                err = str(e)
+                break
+        code = _strip_fences(code)
+        # Validación por construcción: rig, protagonista y UNA sola banda.
+        # No gastamos un render si no pasa; cuenta como intento.
+        err = _validar_escena(code, cls)
+        if err:
+            continue
+        f.write_text(code, encoding="utf-8")
+        r = subprocess.run(
+            [sys.executable, "-m", "manim", "render", "-qm",
+             "--media_dir", str(media), "-o", sid, f.name, cls],
+            cwd=str(sdir), capture_output=True, text=True, timeout=600)
+        if r.returncode == 0:
+            # Con -o <sid> el archivo final se llama <sid>.mp4
+            # (ojo: partial_movie_files/ también contiene mp4s).
+            cands = [q for q in media.glob(f"videos/**/{sid}.mp4")
+                     if "partial_movie_files" not in q.parts]
+            cands.sort(key=lambda q: q.stat().st_mtime)
+            if cands:
+                out.write_bytes(cands[-1].read_bytes())
+                vdur = _probe_duration(out)
+                aviso = ""
+                if adur and vdur < 0.3 * adur:
+                    aviso = (f" AVISO: el video dura {vdur:.1f}s pero el audio "
+                             f"{adur:.1f}s — el ensamblado rellenará con imagen "
+                             "congelada; considera regenerar la escena.")
+                return True, (f"render OK ({vdur:.1f}s)." + aviso), False
+            err = "manim terminó sin generar el mp4."
+        else:
+            err = (r.stdout or "")[-1200:] + (r.stderr or "")[-1200:]
+    return False, err, _es_fallo_quota(err)
 
 
 def run_animacion(generate_fn, p, job, progress=None):
@@ -776,70 +906,19 @@ def run_animacion(generate_fn, p, job, progress=None):
             arts.append(str(out))
             prog.item(done, len(scenes), f"{cls} ya estaba")
             continue
-        adur = _probe_duration(job / "audio" / f"{sid}.mp3")
-        secs = round(adur) if adur else max(4, len(sc["voz"].split()) // 3)
-        code = None
-        err = ""
-        for intento in range(3):
-            try:
-                if intento == 0:
-                    prompt = SCENE_PROMPT.format(
-                        cls=cls, rig=rig_text, sid=cls, voz=sc["voz"],
-                        visual=sc["visual"] or sc["voz"][:80], secs=secs)
-                    code, _ = generate_fn(
-                        prompt, system="Eres programador experto en Manim. "
-                                       "Devuelves solo código Python válido.")
-                else:
-                    fixed, _ = generate_fn(
-                        FIX_PROMPT.format(error=err[-1500:], code=code,
-                                          rig=rig_text),
-                        system="Eres programador experto en Manim. "
-                               "Devuelves solo código Python válido.")
-                    code = fixed
-            except Exception as e:
-                err = str(e)
-                break
-            code = _strip_fences(code)
-            # Validación anti-desvío: si el modelo ignora el rig o no
-            # define la clase, no gastamos un render; cuenta como intento.
-            if "zenn_rig" not in code or f"class {cls}" not in code:
-                err = ("El código no usa el rig (falta 'from zenn_rig "
-                       f"import *' o la clase {cls}). Usa SOLO el rig "
-                       "para monigotes y props; no los construyas con "
-                       "Circle/Line sueltos.")
-                continue
-            f = sdir / f"{sid}.py"
-            f.write_text(code, encoding="utf-8")
-            r = subprocess.run(
-                [sys.executable, "-m", "manim", "render", "-qm",
-                 "--media_dir", str(media), "-o", sid, f.name, cls],
-                cwd=str(sdir), capture_output=True, text=True, timeout=600)
-            if r.returncode == 0:
-                # Con -o <sid> el archivo final se llama <sid>.mp4
-                # (ojo: partial_movie_files/ también contiene mp4s).
-                cands = [q for q in media.glob(f"videos/**/{sid}.mp4")
-                         if "partial_movie_files" not in q.parts]
-                cands.sort(key=lambda q: q.stat().st_mtime)
-                if cands:
-                    out.write_bytes(cands[-1].read_bytes())
-                    logs.append(f"{cls}: render OK "
-                                f"({_probe_duration(out):.1f}s).")
-                    arts.append(str(out))
-                    err = ""
-                    break
-                err = "manim terminó sin generar el mp4."
-            else:
-                err = (r.stdout or "")[-1200:] + (r.stderr or "")[-1200:]
-        if err:
+        ok1, err, es_quota = _generar_y_renderizar_escena(
+            generate_fn, sdir, media, vdir, job, sc, rig_text)
+        if ok1:
+            logs.append(f"{cls}: {err}")
+            arts.append(str(out))
+        else:
             fallos.append(cls)
             logs.append(f"{cls}: FALLO tras intentos: {err[-300:]}")
-            if any(w in err.lower() for w in
-                   ("rate limit", "quota", "429", "tokens per day", "tpd",
-                    "too many requests")):
+            if es_quota:
                 fallos_quota.append(cls)
         done += 1
         prog.item(done, len(scenes),
-                  f"{cls} lista" if not err else f"{cls} falló")
+                  f"{cls} lista" if ok1 else f"{cls} falló")
         if getattr(generate_fn, "backend", "") == "groq":
             time.sleep(6)  # OTPM 1000: no saturar tokens de salida/minuto
     ok = not fallos
@@ -854,6 +933,67 @@ def run_animacion(generate_fn, p, job, progress=None):
                  "backend en la barra lateral o reanuda mañana: las escenas "
                  "ya renderizadas se omiten solas.")
     return ok, head + "\n" + "\n".join(logs[-20:]), arts, None
+
+
+def run_reanimar_escena(generate_fn, p, job, sid, regen_code=True,
+                        progress=None):
+    """Re-anima UNA sola escena (p. ej. S07) sin tocar las demás.
+
+    - Borra video/scenes/{sid}.mp4.
+    - regen_code=True: borra también scripts/{sid}.py y regenera el código
+      con el LLM (gasta tokens solo de esa escena), con validación y
+      autorreparación.
+    - regen_code=False: re-renderiza el scripts/{sid}.py existente
+      (CERO tokens; útil si solo actualizaste el rig, p. ej. quitar mangas).
+    Después hay que re-ejecutar la etapa 8 (Ensamblado) para regenerar el
+    video final.
+    """
+    sid = sid.strip().lower()
+    if not re.fullmatch(r"s\d+", sid):
+        return False, f"Escena inválida: '{sid}'. Usa el formato S07.", [], None
+    scenes = _parse_storyboard(job)
+    sc = next((s for s in scenes if s["id"] == sid), None)
+    if not sc:
+        return (False, f"La escena {sid.upper()} no está en STORYBOARD.md.",
+                [], None)
+    rig = _rig_source()
+    if not rig:
+        return False, "No encuentro scripts/zenn_rig.py en el paquete.", [], None
+    sdir = job / "scripts"
+    sdir.mkdir(parents=True, exist_ok=True)
+    (sdir / "zenn_rig.py").write_text(
+        rig.read_text(encoding="utf-8"), encoding="utf-8")
+    vdir = job / "video" / "scenes"
+    vdir.mkdir(parents=True, exist_ok=True)
+    media = job / "media"
+    rig_text = _rig_api_text(sdir / "zenn_rig.py")
+    out = vdir / f"{sid}.mp4"
+    if out.exists():
+        out.unlink()
+    fpy = sdir / f"{sid}.py"
+    if regen_code:
+        if not generate_fn:
+            return (False, "Regenerar código necesita un backend LLM "
+                           "(Configuración) u Ollama local.", [], None)
+        if fpy.exists():
+            fpy.unlink()
+    elif not fpy.exists():
+        return (False, f"No hay código previo scripts/{sid}.py. Activa "
+                       "'Regenerar código con LLM' o genera la escena en la "
+                       "etapa 7.", [], None)
+    prog = Progreso("reanimar", progress)
+    prog.start(1, f"re-animando {sid.upper()}")
+    ok1, err, es_quota = _generar_y_renderizar_escena(
+        generate_fn, sdir, media, vdir, job, sc, rig_text,
+        solo_render=not regen_code)
+    prog.item(1, 1, f"{sid.upper()} lista" if ok1 else "falló")
+    if ok1:
+        log = (f"{sid.upper()}: {err}\n"
+               "Ahora re-ejecuta la etapa 8 (Ensamblado) para regenerar el "
+               "video final con esta escena corregida.")
+        return True, log, [str(out)], None
+    extra = ("\n⚠️ Fallo de CUOTA del backend, no de código." if es_quota else "")
+    return False, f"{sid.upper()}: FALLO tras intentos: {err[-500:]}" + extra, [], None
 
 
 # ---------- ensamblado: video + audio (audio manda) + SRT ----------
@@ -916,6 +1056,21 @@ def run_ensamblado(p, job, progress=None):
     if not scenes:
         return (False, "Sin videos de escenas: ejecuta antes la etapa 7 "
                        "(Animación).", [], None)
+    # Garantía de duración: el video final debe cubrir TODAS las escenas del
+    # storyboard. Si falta alguna, NO construimos un video corto en silencio:
+    # fallamos con la lista para que se re-animen solo esas.
+    sb_ids = [s["id"] for s in _parse_storyboard(job)]
+    if sb_ids:
+        have = {sc.stem.lower() for sc in scenes if sc.stat().st_size > 0}
+        faltan = [i.upper() for i in sb_ids if i not in have]
+        if faltan:
+            return (False,
+                    "Faltan los videos de estas escenas: "
+                    + ", ".join(faltan) + ". El video final quedaría más "
+                    "corto que la narración. Re-ejecuta la etapa 7 "
+                    "(Animación: omite solas las ya hechas) o usa "
+                    "«Re-animar escena» para cada una, y luego repite esta "
+                    "etapa.", [], None)
     prog = Progreso("ensamblado", progress)
     prog.start(len(scenes) + 2, "leyendo escenas")
     vo_file = job / "vo.json"
@@ -950,7 +1105,10 @@ def run_ensamblado(p, job, progress=None):
         segs.append(seg)
         srt_items.append({"id": sid, "text": texts.get(sid, "")})
         srt_durs.append(adur)
-        logs.append(f"{sid.upper()}: {adur:.1f}s")
+        vdur = _probe_duration(sc)
+        aviso = (f" ⚠️ video {vdur:.1f}s < audio (relleno con imagen congelada)"
+                 if vdur and vdur < 0.3 * adur else "")
+        logs.append(f"{sid.upper()}: {adur:.1f}s{aviso}")
         prog.item(len(segs), len(scenes) + 2, f"{sid.upper()} unida")
     vout = job / "video"
     listf = segdir / "list.txt"

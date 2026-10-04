@@ -412,6 +412,50 @@ elif view == "🎬 Proyectos":
                                  disabled=bool(_running)):
                         db.set_stage(conn, pid, s["stage"], "omitido", "Omitido.")
                         rerun()
+                if s["stage"] == "animacion":
+                    st.divider()
+                    st.markdown("**🔁 Re-animar una escena** (sin tocar las demás)")
+                    rs1, rs2 = st.columns([2, 3])
+                    with rs1:
+                        sid_in = st.text_input("Escena", value="S07",
+                                               key=f"rsid{pid}")
+                    with rs2:
+                        regen = st.checkbox(
+                            "Regenerar código con LLM (gasta tokens de 1 escena)",
+                            value=True, key=f"rgen{pid}")
+                    st.caption("Desactívalo para re-renderizar el código existente "
+                               "con CERO tokens (p. ej. tras actualizar el rig, "
+                               "como quitar las mangas). Después re-ejecuta la "
+                               "etapa 8 (Ensamblado).")
+                    if st.button("🔁 Re-animar escena", key=f"rgo{pid}",
+                                 disabled=bool(_running)):
+                        st.session_state["running"] = (
+                            pid, f"Re-animar {sid_in.strip().upper()}")
+                        box = st.status(
+                            f"▶ Re-animando {sid_in.strip().upper()}…",
+                            expanded=True)
+                        bar = box.progress(0, text="Iniciando…")
+
+                        def _cb(_k, done, total, det):
+                            bar.progress(min(done / max(total, 1), 1.0),
+                                         text=det)
+
+                        try:
+                            ok, log, arts, _ = pipeline.run_reanimar_escena(
+                                gen_fn, p, pipeline.job_dir_of(p),
+                                sid_in, regen_code=regen, progress=_cb)
+                        finally:
+                            st.session_state.pop("running", None)
+                        box.update(
+                            label=f"{'✅' if ok else '❌'} Re-animar "
+                                  f"{sid_in.strip().upper()}",
+                            state="complete" if ok else "error",
+                            expanded=not ok)
+                        if ok:
+                            st.success(log)
+                        else:
+                            st.error(log[-800:])
+                        rerun()
 
         # ---- puerta: guion ----
         st.subheader("🚪 Puerta 1 · Guion")

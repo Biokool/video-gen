@@ -492,11 +492,11 @@ PROPS = {
 
 STYLES = [
     {"bg": YELLOW, "fg": BLACK, "stroke": BLACK, "pose": "run",
-     "expr": "feliz"},
+     "expr": "feliz", "playera": "naranja"},
     {"bg": BLACK, "fg": WHITE, "stroke": WHITE, "pose": "point",
-     "expr": "sorpresa"},
+     "expr": "sorpresa", "playera": "azul"},
     {"bg": WHITE, "fg": BLACK, "stroke": BLACK, "pose": "think",
-     "expr": "preocupado"},
+     "expr": "preocupado", "playera": "roja"},
 ]
 
 
@@ -535,10 +535,10 @@ def render(concept, style, path, seed):
     fg, stroke = style["fg"], style["stroke"]
     # suelo
     jline(d, [(690, 648), (1245, 648)], 8, stroke)
-    # monigote señalando al objeto, con cara expresiva
-    stick(d, 790, 648, 330, pose=style["pose"], stroke=stroke)
-    cara_thumb(d, 790, 648 - 330 + 330 / 8.0, 330 / 8.0,
-               style.get("expr", "sorpresa"), stroke)
+    # protagonista oficial señalando al objeto, con cara expresiva
+    prota_thumb(d, 790, 648, 330, playera=style.get("playera", "naranja"),
+                expr=style.get("expr", "sorpresa"), pose=style["pose"],
+                stroke=stroke)
     # objeto del tema, grande
     PROPS.get(concept.get("prop", "pregunta"),
               PROPS["pregunta"])(d, 1085, 325)
@@ -657,3 +657,76 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+# ---------- protagonista "El Porqué" para miniaturas ----------
+PLAYERA_T = {
+    "naranja": (245, 130, 11), "azul": (46, 155, 230),
+    "verde": (63, 163, 77), "roja": (230, 57, 70),
+    "amarilla": (255, 195, 0), "rosa": (242, 92, 155),
+    "teal": (42, 157, 143), "morada": (123, 47, 190),
+    "negra": (34, 34, 34), "blanca": (245, 245, 245),
+}
+
+
+def prota_thumb(d, x, y, s, playera="naranja", expr="sorpresa",
+                pose="point", stroke=BLACK, lw=12):
+    """Protagonista oficial: x,y = pies; s = altura total."""
+    col = PLAYERA_T.get(playera, PLAYERA_T["naranja"])
+    fs = (17, 17, 17)  # la cara siempre en oscuro (la cabeza es blanca)
+    hr = s * 0.20  # proporciones alargadas (rig v4.1)
+    hcx, hcy = x, y - s + hr
+    # cabeza
+    d.ellipse([hcx - hr, hcy - hr, hcx + hr, hcy + hr],
+              fill=WHITE, outline=fs, width=lw)
+    # ojos grandes
+    for sx in (-1, 1):
+        ex, ey = hcx + sx * hr * 0.36, hcy + hr * 0.08
+        ew, eh = hr * 0.64, hr * 0.88
+        d.ellipse([ex - ew / 2, ey - eh / 2, ex + ew / 2, ey + eh / 2],
+                  fill=WHITE, outline=fs, width=max(4, lw // 2))
+        pr = hr * 0.20
+        d.ellipse([ex - pr, ey - pr * 0.6, ex + pr, ey + pr * 1.4],
+                  fill=fs)
+        br = pr * 0.36
+        d.ellipse([ex - br * 1.6, ey - br * 0.6, ex - br * 0.2, ey + br * 0.8],
+                  fill=WHITE)
+    # boca
+    my = hcy + hr * 0.52
+    if expr == "feliz":
+        d.arc([hcx - hr * 0.34, my - hr * 0.34, hcx + hr * 0.34, my + hr * 0.34],
+              start=20, end=160, fill=fs, width=max(5, lw // 2))
+    elif expr == "preocupado":
+        d.arc([hcx - hr * 0.30, my - hr * 0.10, hcx + hr * 0.30, my + hr * 0.42],
+              start=200, end=340, fill=fs, width=max(5, lw // 2))
+    else:  # sorpresa
+        d.ellipse([hcx - hr * 0.16, my - hr * 0.18, hcx + hr * 0.16,
+                   my + hr * 0.18], fill=fs)
+    # playera: torso (sin mangas)
+    tw, th = s * 0.24, s * 0.20
+    ttop = hcy + hr + s * 0.03
+    d.rounded_rectangle([x - tw / 2, ttop, x + tw / 2, ttop + th],
+                        radius=int(s * 0.06), fill=col, outline=stroke,
+                        width=max(6, lw - 2))
+    # extremidades
+    shy, hip = ttop + s * 0.05, ttop + th
+    if pose == "run":
+        jline(d, [(x + 0.06 * s, shy), (x, hip)], lw, stroke)
+        jline(d, [(x + 0.06 * s, shy), (x + 0.30 * s, shy - 0.06 * s)], lw, stroke)
+        jline(d, [(x + 0.06 * s, shy), (x - 0.20 * s, shy + 0.10 * s)], lw, stroke)
+        jline(d, [(x, hip), (x + 0.30 * s, y - 0.02 * s)], lw, stroke)
+        jline(d, [(x, hip), (x - 0.26 * s, y - 0.02 * s)], lw, stroke)
+    elif pose == "think":
+        jline(d, [(x, shy), (x, hip)], lw, stroke)
+        jline(d, [(x, shy), (x + 0.14 * s, shy + 0.18 * s),
+                  (x + 0.08 * s, hcy + hr * 0.8)], lw, stroke)
+        jline(d, [(x, shy), (x - 0.12 * s, shy + 0.20 * s)], lw, stroke)
+        jline(d, [(x, hip), (x - 0.10 * s, y)], lw, stroke)
+        jline(d, [(x, hip), (x + 0.12 * s, y)], lw, stroke)
+    else:  # point
+        jline(d, [(x, shy), (x, hip)], lw, stroke)
+        jline(d, [(x, shy), (x + 0.34 * s, shy - 0.06 * s)], lw, stroke)
+        jline(d, [(x, shy), (x - 0.12 * s, shy + 0.20 * s)], lw, stroke)
+        jline(d, [(x, hip), (x - 0.10 * s, y)], lw, stroke)
+        jline(d, [(x, hip), (x + 0.12 * s, y)], lw, stroke)
+    return (hcx, hcy, hr)
