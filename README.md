@@ -59,7 +59,7 @@ streamlit run app.py  # abre http://localhost:8501
   el botón «Correr todo», la puerta del guion (leer, aprobar, pedir cambios
   o reescribir con crítica) y la puerta de miniatura (elegir entre las
   generadas).
-- **⚙️ Configuración**: voz/idioma por defecto y claves de los 10 backends.
+- **⚙️ Configuración**: voz/idioma por defecto y claves de los 7 backends.
 
 ## Tipos de proyecto
 
@@ -71,7 +71,7 @@ streamlit run app.py  # abre http://localhost:8501
 
 ## Combo de modelos (sidebar)
 
-Diez backends con capa gratuita (verificada 2026-09/10), en orden de
+Siete backends con capa gratuita (verificada 2026-09/10), en orden de
 preferencia: calidad de español + cuota + velocidad. El set gratis rota en
 todos los proveedores: el panel descubre modelos vía API cuando hay key y,
 si uno falla (404/429/límite), intenta el siguiente de la cadena.
@@ -79,22 +79,12 @@ si uno falla (404/429/límite), intenta el siguiente de la cadena.
 | Backend | Gratis | Modelos preferidos |
 |---|---|---|
 | Gemini (Google AI Studio) | ~1.500 req/día en Flash, sin tarjeta | `gemini-2.5-flash` (+ descubrimiento) |
-| Groq | 1.000 req/día, 200K tok/día por modelo | `qwen/qwen3.8-27b`, `openai/gpt-oss-120b` |
-| Token Harbor | solo ids `:free` (7×24 h por cuenta) | el `:free` que devuelva `/models` |
-| FreeLLMAPI | 10.000 tokens al crear la key | `glm-5.2`, `glm-4.7`, `kimi-k3` |
-| DeepSeek (oficial) | de pago (tarifa por token) | `deepseek-chat`, `deepseek-reasoner` |
+| Groq | 1.000 req/día, 200K tok/día por modelo | `qwen/qwen3.6-27b`, `openai/gpt-oss-120b` |
 | Cerebras | ~1M tok/día, el más rápido | `zai-glm-4.7`, `gpt-oss-120b` (lineup rotativo) |
 | OpenRouter :free | 50 req/día (1.000 con $10 de crédito) | nemotron-3-super → gemma-4-31b → llama-3.3-70b → `openrouter/free` |
 | Mistral (La Plateforme) | plan Experiment (~1B tok/mes) | `mistral-small/medium/large-latest` |
 | Cohere (trial) | 1.000 llamadas/mes | `command-a-03-2025`, `command-r-plus` |
 | Ollama local | ilimitado (tu hardware) | lista dinámica de `ollama list` |
-
-- **Token Harbor**: la API solo enseña los ids `:free` (nunca los de pago),
-  así el panel no puede gastar saldo por accidente.
-- **FreeLLMAPI**: todo su catálogo es de la bolsa gratis; el base URL es
-  `https://api.freellmapi.ai/v1`.
-- **DeepSeek oficial**: `https://api.deepseek.com/v1`, el único de pago de
-  la lista — úsalo cuando quieras la calidad de `deepseek-chat`.
 
 - **ollama**: el combo muestra lo que tengas instalado; nada está hardcodeado.
 - Las claves se guardan en el SQLite local del panel (Configuración),

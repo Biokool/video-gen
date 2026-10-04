@@ -23,6 +23,7 @@ import json
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -395,11 +396,13 @@ def run_paquete(generate_fn, p, job):
 
 
 # ---------- TTS multi-motor (automático) ----------
-def run_tts(job_dir, voice="edge:es-MX-DaliaNeural", language="es"):
+def run_tts(job_dir, voice="edge:es-MX-DaliaNeural", language="es",
+            progress=None):
     """Lee jobs/<slug>/vo.json ([{id, text}]) y genera audio/<id>.mp3.
 
     La voz es un spec "<motor>:<voz>" (ver tts_engine.py): edge neural
     (default, la más humana), kokoro local, piper local o hatch legacy.
+    progress(stage, done, total, detalle): callback opcional de avance.
     """
     job = Path(job_dir)
     vo_file = job / "vo.json"
@@ -411,11 +414,61 @@ def run_tts(job_dir, voice="edge:es-MX-DaliaNeural", language="es"):
         return False, f"{vo_file} está vacío."
     sys.path.insert(0, str(HERE))
     import tts_engine
-    return tts_engine.speak_batch(items, voice, job / "audio", language)
+    return tts_engine.speak_batch(items, voice, job / "audio", language,
+                                  progress=progress)
 
 
 # ---------- vo.json automático (desde storyboard o guion) ----------
 _SENT_SPLIT = re.compile(r"(?<=[.!?…])\s+")
+
+
+# ---------- progreso con ETA (lo pinta la app) ----------
+def fmt_eta(secs):
+    if secs is None:
+        return ""
+    secs = int(round(secs))
+    if secs < 60:
+        return f"~{secs}s restantes"
+    m, s = divmod(secs, 60)
+    return f"~{m}m{s:02d}s restantes" if m < 60 else f"~{m // 60}h{(m % 60):02d}m restantes"
+
+
+class Progreso:
+    """Reporta avance de una etapa larga con ETA.
+
+    callback(stage_key, done, total, detalle): la app lo usa para
+    pintar barra de progreso. `detalle` ya trae el ETA calculado
+    con la media de lo que tardó cada elemento hasta ahora.
+    """
+    def __init__(self, stage, callback=None):
+        self.stage = stage
+        self.cb = callback
+        self.t0 = None
+        self.durs = []
+
+    def start(self, total, label=""):
+        self.t0 = time.time()
+        self.durs = []
+        self._emit(0, total, label or "iniciando…", None)
+
+    def item(self, done, total, label=""):
+        if self.t0 is not None and done > 0:
+            self.durs.append(time.time() - self.t0 - sum(self.durs))
+        eta = None
+        if self.durs:
+            eta = (sum(self.durs) / len(self.durs)) * (total - done)
+        self._emit(done, total, label, eta)
+
+    def _emit(self, done, total, label, eta):
+        if not self.cb:
+            return
+        det = f"{label} · {done}/{total}" if label else f"{done}/{total}"
+        if eta:
+            det += f" · {fmt_eta(eta)}"
+        try:
+            self.cb(self.stage, done, total, det)
+        except Exception:
+            pass
 
 
 def build_vo_json(p, job):
@@ -455,7 +508,7 @@ def build_vo_json(p, job):
     return 0, ""
 
 
-def run_tts_stage(p, job):
+def run_tts_stage(p, job, progress=None):
     extra = ""
     if not (job / "vo.json").exists():
         n, origen = build_vo_json(p, job)
@@ -463,7 +516,7 @@ def run_tts_stage(p, job):
             return (False, "Sin vo.json ni storyboard/guion para crearlo. "
                            "Genera primero el storyboard (etapa 5).", [], None)
         extra = f"vo.json creado desde {origen} ({n} líneas). "
-    ok, log = run_tts(job, p["voice"], p["language"])
+    ok, log = run_tts(job, p["voice"], p["language"], progress=progress)
     arts = [str(a) for a in (job / "audio").glob("*.mp3")] if ok else []
     return ok, extra + log, arts, None
 
@@ -517,6 +570,7 @@ Reglas de calidad visual:
 - Usa props CON COLOR y, si la escena es nocturna/espacial, fondo oscuro.
 - Movimientos simples pero presentes: entradas (FadeIn/Create), caminar,
   señalar, transformaciones. Nada de pantalla estática todo el tiempo.
+- Código COMPACTO (~40-70 líneas): nada de comentarios largos.
 Devuelve SOLO el código, sin explicaciones ni ```."""
 
 FIX_PROMPT = """Este código Manim falló al renderizar. Corrígelo y devuelve el archivo COMPLETO, solo código.
@@ -599,7 +653,12 @@ def _parse_storyboard(job):
     return scenes
 
 
-def run_animacion(generate_fn, p, job):
+def run_animacion(generate_fn, p, job, progress=None):
+    """El LLM genera el código Manim escena por escena y lo renderiza.
+
+    progress(stage, done, total, detalle): callback de avance con ETA.
+    Con backend groq se pausa 6s entre escenas (OTPM 1000).
+    """
     if not generate_fn:
         return (False, "Necesita un backend LLM para generar el código de "
                        "escenas (Configuración).", [], None)
@@ -627,13 +686,18 @@ def run_animacion(generate_fn, p, job):
     media = job / "media"
     rig_text = _rig_api_text(sdir / "zenn_rig.py")
 
+    prog = Progreso("animacion", progress)
+    prog.start(len(scenes), "leyendo escenas")
     logs, arts, fallos = [], [], []
+    done = 0
     for sc in scenes:
         sid, cls = sc["id"], sc["id"].upper()
         out = vdir / f"{sid}.mp4"
         if out.exists() and out.stat().st_size > 0:
+            done += 1
             logs.append(f"{cls}: ya renderizada, se omite.")
             arts.append(str(out))
+            prog.item(done, len(scenes), f"{cls} ya estaba")
             continue
         adur = _probe_duration(job / "audio" / f"{sid}.mp3")
         secs = round(adur) if adur else max(4, len(sc["voz"].split()) // 3)
@@ -692,6 +756,11 @@ def run_animacion(generate_fn, p, job):
         if err:
             fallos.append(cls)
             logs.append(f"{cls}: FALLO tras intentos: {err[-300:]}")
+        done += 1
+        prog.item(done, len(scenes),
+                  f"{cls} lista" if not err else f"{cls} falló")
+        if getattr(generate_fn, "backend", "") == "groq":
+            time.sleep(6)  # OTPM 1000: no saturar tokens de salida/minuto
     ok = not fallos
     head = (f"Animación: {len(arts)}/{len(scenes)} escenas renderizadas."
             if ok else
@@ -747,7 +816,11 @@ def _build_srt(items, durations):
     return "\n".join(out)
 
 
-def run_ensamblado(p, job):
+def run_ensamblado(p, job, progress=None):
+    """Une escenas + audios (el audio manda), SRT y versión subtitulada.
+
+    progress(stage, done, total, detalle): callback de avance con ETA.
+    """
     import shutil
     if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
         return (False, "Falta ffmpeg/ffprobe en el PATH: instálalo para "
@@ -757,6 +830,8 @@ def run_ensamblado(p, job):
     if not scenes:
         return (False, "Sin videos de escenas: ejecuta antes la etapa 7 "
                        "(Animación).", [], None)
+    prog = Progreso("ensamblado", progress)
+    prog.start(len(scenes) + 2, "leyendo escenas")
     vo_file = job / "vo.json"
     items = (json.loads(vo_file.read_text(encoding="utf-8"))
              if vo_file.exists() else [])
@@ -790,6 +865,7 @@ def run_ensamblado(p, job):
         srt_items.append({"id": sid, "text": texts.get(sid, "")})
         srt_durs.append(adur)
         logs.append(f"{sid.upper()}: {adur:.1f}s")
+        prog.item(len(segs), len(scenes) + 2, f"{sid.upper()} unida")
     vout = job / "video"
     listf = segdir / "list.txt"
     listf.write_text("".join(f"file '{s.name}'\n" for s in segs),
@@ -804,6 +880,7 @@ def run_ensamblado(p, job):
     srt = _build_srt(srt_items, srt_durs)
     srt_path = vout / "final.srt"
     srt_path.write_text(srt, encoding="utf-8")
+    prog.item(len(segs) + 1, len(segs) + 2, "subtítulos generados")
     sub = vout / "final_con_subtitulos.mp4"
     r = subprocess.run(
         ["ffmpeg", "-v", "error", "-y", "-i", "final.mp4", "-vf",
@@ -816,6 +893,7 @@ def run_ensamblado(p, job):
     if r.returncode == 0:
         arts.append(str(sub))
     total = sum(srt_durs)
+    prog.item(len(segs) + 2, len(segs) + 2, "video final listo")
     log = (f"Ensamblado OK: {len(segs)} escenas, {total:.0f}s totales "
            f"({total / 60:.1f} min).\n" + " · ".join(logs) +
            ("\nVersión con subtítulos quemados generada."
@@ -940,11 +1018,15 @@ def run_thumbnails(project_id=None, title="", generate_fn=None):
     return run(cmd, cwd=BASE, timeout=300)
 
 
-def run_miniatura(generate_fn, p):
+def run_miniatura(generate_fn, p, progress=None):
     pid = p["id"]
+    if progress:
+        progress("miniatura", 0, 3, "generando conceptos")
     ok, log = run_thumbnails(pid, p["title"], generate_fn)
     if not ok:
         return False, log, [], None
+    if progress:
+        progress("miniatura", 3, 3, "3 variantes listas")
     arts = [str(a) for a in thumbs_dir().glob(f"thumb_{pid}_*.png")]
     return True, log, arts, None
 
@@ -971,8 +1053,12 @@ _NO_LLM = ("Esta etapa necesita un modelo: elige un backend en el sidebar "
            "y pon su API key en Configuración (o usa Ollama local).")
 
 
-def execute_stage(p, stage, generate_fn=None):
-    """Devuelve (ok, log, artefactos, estado_sugerido|None)."""
+def execute_stage(p, stage, generate_fn=None, progress=None):
+    """Devuelve (ok, log, artefactos, estado_sugerido|None).
+
+    progress(stage, done, total, detalle): callback de avance con ETA
+    para las etapas largas (tts, animación, ensamblado, miniaturas).
+    """
     job = job_dir_of(p)
     kind = pget(p, "kind", "largo")
     try:
@@ -992,13 +1078,13 @@ def execute_stage(p, stage, generate_fn=None):
         if stage == "storyboard":
             return run_storyboard(generate_fn, p, job)
         if stage == "tts":
-            return run_tts_stage(p, job)
+            return run_tts_stage(p, job, progress=progress)
         if stage == "animacion":
-            return run_animacion(generate_fn, p, job)
+            return run_animacion(generate_fn, p, job, progress=progress)
         if stage == "ensamblado":
-            return run_ensamblado(p, job)
+            return run_ensamblado(p, job, progress=progress)
         if stage == "miniatura":
-            return run_miniatura(generate_fn, p)
+            return run_miniatura(generate_fn, p, progress=progress)
         if stage == "paquete":
             return run_paquete(generate_fn, p, job)
         if stage in MANUAL_STAGES:
@@ -1012,10 +1098,12 @@ def execute_stage(p, stage, generate_fn=None):
         return False, f"Error: {e}", [], None
 
 
-def run_all(conn, p, generate_fn, on_step=None):
+def run_all(conn, p, generate_fn, on_step=None, on_progress=None):
     """Ejecuta las etapas EN ORDEN y se detiene donde hace falta un humano.
 
     on_step(stage, ok, log) se llama tras cada etapa ejecutada.
+    on_progress(stage, done, total, detalle) reporta el avance de las
+    etapas largas con ETA.
     Devuelve (motivo, detalle):
       ("done", "")        todo completado
       ("gate", gate)      esperando aprobación humana (guion/miniatura/tema)
@@ -1040,7 +1128,8 @@ def run_all(conn, p, generate_fn, on_step=None):
             if _db.get_approval(conn, pid, "guion")["status"] == "aprobado":
                 continue
             if stt != "en-curso":
-                ok, log, arts, sugg = execute_stage(p, name, generate_fn)
+                ok, log, arts, sugg = execute_stage(p, name, generate_fn,
+                                                   progress=on_progress)
                 _db.set_stage(conn, pid, name,
                               sugg or ("ok" if ok else "fallo"), log, arts)
                 if on_step:
@@ -1058,7 +1147,8 @@ def run_all(conn, p, generate_fn, on_step=None):
             if pget(p, "kind", "largo") == "largo" and \
                _db.get_approval(conn, pid, "miniatura")["status"] != "aprobado":
                 return "gate", "miniatura"
-        ok, log, arts, sugg = execute_stage(p, name, generate_fn)
+        ok, log, arts, sugg = execute_stage(p, name, generate_fn,
+                                                   progress=on_progress)
         _db.set_stage(conn, pid, name,
                       sugg or ("ok" if ok else "fallo"), log, arts)
         if on_step:

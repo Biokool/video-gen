@@ -11,6 +11,7 @@ y se detiene cuando necesita tu decisión (aprobar guion o miniatura)
 o una etapa manual (animación, ensamblado).
 """
 import sys
+import time
 from pathlib import Path
 
 import streamlit as st
@@ -50,6 +51,53 @@ def stage_badge(status):
             "manual": "✅"}.get(status, "❔")
 
 
+def fmt_dur(secs):
+    secs = int(round(secs))
+    if secs < 60:
+        return f"{secs}s"
+    m, s = divmod(secs, 60)
+    return f"{m}m{s:02d}s"
+
+
+def duracion_de(log):
+    """Extrae '⏱ Duración: Xm' del log de una etapa, si existe."""
+    import re
+    m = re.search(r"⏱ Duración: (\S+)", log or "")
+    return m.group(1) if m else ""
+
+
+def apply_stage_result(pid, stage, ok, log, arts, sugg):
+    db.set_stage(conn, pid, stage, sugg or ("ok" if ok else "fallo"),
+                 log, arts)
+
+
+def ejecutar_con_progreso(pid, p, stage, gen_fn, titulo):
+    """Ejecuta UNA etapa con indicador visible, barra de progreso y ETA.
+
+    Muestra un panel st.status con la barra mientras corre, guarda la
+    duración en el log y marca la etapa. Devuelve (ok, log).
+    """
+    st.session_state["running"] = (pid, titulo)
+    box = st.status(f"▶ {titulo} — en ejecución…", expanded=True)
+    bar = box.progress(0, text="Iniciando…")
+
+    def cb(_skey, done, total, det):
+        bar.progress(min(done / max(total, 1), 1.0), text=det)
+
+    t0 = time.time()
+    try:
+        ok, log, arts, sugg = execute_stage(p, stage, gen_fn,
+                                            progress=cb)
+    finally:
+        st.session_state.pop("running", None)
+    dt = time.time() - t0
+    log = (log or "") + f"\n⏱ Duración: {fmt_dur(dt)}"
+    apply_stage_result(pid, stage, ok, log, arts, sugg)
+    box.update(label=f"{'✅' if ok else '❌'} {titulo} — {fmt_dur(dt)}",
+               state="complete" if ok else "error", expanded=not ok)
+    return ok, log
+
+
 def all_keys():
     keys = {b: get(llm.BACKENDS[b]["setting"])
             for b in llm.BACKENDS if llm.BACKENDS[b]["setting"]}
@@ -62,6 +110,7 @@ def make_generate_fn(backend, model):
     def fn(prompt, system=""):
         return llm.generate(prompt, backend=backend, model=model,
                             system=system, keys=keys)
+    fn.backend = backend  # el pipeline lo usa para pacing (Groq OTPM)
     return fn
 
 
@@ -93,8 +142,15 @@ if st.sidebar.button("Guardar como predeterminado"):
     st.sidebar.success("Guardado.")
 
 st.sidebar.divider()
+# ---- indicador global: algo se está ejecutando ----
+_running = st.session_state.get("running")
+if _running:
+    st.sidebar.error(f"▶ CORRIENDO\n\n{_running[1]}\n(proyecto #{_running[0]})")
+    st.sidebar.caption("No pulses otros botones hasta que termine.")
 view = st.sidebar.radio("Vista", ["📥 Bandeja de temas", "🎬 Proyectos",
                                   "⚙️ Configuración"])
+st.sidebar.divider()
+st.sidebar.caption("Panel v5 · Zenn Factory")
 
 gen_fn = make_generate_fn(backend, model_id)
 
@@ -201,7 +257,11 @@ elif view == "🎬 Proyectos":
             del st.session_state["project_id"]
             rerun()
         st.title(f"#{p['id']} {p['title']}")
-        st.caption(f"{project_kind_label(p['kind'])} · voz {p['voice']} · "
+        import tts_engine as _te
+        _veng, _vvoz = _te.parse_spec(p["voice"])
+        _vlabel = dict(_te.VOICE_CATALOG.get(_veng, {}).get("voices", [])
+                       ).get(_vvoz, p["voice"])
+        st.caption(f"{project_kind_label(p['kind'])} · 🎙️ {_vlabel} · "
                    f"{p['language']} · modelo del sidebar: "
                    f"{llm.BACKENDS[backend]['label']} / {model_id}")
 
@@ -237,15 +297,34 @@ elif view == "🎬 Proyectos":
             kind_msg, txt = st.session_state.pop("run_msg")
             (st.success if kind_msg == "ok" else st.warning)(txt)
         if st.button("▶ Correr todo (avanza solo y se detiene si te necesita)",
-                     type="primary"):
-            box = st.empty()
+                     type="primary", disabled=bool(_running)):
+            st.session_state["running"] = (pid, "Correr todo")
+            box = st.status("▶ Correr todo — en ejecución…", expanded=True)
+            bar = box.progress(0, text="Iniciando…")
             lines = []
+            n_pend = len([s for s in stages
+                          if s["status"] not in ("ok", "manual", "omitido")])
+            hecho = {"n": 0}
 
             def on_step(name, ok, log):
-                lines.append(f"{'✅' if ok else '❌'} {stage_label(p['kind'], name)}")
+                hecho["n"] += 1
+                lines.append(f"{'✅' if ok else '❌'} "
+                             f"{stage_label(p['kind'], name)}")
                 box.write("\n\n".join(lines))
 
-            reason, detail = run_all(conn, p, gen_fn, on_step=on_step)
+            def cb(_skey, done, total, det):
+                frac = (hecho["n"] + min(done / max(total, 1), 1.0))
+                bar.progress(min(frac / max(n_pend, 1), 1.0),
+                             text=f"Etapa {hecho['n'] + 1}/{n_pend} · {det}")
+
+            try:
+                reason, detail = run_all(conn, p, gen_fn, on_step=on_step,
+                                         on_progress=cb)
+            finally:
+                st.session_state.pop("running", None)
+            box.update(label="⏸ Correr todo — detenido (te necesita)" if reason != "done"
+                       else "✅ Correr todo — completo",
+                       state="complete", expanded=False)
             if reason == "done":
                 msg = ("ok", "✅ Todo ejecutado. Revisa el paquete de publicación.")
             elif reason == "gate" and detail == "guion":
@@ -270,12 +349,28 @@ elif view == "🎬 Proyectos":
 
         # ---- config rápida ----
         with st.expander("⚙️ Configuración del proyecto"):
-            ck1, ck2, ck3 = st.columns(3)
-            nv = ck1.text_input("Voz", p["voice"])
-            nl = ck2.text_input("Idioma", p["language"])
-            nm = ck3.text_input("Modelo", p["model_id"])
+            import tts_engine
+            peng, pvoice = tts_engine.parse_spec(p["voice"])
+            pengs = tts_engine.ENGINES
+            ck1, ck2 = st.columns(2)
+            sel_eng = ck1.selectbox(
+                "Motor de voz", pengs,
+                index=pengs.index(peng) if peng in pengs else 0,
+                format_func=lambda e: tts_engine.VOICE_CATALOG[e]["label"],
+                key=f"veng{pid}")
+            vlist = tts_engine.VOICE_CATALOG[sel_eng]["voices"]
+            vids = [v for v, _ in vlist]
+            sel_voice = ck2.selectbox(
+                "Voz", vids,
+                index=vids.index(pvoice) if sel_eng == peng and pvoice in vids else 0,
+                format_func=lambda v: dict(vlist)[v],
+                key=f"vvoz{pid}")
+            ck3, ck4 = st.columns(2)
+            nl = ck3.text_input("Idioma", p["language"])
+            nm = ck4.text_input("Modelo", p["model_id"])
             if st.button("Guardar config"):
-                db.update_project(conn, pid, voice=nv, language=nl, model_id=nm)
+                db.update_project(conn, pid, voice=f"{sel_eng}:{sel_voice}",
+                                  language=nl, model_id=nm)
                 st.success("Guardado.")
                 rerun()
 
@@ -284,8 +379,10 @@ elif view == "🎬 Proyectos":
         for i, s in enumerate(stages):
             sname = stage_label(p["kind"], s["stage"])
             auto = dict((x[0], x[2]) for x in stages_for(p["kind"])).get(s["stage"], "?")
+            dur = duracion_de(s["log"])
             titulo = (f"**{i + 1}/{total}** {stage_badge(s['status'])} "
-                      f"{sname} · `{auto}` · {s['status']}")
+                      f"{sname} · `{auto}` · {s['status']}"
+                      + (f" · ⏱ {dur}" if dur else ""))
             with st.expander(titulo):
                 hint = STAGE_HINTS.get(s["stage"])
                 if hint:
@@ -297,19 +394,22 @@ elif view == "🎬 Proyectos":
                     st.write(f"📎 {a}")
                 c1, c2, c3 = st.columns(3)
                 with c1:
-                    if st.button("▶ Ejecutar", key=f"run{pid}{s['stage']}"):
-                        ok, log, arts2, sugg = execute_stage(p, s["stage"], gen_fn)
-                        apply_stage_result(pid, s["stage"], ok, log, arts2, sugg)
+                    if st.button("▶ Ejecutar", key=f"run{pid}{s['stage']}",
+                                 disabled=bool(_running)):
+                        ok, _log = ejecutar_con_progreso(
+                            pid, p, s["stage"], gen_fn, sname)
                         if not ok:
-                            st.error(log)
+                            st.error(_log[-800:])
                         rerun()
                 with c2:
-                    if st.button("✔ Marcar hecho", key=f"man{pid}{s['stage']}"):
+                    if st.button("✔ Marcar hecho", key=f"man{pid}{s['stage']}",
+                                 disabled=bool(_running)):
                         db.set_stage(conn, pid, s["stage"], "manual",
                                      "Marcado manual desde el panel.")
                         rerun()
                 with c3:
-                    if st.button("⏭ Omitir", key=f"sk{pid}{s['stage']}"):
+                    if st.button("⏭ Omitir", key=f"sk{pid}{s['stage']}",
+                                 disabled=bool(_running)):
                         db.set_stage(conn, pid, s["stage"], "omitido", "Omitido.")
                         rerun()
 

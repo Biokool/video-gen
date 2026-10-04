@@ -217,16 +217,33 @@ def _ollama_generate(model, prompt, system=""):
 # Límite de salida por minuto (OTPM) de Groq: pedir más de 1.000 tokens
 # de golpe devuelve 400 aunque el modelo lo necesite. El resto de backends
 # usan el máximo por defecto.
-MAX_TOKENS = {"groq": 950}
+MAX_TOKENS = {"groq": 1200}  # OTPM 1000: ~1200 tokens ≈ escenas compactas sin truncar
+
+
+def _rate_kind(msg):
+    """Clasifica un error de cuota: 'wait' (se libera solo, reintentar),
+    'skip' (cuota diaria/facturación: saltar al siguiente modelo),
+    None (no es cuota)."""
+    m = (msg or "").lower()
+    if "too large for model" in m:
+        return None   # error duro de cuota: reintentar no arregla nada
+    skip = ("exceeded your current quota", "quota exceeded",
+            "daily quota", "check your plan", "billing",
+            "resource_exhausted", "insufficient_quota", "insufficient funds",
+            "account", "suspend")
+    if any(p in m for p in skip):
+        return "skip"
+    wait = ("rate limit", "too many requests", " 429",
+            "output tokens per minute", "requests per minute",
+            "tokens per minute", "try again", "temporarily",
+            "overloaded", "server busy")
+    if any(p in m for p in wait):
+        return "wait"
+    return None
 
 
 def _is_rate_limit(msg):
-    m = (msg or "").lower()
-    if "too large for model" in m:
-        return False   # error duro de cuota: reintentar no arregla nada
-    return ("rate limit" in m or "too many requests" in m or
-            " 429" in m or "output tokens per minute" in m or
-            "requests per minute" in m)
+    return _rate_kind(msg) is not None
 
 
 def _rate_wait(msg, default=30.0):
@@ -418,10 +435,15 @@ def generate(prompt, backend="gemini", model="", system="", keys=None,
                     raise LLMError("respuesta vacía")
                 return text, m
             except LLMError as e:
-                if _is_rate_limit(str(e)) and attempt < 2:
+                kind = _rate_kind(str(e))
+                if kind == "wait" and attempt < 2:
                     wait = _rate_wait(str(e))
                     time.sleep(wait)   # cuota por minuto: se libera sola
                     continue
+                if kind == "skip":
+                    errors.append(f"{m}: cuota agotada, salto al siguiente "
+                                  f"modelo ({e})")
+                    break              # no tiene caso reintentar el mismo
                 errors.append(f"{m}: {e}")
                 break
     raise LLMError(f"Ningún modelo de '{backend}' respondió.\n" +

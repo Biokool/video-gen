@@ -90,33 +90,58 @@ def runner_path():
     return HERE / "tts_runner.py"
 
 
-def speak_batch(items, spec, audio_dir, language="es"):
+def speak_batch(items, spec, audio_dir, language="es", progress=None):
     """Genera audio/<id>.mp3 para [{id, text}]. Devuelve (ok, log).
 
-    Un solo proceso runner para toda la etapa; normaliza volumen.
+    Kokoro carga el modelo una vez: va en un solo lote. Los demás
+    motores van elemento por elemento para reportar avance real.
+    progress(stage, done, total, detalle): callback opcional.
     """
     engine, voice = parse_spec(spec)
     audio_dir = Path(audio_dir)
     audio_dir.mkdir(parents=True, exist_ok=True)
-    batch = {
-        "engine": engine, "voice": voice, "language": language,
-        "items": [{"id": it["id"], "text": it["text"],
-                   "out": str(audio_dir / f"{it['id'].lower()}.mp3")}
-                  for it in items],
-    }
-    bfile = audio_dir / "_tts_batch.json"
-    bfile.write_text(json.dumps(batch, ensure_ascii=False), encoding="utf-8")
-    r = subprocess.run([sys.executable, str(runner_path()), str(bfile)],
-                       capture_output=True, text=True, timeout=3600)
-    try:
-        res = json.loads((r.stdout or "").strip().splitlines()[-1])
-    except Exception:
-        return False, (f"El runner TTS no respondió bien (motor {engine}). "
-                       f"Salida: {(r.stdout or '')[-300:]} "
-                       f"Error: {(r.stderr or '')[-300:]}")
-    ok_ids = res.get("ok", [])
-    fails = res.get("fail", {})
-    log = (f"TTS motor {engine} · voz {voice}: {len(ok_ids)}/{len(items)} OK"
+
+    def run_batch(sub):
+        batch = {
+            "engine": engine, "voice": voice, "language": language,
+            "items": [{"id": it["id"], "text": it["text"],
+                       "out": str(audio_dir / f"{it['id'].lower()}.mp3")}
+                      for it in sub],
+        }
+        bfile = audio_dir / "_tts_batch.json"
+        bfile.write_text(json.dumps(batch, ensure_ascii=False),
+                         encoding="utf-8")
+        r = subprocess.run([sys.executable, str(runner_path()), str(bfile)],
+                           capture_output=True, text=True, timeout=3600)
+        try:
+            return json.loads((r.stdout or "").strip().splitlines()[-1])
+        except Exception:
+            return {"ok": [],
+                    "fail": {it["id"]: "El runner TTS no respondió "
+                                       f"(motor {engine}). "
+                                       f"{(r.stderr or '')[-200:]}"
+                             for it in sub}}
+
+    total, ok_ids, fails = len(items), [], {}
+    if engine == "kokoro":
+        if progress:
+            progress("tts", 0, total, "cargando modelo Kokoro…")
+        res = run_batch(items)
+        ok_ids, fails = res.get("ok", []), res.get("fail", {})
+        if progress:
+            progress("tts", total, total, f"{len(ok_ids)}/{total} audios")
+    else:
+        for i, it in enumerate(items, 1):
+            if progress:
+                progress("tts", i - 1, total, f"narrando {it['id'].upper()}")
+            res = run_batch([it])
+            ok_ids += res.get("ok", [])
+            fails.update(res.get("fail", {}))
+            if progress:
+                progress("tts", i, total,
+                         f"{it['id'].upper()} listo" if it["id"] in ok_ids
+                         else f"{it['id'].upper()} falló")
+    log = (f"TTS motor {engine} · voz {voice}: {len(ok_ids)}/{total} OK"
            + (f" | fallos: {fails}" if fails else "")
            + " · volumen normalizado (loudnorm).")
     return not fails, log

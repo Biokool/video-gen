@@ -1,37 +1,53 @@
+from manim import *
 from zenn_rig import *
 
+
 class S23(Scene):
+    def _play_any(self, obj, **kwargs):
+        if obj is None:
+            return
+        if isinstance(obj, Animation):
+            self.play(obj, **kwargs)
+        else:
+            self.play(FadeIn(obj, **kwargs))
+
     def construct(self):
-        self.background_color = "#0a0a0a"
-        
-        estrellas = VGroup(*[
-            Dot(radius=0.02, color=WHITE).move_to([random.uniform(-6, 6), random.uniform(-4, 4), 0])
-            for _ in range(30)
-        ])
-        self.add(estrellas)
-        self.play(FadeIn(estrellas), run_time=2.0)
+        self.add(fondo(INK))
 
-        # Usar el rig para el monigote
-        monigote = self.rig.get_monic("stickman")
-        monigote.scale(1.5).move_to(ORIGIN)
-        self.play(FadeIn(monigote), run_time=1.0)
+        stars = estrellas(n=42, seed=7, color=WHITE)
+        self.play(FadeIn(stars, run_time=1.0))
 
-        # Red de seguridad
-        red = Grid(
-            x_lines=5, y_lines=5,
-            height=3, width=3,
-            color=BLUE, stroke_width=1,
-            buff=0
-        ).move_to([0, 0.5, 0])
-        
-        self.play(Create(red), run_time=2.0)
+        planet = planeta(pos=RIGHT * 2.8, radio=0.95, color=TEAL)
+        self.play(Create(planet, run_time=1.2))
 
-        # Callout
-        callout_obj = Text("Invisible", color=YELLOW, font_size=48)
-        callout_obj.to_edge(UP, buff=0.5)
-        self.play(FadeIn(callout_obj), run_time=1.0)
+        fig = stick_idle(pos=LEFT * 4.2, color=WHITE)
+        self.play(FadeIn(fig, run_time=0.6))
 
+        self._play_any(
+            stick_walk(fig, LEFT * 2.4, run_time=2.0, steps=6),
+            run_time=2.0,
+        )
+        self.add(expresion(fig, "sorpresa"))
+
+        self._play_any(
+            stick_point(fig, planet.get_center()),
+            run_time=1.0,
+        )
+
+        self._play_any(red_accent(planet), run_time=0.6)
+
+        call = callout("INVISIBLE", color=ORANGE)
+        self._play_any(call, run_time=0.6)
         self.wait(1.0)
 
-        self.play(FadeOut(callout_obj), run_time=0.5)
-        self.wait(0.5)
+        self._play_any(
+            Transform(call, callout("DOMINA", color=YELLOW)),
+            run_time=0.7,
+        )
+        self.wait(1.2)
+
+        self._play_any(
+            Transform(call, callout("COSMOS", color=RED)),
+            run_time=0.7,
+        )
+        self.wait(1.5)

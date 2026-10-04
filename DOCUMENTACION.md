@@ -245,6 +245,9 @@ handle y que no exista un canal grande con el nombre antes de cambiar.
 | Ensamblado falla | ffmpeg/ffprobe no están en el PATH |
 | El LLM ignora el rig | El panel lo detecta y reintenta solo (máx. 2 por escena); si persiste, cambia de modelo (gpt-oss-120b y qwen3.6 obedecen mejor) |
 | Puerto 8501 ocupado | Cierra el otro Streamlit o cambia `--server.port` |
+| Gemini 429 «exceeded your current quota» | El panel ya no quema los 3 intentos: salta solo al siguiente modelo de la cadena |
+| Código de escena sale cortado (Groq) | OTPM 1000: el panel pide escenas compactas (1200 tokens) y pausa 6 s entre escenas; si una escena falla por eso, reintenta la etapa (las hechas se omiten) |
+| No sé si está corriendo o cuánto falta | v5: el sidebar muestra **▶ CORRIENDO** en rojo, cada etapa larga abre un panel con **barra de progreso y ETA** («S12/24 · ~3m20s restantes») y al terminar guarda la **duración** en su tarjeta |
 
 ## 10. Estructura de archivos
 
@@ -252,7 +255,7 @@ handle y que no exista un canal grande con el nombre antes de cambiar.
 video-gen/
 ├─ app.py · db.py · llm.py · pipeline.py · seed.py
 ├─ tts_engine.py · tts_runner.py     ← voces
-├─ INICIAR.bat · requirements.txt · PROMPT_MAESTRO.md
+├─ INICIAR.bat · ARRANCAR_OLLAMA.bat · requirements.txt · PROMPT_MAESTRO.md
 ├─ panel.db                          ← TUS datos y keys (no compartir)
 ├─ scripts/zenn_rig.py               ← librería de dibujo
 ├─ fonts/GochiHand.ttf
@@ -269,5 +272,24 @@ video-gen/
 - [ ] Énfasis de palabras sincronizado en pantalla (word-timing).
 - [ ] A/B de miniaturas con las 3 variantes tras publicar.
 
-*Versión del panel: v4 (voces multi-motor, rig v2, subtítulos pulidos,
-miniaturas v3, paquete viral).*
+## 12. Cambios v5 (2026-10-03)
+
+- **Progreso visible con ETA:** TTS, animación, ensamblado y miniaturas
+  reportan elemento por elemento («S12/24 · ~3m20s restantes»); el
+  sidebar muestra **▶ CORRIENDO** y bloquea doble-clic; cada tarjeta de
+  etapa guarda su **duración** al terminar.
+- **Cuotas inteligentes:** `_rate_kind()` distingue «esperar» (cuota por
+  minuto → reintenta el mismo modelo) de «saltar» (cuota diaria /
+  facturación, p. ej. el 429 de Gemini → pasa al siguiente modelo sin
+  quemar intentos).
+- **Groq OTPM:** presupuesto de 1200 tokens por escena, prompt de código
+  compacto y pausa de 6 s entre escenas.
+- **Backends nuevos** (de la sesión 2026-10-02): Token Harbor, FreeLLMAPI
+  y DeepSeek oficial + `ARRANCAR_OLLAMA.bat` (Ollama en modo CPU: el
+  driver NVIDIA 546.29 no compila PTX).
+- **Firmas reales del rig** en los prompts (`ast` sobre zenn_rig.py):
+  el modelo ya no inventa parámetros.
+- Selector de **voz amable** también en la config de cada proyecto.
+
+*Versión del panel: v5 (progreso con ETA, cuotas inteligentes, pacing
+Groq, rig con firmas reales, backends Token Harbor/FreeLLMAPI/DeepSeek).*

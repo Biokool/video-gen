@@ -1,75 +1,66 @@
 from manim import *
 from zenn_rig import *
 
-def estrellas(n=50):
-    """Crea un VGroup con n estrellas (pequeños círculos blancos) aleatorios."""
-    stars = VGroup()
-    for _ in range(n):
-        star = Dot(
-            np.random.uniform(-7, 7), 
-            np.random.uniform(-4, 4), 
-            color=WHITE,
-            scale=0.1
-        )
-        stars.add(star)
-    return stars
-
 class S22(Scene):
     def construct(self):
-        # Escenario nocturno/especial para "materia oscura"
-        self.add(fondo(INK))
-        
-        # Estrellas de fondo
-        estrellas_obj = estrellas(n=50)
-        self.play(FadeIn(estrellas_obj, run_time=1.5))
+        # Monigote para reaccionar a la información
+        stick_person = stick_idle(pos=LEFT * 3)
 
-        # Split screen: Lado Izquierdo (Cosmos/Materia Oscura)
-        lado_izq = VGroup()
-        fig_derecho = stick_idle(LEFT * 3, height=2.5, color=WHITE)
-        expresion_derecho = expresion(fig_derecho, "sorpresa")
-        
-        # Elementos cósmicos abstractos para el lado izquierdo
-        esfera_oscura = Esfera(radius=1.5, color=PURPLE_E, opacity=0.3)
-        esfera_oscura.move_to(LEFT * 6 + UP * 1)
-        
-        lado_izq.add(fig_derecho, expresion_derecho, esfera_oscura)
-        
-        # Split screen visual divider
-        linea_division = Line(UP*4, DOWN*4, color=WHITE, stroke_width=2)
-        self.play(Create(linea_division))
-        
-        # Lado Derecho (Biología/Materia Ordinaria)
-        fig_izquierdo = stick_idle(RIGHT * 3, height=2.5, color=YELLOW)
-        expresion_izquierdo = expresion(fig_izquierdo, "normal")
-        
-        # Prop biológico: ADN simplificado o célula (usamos una esfera brillante)
-        celula = Circle(radius=1.2, color=GREEN_E, fill_opacity=0.5)
-        celula.move_to(RIGHT * 6 + UP * 1)
-        
-        self.add(fig_izquierdo, expresion_izquierdo, celula)
+        # Crear la pantalla dividida con los datos
+        # La función split_screen espera STRINGS para left_text y right_text,
+        # y ella misma crea los objetos Text internos.
+        # El objeto 'split' devuelto es un VGroup que contiene los elementos
+        # en un orden específico (típicamente [left_text, divider, right_text]).
+        split = split_screen("95% MATERIA OSCURA", "100% MATERIA ORDINARIA", divider_color=INK)
 
-        # Transición: El personaje de la derecha se acerca al centro para explicar
-        self.play(fig_izquierdo.animate.next_to(linea_division, RIGHT, buff=0.5),
-                  expresion_izquierdo.animate.next_to(fig_izquierdo, UP))
-        
-        # Callout principal: "95% Materia Oscura"
-        callout_1 = callout("95% MATERIA OSCURA", color=PURPLE_E)
-        callout_1.move_to(LEFT * 6 + DOWN * 2.5)
-        
-        self.play(FadeIn(callout_1))
-        self.wait(3)
+        # Escalar el texto DESPUÉS de que split_screen lo haya creado.
+        # Accedemos a los objetos Text dentro del VGroup 'split' por su índice.
+        # Asumiendo que el texto izquierdo es el primer elemento y el derecho el tercero.
+        split[0].scale(0.7) # Texto izquierdo
+        split[2].scale(0.7) # Texto derecho
 
-        # Cambio de expresión a "sorpresa" en el personaje de la derecha para enfatizar
-        self.play(Transform(expresion_izquierdo, expresion(fig_izquierdo, "miedo")))
-        
-        # Callout 2: "100% Materia Ordinaria"
-        callout_2 = callout("100% MATERIA ORDINARIA", color=GREEN_E)
-        callout_2.move_to(RIGHT * 6 + DOWN * 2.5)
-        
-        self.play(FadeIn(callout_2))
-        
-        # Animación final: Los dos grupos se miran
-        self.play(fig_derecho.animate.look_at(fig_izquierdo),
-                  fig_izquierdo.animate.look_at(fig_derecho))
-        
-        self.wait(3)
+        # Animaciones
+        self.play(
+            FadeIn(stick_person),
+            run_time=1
+        )
+        self.play(
+            Create(split),
+            run_time=3
+        )
+
+        # Añadir expresión de sorpresa al monigote
+        exp = expresion(stick_person, 'sorpresa')
+        self.play(
+            FadeIn(exp),
+            run_time=0.5
+        )
+
+        # Resaltar la parte de la materia oscura
+        # Accedemos al objeto Text izquierdo por su índice.
+        accent_dark = red_accent(split[0])
+        self.play(
+            FadeIn(accent_dark),
+            run_time=0.5
+        )
+        self.wait(2) # Pausa para la narración: "tú eres 95% materia oscura en términos de masa cósmica"
+
+        # Cambiar el resalte a la materia ordinaria
+        # Accedemos al objeto Text derecho por su índice.
+        accent_ordinary = red_accent(split[2])
+        self.play(
+            FadeOut(accent_dark),
+            FadeIn(accent_ordinary),
+            run_time=1
+        )
+        self.wait(2) # Pausa para la narración: "pero biológicamente eres 100% materia ordinaria."
+
+        # Limpiar la escena
+        self.play(
+            FadeOut(accent_ordinary),
+            FadeOut(exp),
+            FadeOut(stick_person),
+            FadeOut(split),
+            run_time=1
+        )
+        self.wait(1)

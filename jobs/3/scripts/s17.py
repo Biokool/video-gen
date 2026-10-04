@@ -1,41 +1,44 @@
 from manim import *
 from zenn_rig import *
 
+
 class S17(Scene):
     def construct(self):
-        detector = caja("XENON", pos=DOWN * 1.6, width=2.4)
-        rock = red_seguridad(width=7.5, height=1.2, pos=UP * 1.9)
-        researcher = stick_idle(pos=LEFT * 4.0 + DOWN * 0.2, height=2.0, color=INK)
-        researcher.add(expresion(researcher, "preocupado"))
+        def play(obj, run_time=1.0):
+            if obj is None:
+                self.wait(run_time)
+            elif isinstance(obj, Animation):
+                self.play(obj, run_time=run_time)
+            else:
+                self.play(FadeIn(obj), run_time=run_time)
 
-        self.play(
-            FadeIn(rock),
-            FadeIn(detector),
-            FadeIn(researcher),
-            run_time=1.5
+        self.add(fondo(INK))
+        play(estrellas(n=30), 1.0)
+
+        fig = stick_idle(pos=LEFT * 3.4, color=WHITE, height=2.2)
+        play(fig, 0.9)
+        play(expresion(fig, "preocupado"), 0.6)
+
+        flash_graph = curva(
+            pos=RIGHT * 2.6,
+            ancho=4.2,
+            alto=2.4,
+            color=WHITE,
+            acento=RED,
         )
+        play(flash_graph, 1.1)
 
-        self.play(
-            stick_walk(researcher, RIGHT * 2.0 + DOWN * 0.2, run_time=2.5, steps=7)
-        )
-
-        self.play(stick_point(researcher, detector), run_time=1.0)
-
-        accent = red_accent(detector, scale=1.35)
-        if isinstance(accent, Animation):
-            self.play(accent, run_time=0.8)
-        else:
-            self.play(FadeIn(accent), run_time=0.8)
-
-        label1 = callout("Miles de metros", color=ORANGE, font_size=64)
-        label1.shift(UP * 3.3)
-        self.play(FadeIn(label1), run_time=0.8)
+        label = callout("BAJO ROCA", color=YELLOW, font_size=76).to_edge(UP)
+        play(label, 0.8)
         self.wait(1.0)
 
-        label2 = callout("Destellos", color=RED, font_size=72)
-        label2.shift(UP * 0.7 + RIGHT * 3.0)
-        self.play(FadeIn(label2), run_time=0.8)
-        self.wait(1.0)
+        play(stick_point(fig, flash_graph.get_center()), 1.4)
+        accent = red_accent(flash_graph, scale=1.35)
+        play(accent, 1.0)
 
-        self.play(stick_think(researcher, "¿Impactos?"), run_time=1.2)
+        flash = callout("DESTELLO", color=ORANGE, font_size=88)
+        flash.move_to(flash_graph.get_center() + UP * 1.8)
+        self.play(ReplacementTransform(label, flash), run_time=1.0)
+
+        play(stick_think(fig, "¿luz?"), 1.8)
         self.wait(1.4)
