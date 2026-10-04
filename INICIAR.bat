@@ -78,15 +78,26 @@ if exist "%~dp0ARRANCAR_OLLAMA.bat" (
     echo       INFO: sin ARRANCAR_OLLAMA.bat  ^(opcional, modelos locales^).
 )
 
+if exist "%~dp0PANEL_CONTROL.ps1" (
+    echo       Revisando si ya hay un panel corriendo...
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0PANEL_CONTROL.ps1"
+)
+
 echo.
 echo ----------------------------------------------------------
 echo   Abriendo el panel:  http://localhost:8501
-echo   Para pararlo:       Ctrl+C en esta ventana
+echo   Para pararlo:       cierra esta ventana ^(o vuelve a lanzar INICIAR.bat^)
 echo ----------------------------------------------------------
 echo.
+set "intentos=0"
+:try_start
 "%ST%" run app.py --server.port 8501
-if errorlevel 1 goto fail
-goto end
+if not errorlevel 1 goto end
+set /a intentos+=1
+if %intentos% geq 3 goto fail
+echo       Puerto 8501 ocupado, reintento en 5 s...  ^(%intentos%/3^)
+timeout /t 5 /nobreak >nul 2>nul
+goto try_start
 
 :fail
 echo.
