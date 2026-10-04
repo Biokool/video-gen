@@ -314,5 +314,55 @@ video-gen/
 - **Temas:** el generador mezcla curiosidades científicas, cultura
   alternativa y preguntas cotidianas, con formato de título de alto CTR.
 
-*Versión del panel: v6 (composición segura, estilo ilustrado, guion con
-retención, saludo/despedida fijos).*
+## 13. Cambios v6.1 (2026-10-03)
+
+- **Bug de cuotas Groq:** el error `tokens per day (TPD)` se clasificaba
+  como límite temporal (`wait`) en vez de cuota diaria (`skip`): el panel
+  esperaba 30 s y reintentaba el MISMO modelo agotado 3 veces por escena.
+  Ahora `tokens per day`/`tpd` → `skip` (verificado con el mensaje real).
+- **Transparencia de consumo:** la etapa de animación estima los tokens al
+  inicio (`~N escenas × ~2.6K tokens`) y avisa del límite Groq gratuito
+  (200K/día). Si todas las fallas son de cuota, el resumen lo dice
+  explícito y sugiere cambiar de backend o reanudar otro día.
+- Integrados los cambios de Chino: catálogos de modelos gratuitos
+  renovados en vivo (2026-10-03) e INICIAR.bat con detección de panel
+  ya corriendo.
+
+## 14. Cambios v6.2 (2026-10-03)
+
+- **Ritmo por defecto:** el storyboard ahora pide escenas CORTAS de 8–12
+  segundos (~25–35 palabras de VOZ, ~50–60 escenas por video de 10 min).
+  Más cortes = más dinamismo = más retención. Es el comportamiento
+  estándar, no una opción.
+- **Anti-truncado:** la etapa de storyboard verifica cobertura (palabras de
+  VOZ vs. palabras del guion); si cubre menos del 70%, avisa explícito
+  para reintentar con otro backend.
+- Nota honesta: más escenas = más tokens (~2.6K por escena). Con 50–60
+  escenas, Groq gratis (200K/día) se agota en un video; la estimación de
+  tokens al inicio de la animación lo muestra. Estrategia: repartir etapas
+  entre días, rotar backends u Ollama local para animación.
+
+## 15. Cambios v7 (2026-10-04)
+
+- **Protagonista oficial** (rig v4, según character sheets del canal):
+  `protagonista(pos, playera, altura, expresion, pose)` — cabezón de ojos
+  grandes, playera de color, extremidades negras. 15 expresiones
+  (feliz, alegria_pura, triste, enojado, sorpresa, mente_explotada,
+  pensando, confundido, miedo, decidido, euforico, cansado, dormido,
+  nervioso, sarcastico), 5 poses (de_pie, senalando, brazos_cruzados,
+  caminando, corriendo), 10 colores de playera. `cambiar_cara(prota,
+  tipo)` cambia la expresión en el acto; `version_prota(n)` ataja las
+  versiones de la sheet (1=intro naranja … 8=final teal). Es OBLIGATORIO
+  en todas las escenas (storyboard + prompt de escenas).
+- **Miniaturas** con el protagonista (`prota_thumb` en PIL): cabezón +
+  playera de color por variante, cara siempre legible en cualquier fondo.
+- **Temas que venden:** TOPIC_PROMPT con las 6 fórmulas ganadoras
+  analizadas de Ink Explainer / Simple Paint / theblurb / Aussie Finance
+  (pregunta con hueco, 2ª persona + secreto, cifra + quiebre,
+  supervivencia, superlativo honesto, comportamiento animal) + formato
+  serie "en cada nivel de X". Informe completo en
+  `docs/ANALISIS_CANALES.md`. Diferenciadores: español (hueco vacío),
+  fuentes reales citadas, ritmo 8–12s, playera por tema.
+
+*Versión del panel: v7 (protagonista oficial, miniaturas con personaje,
+temas con fórmulas ganadoras).*

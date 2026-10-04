@@ -290,6 +290,15 @@ y una descripción visual de 1 línea (qué personaje u objeto se ve, con qué
 expresión y colores).
 
 REGLAS:
+- RITMO POR DEFECTO: escenas CORTAS de 8-12 segundos (~25-35 palabras de VOZ
+  por escena). Más cortes = más dinamismo = más retención. Parte el guion en
+  TANTAS escenas como necesites (un video de 10 minutos → 50-60 escenas).
+  PROHIBIDO meter 3 o más frases en una sola escena si puedes partirla en dos.
+- PROTAGONISTA EN TODAS: el personaje principal (protagonista) aparece en
+  cada escena como conductor. Varía su playera por bloque temático
+  (naranja=intro, azul=presentación, verde=transmisión, roja=curiosidad,
+  amarilla=pregunta, rosa=detalles, teal=cierre) y su expresión según la
+  emoción de la narración.
 - La PRIMERA escena es la bienvenida: tarjeta_canal() + el saludo del guion.
 - La ÚLTIMA escena es la despedida del guion (tono cálido, cierre del canal).
 - Cada escena: 2-4 elementos, nada encimado, nada cortado por los bordes,
@@ -322,7 +331,18 @@ def run_storyboard(generate_fn, p, job):
     out = job / "STORYBOARD.md"
     out.write_text(text, encoding="utf-8")
     n = text.count("### S")
-    return True, f"Storyboard con {model}: {n} escenas en {out}.", [str(out)], None
+    # Verificación anti-truncado: la suma de palabras de VOZ debe cubrir
+    # el grueso del guion; si no, el modelo cortó la respuesta.
+    voz_words = sum(len(m.group(1).split())
+                    for m in re.finditer(r"VOZ:\s*(.+)", text))
+    guion_words = len(re.sub(r"^#.*$", "", script, flags=re.M).split())
+    aviso = ""
+    if guion_words > 0 and voz_words < 0.7 * guion_words:
+        aviso = (f" ⚠️ POSIBLE TRUNCADO: el storyboard cubre ~{voz_words} "
+                 f"palabras de {guion_words} del guion. Reintenta la etapa "
+                 f"con otro backend o en otro momento.")
+    return True, (f"Storyboard con {model}: {n} escenas en {out} "
+                  f"(~{voz_words} palabras de VOZ).{aviso}"), [str(out)], None
 
 
 # ---------- paquete de publicación (asistida) ----------
@@ -534,13 +554,27 @@ def run_tts_stage(p, job, progress=None):
 
 # ---------- animación: LLM genera Manim + render con autorreparación ----------
 RIG_API = """API del rig (zenn_rig.py, ya importado con *). USO OBLIGATORIO:
-los monigotes y objetos se crean SOLO con estas funciones. PROHIBIDO
-construir monigotes con Circle/Line sueltos o redefinir el rig.
-- stick_idle(pos, height=2.2, color=INK) -> monigote quieto
-- stick_walk(fig, target, run_time=2.0) / stick_run(fig, target, run_time=1.5)
-- stick_point(fig, target) / stick_think(fig, texto) / stick_group(n, ...)
-- expresion(fig, tipo) -> cara sobre la cabeza (añadir tras posicionar):
-  tipos: "normal", "feliz", "preocupado", "sorpresa", "triste", "miedo", "dormido"
+los personajes y objetos se crean SOLO con estas funciones. PROHIBIDO
+construir personajes con Circle/Line sueltos o redefinir el rig.
+
+PERSONAJE PRINCIPAL — "EL PORQUÉ" (protagonista en TODAS las escenas):
+  protagonista(pos, playera, altura=3.0, expresion, pose) -> el conductor:
+  cabezón de ojos grandes, playera de color, extremidades negras simples.
+  playera: PLAYERA_NARANJA (default/intro), AZUL, VERDE, ROJA, AMARILLA,
+    ROSA, TEAL, MORADA, NEGRA, BLANCA. Cambia el color por bloque temático.
+  expresion: feliz, alegria_pura, triste, enojado, sorpresa,
+    mente_explotada, pensando, confundido, miedo, decidido, euforico,
+    cansado, dormido, nervioso, sarcastico.
+  pose: de_pie, senalando, brazos_cruzados, caminando, corriendo.
+  cambiar_cara(prota, tipo) -> cambia la expresión en el acto (para animar).
+  version_prota(n, pos) -> atajo: 1=intro naranja, 2=presentación azul,
+    4=curiosidad roja, 5=pregunta amarilla, 6=transmisión verde señalando,
+    7=detalles rosa, 8=final teal.
+- Monigote clásico (secundario): stick_idle(pos, height=2.2, color=INK),
+  stick_walk(fig, target, run_time=2.0), stick_run(fig, target, run_time=1.5),
+  stick_point(fig, target), stick_think(fig, texto), stick_group(n, ...),
+  expresion(fig, tipo): "normal", "feliz", "preocupado", "sorpresa",
+  "triste", "miedo", "dormido"
 - title_card(texto, color) -> tarjeta de capítulo a pantalla completa
 - callout(texto, color=ORANGE, font_size=96) / arrow(start, end) / red_accent(obj)
 - split_screen(izq, der) / clock_montage(radius)
@@ -722,6 +756,16 @@ def run_animacion(generate_fn, p, job, progress=None):
     prog = Progreso("animacion", progress)
     prog.start(len(scenes), "leyendo escenas")
     logs, arts, fallos = [], [], []
+    fallos_quota = []  # escenas caídas por cuota del backend (no por código)
+    # Estimación de consumo: el usuario debe dimensionar la cuota diaria.
+    if getattr(generate_fn, "backend", "") == "groq":
+        muestra = SCENE_PROMPT.format(cls="S00", rig=rig_text, sid="S00",
+                                      voz="voz", visual="visual", secs=10)
+        est = len(scenes) * (len(muestra) // 4 + 1200)
+        logs.append(f"~{est // 1000}K tokens estimados en esta etapa "
+                    f"({len(scenes)} escenas). Límite Groq gratuito: "
+                    "200K/día. Si ya generaste guion+storyboard hoy, "
+                    "reparte entre días o usa otro backend/Ollama local.")
     done = 0
     for sc in scenes:
         sid, cls = sc["id"], sc["id"].upper()
@@ -789,6 +833,10 @@ def run_animacion(generate_fn, p, job, progress=None):
         if err:
             fallos.append(cls)
             logs.append(f"{cls}: FALLO tras intentos: {err[-300:]}")
+            if any(w in err.lower() for w in
+                   ("rate limit", "quota", "429", "tokens per day", "tpd",
+                    "too many requests")):
+                fallos_quota.append(cls)
         done += 1
         prog.item(done, len(scenes),
                   f"{cls} lista" if not err else f"{cls} falló")
@@ -800,6 +848,11 @@ def run_animacion(generate_fn, p, job, progress=None):
             f"Animación parcial: {len(arts)}/{len(scenes)} escenas. "
             f"Fallaron: {', '.join(fallos)} (reintenta la etapa: las ya "
             "hechas se omiten).")
+    if not ok and fallos_quota and len(fallos_quota) == len(fallos):
+        head += ("\n⚠️ Todas las fallas fueron de CUOTA del backend "
+                 "(límite diario agotado), no errores de código. Cambia de "
+                 "backend en la barra lateral o reanuda mañana: las escenas "
+                 "ya renderizadas se omiten solas.")
     return ok, head + "\n" + "\n".join(logs[-20:]), arts, None
 
 
@@ -1199,24 +1252,43 @@ def run_all(conn, p, generate_fn, on_step=None, on_progress=None):
 
 
 # ---------- propuestas de temas (asistida por LLM) ----------
-TOPIC_PROMPT = """Propón 8 temas para videos de curiosidad científica al estilo de los canales
-Zenn y Memorias de Pez: una sola pregunta por video, 8-12 minutos, dibujos
-simples y coloridos. Público: hispanohablantes curiosos.
+TOPIC_PROMPT = """Propón 8 temas para videos de curiosidad del canal "El Porqué"
+(español neutro): una sola pregunta por video, 8-12 minutos, animación de
+dibujos simples con personaje cabezón de playera naranja. Público:
+hispanohablantes curiosos. El formato "curiosidad animada" en español está
+casi vacío: tenemos ventaja si los títulos y ángulos son mejores que los
+canales top en inglés (Ink Explainer, Simple Paint, theblurb).
 
-MEZCLA estos 3 tipos:
-- 4 CURIOSIDADES CIENTÍFICAS con hueco de curiosidad ("verdades que casi nadie
-  conoce", datos que rompen una creencia común).
-- 2 de CULTURA ALTERNATIVA: lo que cree la cultura popular / mitos / historia
-  poco contada, contrastado con lo que dice la ciencia.
+MEZCLA estos 4 tipos:
+- 3 CURIOSIDADES CIENTÍFICAS con hueco de curiosidad (datos que rompen una
+  creencia común; la ciencia real citada después es nuestra ventaja).
+- 2 de CULTURA ALTERNATIVA: lo que cree la cultura popular / mitos /
+  historia poco contada, contrastado con lo que dice la ciencia.
 - 2 PREGUNTAS COTIDIANAS con respuesta sorprendente ("¿por qué...?" de la
   vida diaria que nadie se había planteado).
+- 1 de SERIE "EN CADA NIVEL DE X": formato infinito y adictivo
+  (ej: "¿Cómo es el frío en cada nivel de temperatura?", "Tu cuerpo en
+  cada nivel de falta de sueño").
 
-Cada tema debe funcionar como TÍTULO de alto CTR: pregunta directa, palabra
-clave al frente, promesa concreta (nada de títulos vagos).
+FÓRMULAS DE TÍTULO QUE VENDEN (úsalas, en español):
+a) Pregunta directa con hueco: "¿Qué hacían los humanos hace 10,000 años
+   todo el día?" (8M vistas en el referente).
+b) Segunda persona + secreto: "¿Por qué X? (casi nadie lo sabe)".
+c) Cifra + punto de quiebre: "¿Qué cambia en tu cuerpo después de 24 horas
+   sin dormir?".
+d) Supervivencia con stakes: "¿Cómo sobrevivieron los humanos a inviernos
+   que debieron matarlos?".
+e) Superlativo honesto (NADA morboso: sin muertes ni desastres): "El peor
+   error científico de la historia".
+f) Comportamiento animal: "¿Entienden los animales la muerte?".
+
+REGLAS: palabra clave al frente, promesa concreta, nada de títulos vagos.
+Nada de morbo (muertes/desastres): nuestro posicionamiento es credibilidad.
 
 Para cada tema devuelve EXACTAMENTE este formato, sin texto extra:
 
-PREGUNTA: <la pregunta del video>
+PREGUNTA: <la pregunta del video, ya como título>
+FORMULA: <qué fórmula usa: a/b/c/d/e/f>
 ANGULO: <1 línea: por qué engancha / qué creencia rompe>
 SENAL: <1 línea: evidencia de interés: búsquedas, tendencia o dato>
 

@@ -150,7 +150,7 @@ if _running:
 view = st.sidebar.radio("Vista", ["📥 Bandeja de temas", "🎬 Proyectos",
                                   "⚙️ Configuración"])
 st.sidebar.divider()
-st.sidebar.caption("Panel v6 · Zenn Factory")
+st.sidebar.caption("Panel v7 · Zenn Factory")
 
 gen_fn = make_generate_fn(backend, model_id)
 

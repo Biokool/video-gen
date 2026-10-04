@@ -242,7 +242,8 @@ def _rate_kind(msg):
     if "too large for model" in m:
         return None   # error duro de cuota: reintentar no arregla nada
     skip = ("exceeded your current quota", "quota exceeded",
-            "daily quota", "check your plan", "billing",
+            "daily quota", "tokens per day", "tpd",
+            "check your plan", "billing",
             "resource_exhausted", "insufficient_quota", "insufficient funds",
             "account", "suspend")
     if any(p in m for p in skip):
