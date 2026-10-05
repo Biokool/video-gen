@@ -29,3 +29,7 @@ thumbnails/*.png
 .DS_Store
 Thumbs.db
 _streamlit/
+
+# Credenciales OAuth de YouTube (NUNCA subir)
+youtube/token.json
+youtube/client_secret.json

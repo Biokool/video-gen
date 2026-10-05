@@ -28,6 +28,8 @@ import ast
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+
+PANEL_VERSION = "v11"  # se muestra en el pie del sidebar; subir en cada release
 # Dos layouts soportados:
 #  - anidado: panel/ dentro de zenn-factory/ (jobs/ y thumbnails/ en el padre)
 #  - plano:   todo dentro de video-gen/ (jobs/ y thumbnails/ junto a app.py)
@@ -569,6 +571,9 @@ construir personajes con Circle/Line sueltos o redefinir el rig.
 PERSONAJE PRINCIPAL — "EL PORQUÉ" (protagonista en TODAS las escenas):
   protagonista(pos, playera, altura=3.0, expresion, pose) -> el conductor:
   cabezón de ojos grandes, playera de color, extremidades negras simples.
+  LAYOUT: con banda_titulo()/titulo_seguro() arriba, el protagonista va
+  ABAJO (pos con y<=-1.2, altura<=2.6; p. ej. pos=DOWN*1.2+LEFT*3.5);
+  sin banda puede ir al centro (pos=ORIGIN, altura=3.0).
   playera: "naranja" (default/intro), "azul", "verde", "roja", "amarilla",
     "rosa", "teal", "morada", "negra", "blanca" (strings en español;
     también valen las constantes PLAYERA_NARANJA/AZUL/...).
@@ -647,8 +652,17 @@ y de -4 a 4):
   vez en la misma escena a banda_titulo(), titulo_seguro(), title_card(),
   tarjeta_canal() o callout() (se enciman y tapan todo). Si la escena
   necesita dos ideas, usa split_screen() o etiquetas pequeñas.
+- LAYOUT CON BANDA (obligatorio): si la escena lleva banda_titulo() o
+  titulo_seguro() ARRIBA, el protagonista va ABAJO: pos con y<=-1.2 y
+  altura<=2.6 (p. ej. pos=DOWN*1.2+LEFT*3.5 o pos=DOWN*1.2+RIGHT*3.5).
+  La cabeza del protagonista NUNCA entra a la zona y>1.7: la banda la
+  taparía (es el fallo más repetido en producción y se rechaza por
+  validación).
+- Sin banda: el protagonista puede ir al centro (pos=ORIGIN, altura=3.0).
 - PROHIBIDO Text() con font_size mayor a 60: para títulos usa
-  banda_titulo()/titulo_seguro(); para datos destacados, callout().
+  banda_titulo()/titulo_seguro(); para datos destacados, callout();
+  para etiquetas, etiqueta(). El texto crudo grande se corta en los
+  bordes (también se rechaza por validación).
 - Etiquetas: usa etiqueta(texto, (x, y)) con y >= -1.9.
 - SEPARACIÓN: un elemento grande por zona (izquierda/derecha,
   arriba/abajo); deja >=1.5 unidades entre elementos; NADA puede tapar
@@ -732,6 +746,124 @@ def _strip_fences(text):
     return t.strip()
 
 
+# --- evaluador restringido de coordenadas Manim (para el chequeo de layout) ---
+_MANIM_VEC = {
+    "ORIGIN": (0.0, 0.0, 0.0),
+    "LEFT": (-1.0, 0.0, 0.0), "RIGHT": (1.0, 0.0, 0.0),
+    "UP": (0.0, 1.0, 0.0), "DOWN": (0.0, -1.0, 0.0),
+}
+
+
+def _eval_vec(node):
+    """Evalúa expresiones simples de coordenadas Manim.
+
+    Devuelve ("vec", (x, y)) o ("num", v) o None si no se puede resolver.
+    Soporta: ORIGIN/LEFT/RIGHT/UP/DOWN, números, tuplas, np.array([...]),
+    +, -, *, y negación. Cualquier otra cosa → None (no se puede probar).
+    """
+    if isinstance(node, ast.Constant):
+        if isinstance(node.value, (int, float)):
+            return ("num", float(node.value))
+        return None
+    if isinstance(node, ast.Name):
+        v = _MANIM_VEC.get(node.id)
+        return ("vec", (v[0], v[1])) if v else None
+    if isinstance(node, (ast.Tuple, ast.List)) and len(node.elts) >= 2:
+        x, y = _eval_vec(node.elts[0]), _eval_vec(node.elts[1])
+        if x and x[0] == "num" and y and y[0] == "num":
+            return ("vec", (x[1], y[1]))
+        return None
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
+        v = _eval_vec(node.operand)
+        if v and v[0] == "vec":
+            return ("vec", (-v[1][0], -v[1][1]))
+        if v and v[0] == "num":
+            return ("num", -v[1])
+        return None
+    if isinstance(node, ast.BinOp):
+        l, r = _eval_vec(node.left), _eval_vec(node.right)
+        if not l or not r:
+            return None
+        if isinstance(node.op, ast.Add) and l[0] == "vec" and r[0] == "vec":
+            return ("vec", (l[1][0] + r[1][0], l[1][1] + r[1][1]))
+        if isinstance(node.op, ast.Sub) and l[0] == "vec" and r[0] == "vec":
+            return ("vec", (l[1][0] - r[1][0], l[1][1] - r[1][1]))
+        if isinstance(node.op, ast.Mult):
+            if l[0] == "vec" and r[0] == "num":
+                return ("vec", (l[1][0] * r[1], l[1][1] * r[1]))
+            if l[0] == "num" and r[0] == "vec":
+                return ("vec", (l[1] * r[1][0], l[1] * r[1][1]))
+        return None
+    if isinstance(node, ast.Call):
+        f = node.func
+        if (isinstance(f, ast.Attribute) and f.attr == "array"
+                and isinstance(f.value, ast.Name) and f.value.id == "np"
+                and node.args):
+            return _eval_vec(node.args[0])
+        return None
+    return None
+
+
+def _kw(call, nombre, posicional=None, default=None):
+    for kw in call.keywords:
+        if kw.arg == nombre:
+            return kw.value
+    if posicional is not None and len(call.args) > posicional:
+        return call.args[posicional]
+    return default
+
+
+def _num(node, default):
+    v = _eval_vec(node)
+    if v and v[0] == "num":
+        return v[1]
+    return default
+
+
+def _checar_banda_vs_prota(tree):
+    """La banda superior no puede tapar la cabeza del protagonista.
+
+    Si hay banda_titulo()/titulo_seguro() y el protagonista queda con la
+    cabeza dentro de la zona de la banda → error (cuenta como intento y se
+    autorrepara). Solo se chequea cuando pos/altura son evaluables.
+    """
+    bandas, protas = [], []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        f = node.func
+        name = f.attr if isinstance(f, ast.Attribute) else (
+            f.id if isinstance(f, ast.Name) else "")
+        if name in ("banda_titulo", "titulo_seguro"):
+            y = _num(_kw(node, "y", default=None), 2.55)
+            bandas.append(y - 0.85)  # borde inferior de la banda
+        elif name == "protagonista":
+            pos = _kw(node, "pos", posicional=0, default=None)
+            alt = _num(_kw(node, "altura", posicional=2, default=None), 3.0)
+            protas.append((pos, alt))
+        elif name == "version_prota":
+            pos = _kw(node, "pos", posicional=1, default=None)
+            alt = _num(_kw(node, "altura", posicional=2, default=None), 3.0)
+            protas.append((pos, alt))
+    if not bandas or not protas:
+        return ""
+    for pos_node, alt in protas:
+        if pos_node is None:
+            continue
+        v = _eval_vec(pos_node)
+        if not v or v[0] != "vec":
+            continue  # no evaluable: no se puede probar, se deja pasar
+        cabeza_top = v[1][1] + alt - 0.02  # como en el rig
+        for borde in bandas:
+            if cabeza_top > borde:
+                return (f"La banda tapa la cabeza del protagonista "
+                        f"(cabeza hasta y={cabeza_top:.2f}, la banda baja "
+                        f"hasta y={borde:.2f}). Con banda arriba, el "
+                        "protagonista va ABAJO: pos con y<=-1.2 y altura<=2.6 "
+                        "(p. ej. pos=DOWN*1.2+LEFT*3.5, altura=2.6).")
+    return ""
+
+
 # Llamadas que pintan banda/título grande: solo UNA por escena (si no,
 # se enciman, como pasó en producción).
 _BANDAS = {"banda_titulo", "titulo_seguro", "title_card", "tarjeta_canal",
@@ -773,6 +905,23 @@ def _validar_escena(code, cls):
                 f"({', '.join(bandas)}): solo se permite UNA por escena "
                 "porque se enciman. Quita las demás o usa etiqueta() para "
                 "ideas secundarias.")
+    # Layout: la banda no puede tapar la cabeza del protagonista.
+    err_l = _checar_banda_vs_prota(tree)
+    if err_l:
+        return err_l
+    # Text() crudo gigante = texto cortado en bordes. Para títulos usar el
+    # rig (banda_titulo/titulo_seguro/callout), que se auto-ajusta.
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            f = node.func
+            if isinstance(f, ast.Name) and f.id == "Text":
+                fs = _num(_kw(node, "font_size", default=None), 48)
+                if fs > 60:
+                    return (f"Text() con font_size={fs:.0f} se sale de la "
+                            "pantalla y se corta en los bordes. PROHIBIDO "
+                            "font_size>60: usa banda_titulo(), "
+                            "titulo_seguro(), callout() o etiqueta(), que se "
+                            "auto-ajustan solos.")
     return ""
 
 
@@ -1365,6 +1514,30 @@ _NO_LLM = ("Esta etapa necesita un modelo: elige un backend en el sidebar "
            "y pon su API key en Configuración (o usa Ollama local).")
 
 
+def _wrap_generate_fn(generate_fn, p, stage):
+    """Envuelve generate_fn para registrar tokens en el Medidor.
+
+    Lee llm.LAST_USAGE después de cada llamada y lo guarda en
+    BASE/usage.jsonl. Si algo falla, no interrumpe la etapa.
+    """
+    def fn(prompt, system=""):
+        text, model = generate_fn(prompt, system=system)
+        try:
+            import llm as _llm
+            import usage as _usage
+            u = getattr(_llm, "LAST_USAGE", None) or {}
+            _usage.record(
+                BASE, p.get("id"), p.get("title", ""), stage,
+                u.get("backend") or getattr(generate_fn, "backend", ""),
+                model, u.get("prompt_tokens"),
+                u.get("completion_tokens"))
+        except Exception:
+            pass
+        return text, model
+    fn.backend = getattr(generate_fn, "backend", "")
+    return fn
+
+
 def execute_stage(p, stage, generate_fn=None, progress=None):
     """Devuelve (ok, log, artefactos, estado_sugerido|None).
 
@@ -1373,6 +1546,8 @@ def execute_stage(p, stage, generate_fn=None, progress=None):
     """
     job = job_dir_of(p)
     kind = pget(p, "kind", "largo")
+    if generate_fn is not None:
+        generate_fn = _wrap_generate_fn(generate_fn, p, stage)
     try:
         if stage == "investigacion":
             return run_investigacion(generate_fn, p["title"], job)

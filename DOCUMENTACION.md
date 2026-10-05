@@ -42,25 +42,18 @@ Orden de preferencia del router (con fallback automático en cadena):
 | 2 | Groq | 1.000 req/día por modelo | openai/gpt-oss-120b, qwen3.8-27b |
 | 3 | Token Harbor | solo ids `:free` (7×24 h por cuenta) | catálogo descubierto filtrado por `:free` |
 | 4 | FreeLLMAPI | 10.000 tokens al crear la key | glm-5.2, glm-4.7, kimi-k3, qwen3.8-max-preview |
-| 5 | AIHubMix | solo ids `-free` (RPM + tokens/día), sin tarjeta | xiaomi-mimo-v2.6-pro-free, coding-glm-5.3-free, qwen3.6-plus-preview-free |
-| 6 | DeepSeek oficial | de pago (tarifa por token) | deepseek-chat, deepseek-reasoner |
-| 7 | Cerebras | ~1M tokens/día, el más rápido | lineup rotativo |
-| 8 | OpenRouter `:free` | 50 req/día (1.000 con $10) | nemotron-3-super, gemma-4 |
-| 9 | Mistral (Experiment) | ~1B tok/mes (aceptas training) | mistral-large |
-| 10 | Cohere (trial) | 1.000 llamadas/mes | command-r |
-| 11 | Ollama local | ∞, sin internet | qwen3.6, video-factory-qwen |
+| 5 | DeepSeek oficial | de pago (tarifa por token) | deepseek-chat, deepseek-reasoner |
+| 6 | Cerebras | ~1M tokens/día, el más rápido | lineup rotativo |
+| 7 | OpenRouter `:free` | 50 req/día (1.000 con $10) | nemotron-3-super, gemma-4 |
+| 8 | Mistral (Experiment) | ~1B tok/mes (aceptas training) | mistral-large |
+| 9 | Cohere (trial) | 1.000 llamadas/mes | command-r |
+| 10 | Ollama local | ∞, sin internet | qwen3.6, video-factory-qwen |
 
 - **Token Harbor** (`https://tokenharbor.ai/v1`, key `thk_live_…`): el combo
   **solo** muestra ids que terminan en `:free`; los de pago jamás entran en
   la cadena, así que no se descuadra la wallet.
 - **FreeLLMAPI** (`https://api.freellmapi.ai/v1`, key `sk_live_…`): todo su
   catálogo sale de la bolsa de 10.000 tokens gratis.
-- **AIHubMix** (`https://aihubmix.com/v1`, key `sk-…`): agregador
-  OpenAI-compatible con **44 ids `-free` en vivo (2026-10-04)** — GPT,
-  Gemini, MiMo, GLM y Qwen a $0, sin tarjeta ni caducidad. El combo solo
-  muestra los `-free` (los de pago jamás entran en la cadena); se descarta
-  además lo que no sirve para chat (`image`, `embed`, `content-safety`,
-  `tts`). Regístrate en aihubmix.com y pega la key en Configuración.
 - **DeepSeek oficial** (`https://api.deepseek.com/v1`): el único de pago de
   la lista, para cuando quieras `deepseek-chat` sin intermediarios.
 - Las tres claves se pegan en **Configuración → Claves de LLM**, igual que
@@ -439,18 +432,108 @@ video-gen/
 - El resumen de la etapa 7 ahora reporta el estado real: "X/89 escenas
   con video. Faltan N: S03, S06, …" en vez de solo la cola del log.
 
-*Versión del panel: v9 (cuota: alto en seco + log por ejecución + huecos visibles).*
-
 ## 20. Cambios v9.1 (2026-10-04)
 
-- **Backend AIHubMix** (`llm.py`): nuevo backend «AIHubMix · solo gratis»
-  con `https://aihubmix.com/v1` (OpenAI-compatible). Filtra por sufijo
-  `-free` (44 ids en vivo el 2026-10-04) y descarta ids no-chat
-  (`image`, `embed`, `content-safety`, `tts`) con `FREE_EXCLUDE`.
-  Cadena preferida: `xiaomi-mimo-v2.6-pro-free` →
-  `xiaomi-mimo-v2.5-pro-free` → `coding-glm-5.3-free` →
-  `qwen3.6-plus-preview-free` → `xiaomi-mimo-v2.6-flash-free` →
-  `glm-4.7-flash-free` → `ling-3.0-flash-free`; con key, `/models`
-  sustituye la cadena por el catálogo real filtrado igual.
-  Key nueva: `AIHUBMIX_API_KEY` en Configuración (sin key, la cadena
-  preferida funciona como fallback).
+**Bug crítico de miniaturas (NameError: prota_thumb):**
+- Causa: en `thumbnails/generate_thumbnails.py`, `def prota_thumb` quedó
+  definido DESPUÉS del bloque `if __name__ == "__main__": sys.exit(main())`.
+  Como el panel corre el script como programa (no importado), el `sys.exit`
+  se ejecutaba antes de que el `def` existiera → NameError en `render()`.
+  En pruebas importadas sí pasaba, por eso no se detectó antes.
+- Fix: el bloque del protagonista (PLAYERA_T + `prota_thumb`) ahora va
+  ANTES del guard. Verificado corriendo el script como el panel lo hace
+  (`python generate_thumbnails.py 999`): 3/3 miniaturas 1280×720 OK.
+- Lección: todo script que el panel ejecute como subproceso debe probarse
+  como `__main__`, no solo importado.
+
+**Pie de versión dinámico:**
+- El sidebar decía "Panel v7" fijo desde v7. Ahora usa
+  `pipeline.PANEL_VERSION` (v9.1); subir la constante en cada release.
+
+## 21. Cambios v10 (2026-10-04)
+
+**Layout garantizado: la banda ya no tapa al protagonista.**
+- Causa raíz de las capturas: el LLM ponía `banda_titulo()` en y=2.55 y al
+  protagonista en el centro (cabeza en y≈3.0) → la banda tapaba la cara.
+  El validador de "una sola banda" no cubría la posición.
+- Nuevo chequeo por AST (`_checar_banda_vs_prota`): si hay
+  `banda_titulo()/titulo_seguro()` y la cabeza del protagonista
+  (pos.y + altura - 0.02, como en el rig) entra a la zona de la banda →
+  se rechaza y autorrepara. Incluye un mini-evaluador de coordenadas
+  Manim (ORIGIN/LEFT/RIGHT/UP/DOWN, tuplas, np.array, +,-,*); si `pos` no
+  es evaluable, se deja pasar.
+- Regla canónica en el prompt y en RIG_API: con banda arriba, el
+  protagonista va ABAJO (`pos=DOWN*1.2+LEFT*3.5`, `altura=2.6`); sin banda
+  puede ir al centro. Independiente del modelo: ya no importa si el
+  modelo "sigue" la regla, el validador la impone.
+- Extra: `Text()` crudo con `font_size>60` se rechaza (era el texto
+  cortado en los bordes, p. ej. "OPTIMO: 2-6 m"). Usar las funciones del
+  rig, que se auto-ajustan.
+- Verificación: 11/11 casos unitarios + render E2E de escena conforme
+  (banda arriba, protagonista abajo, sin encimado).
+
+## 22. Cambios v11 (2026-10-04)
+
+### 🚀 Publicar en YouTube (nuevo)
+
+**Requisito clave:** la API key de YouTube solo sirve para *leer* datos
+(búsquedas, sugerencias). *Subir* videos exige **OAuth 2.0** con la cuenta
+del canal. No hay forma de publicar solo con la key.
+
+**Instalación (una sola vez):**
+1. `pip install -r requirements.txt` (agrega `google-api-python-client` y
+   `google-auth-oauthlib`; sin ellas, la sección Publicar muestra qué
+   falta en vez de tronar).
+2. En [Google Cloud Console](https://console.cloud.google.com/) (puedes
+   usar el mismo proyecto de tu API key):
+   - **APIs y servicios → Biblioteca** → habilita **YouTube Data API v3**.
+   - **APIs y servicios → Credenciales → Crear credenciales → ID de
+     cliente de OAuth** → tipo **Aplicación de escritorio**.
+   - Descarga el JSON, renómbralo a `client_secret.json` y colócalo en la
+     carpeta `youtube/` junto a `app.py` (créala si no existe).
+3. En el panel, dentro del proyecto: sección **🚀 Publicar en YouTube** →
+   **Paso 1** → **🔗 Conectar mi canal de YouTube**. Se abre el navegador
+   una vez para autorizar; se guarda `youtube/token.json` (se renueva solo).
+
+**Uso (por video):**
+- **Paso 2 · Contenido:** el panel pre-llena título, descripción y
+  etiquetas desde tu `PAQUETE.md` (etapa 10); puedes editarlos ahí mismo.
+  Eliges el video (por defecto `final_con_subtitulos.mp4`) y la privacidad:
+  **privado** (solo tú), **oculto** (solo con enlace) o **público**.
+  Recomendado: súbelo privado, revísalo en YouTube Studio y luego hazlo
+  público.
+- **Paso 3 · Subir:** botón **⬆️ Subir video a YouTube** con barra de
+  progreso real (subida reanudable por chunks de 8 MB: si se corta el
+  internet, reintenta sin empezar de cero). Al terminar muestra la URL
+  (`https://youtu.be/…`) y la guarda en el proyecto.
+- **Desconectar:** borra `token.json` desde el mismo panel.
+
+**Cuota y límites:** cada subida cuesta ~1600 unidades del cupo diario
+(10.000 por defecto) → ~6 videos/día. Para 2 videos/semana sobra.
+**Secretos:** `youtube/client_secret.json` y `youtube/token.json` NUNCA
+van al ZIP ni a git (la carpeta `youtube/` está excluida del paquete).
+
+### 📊 Medidor de tokens (nuevo)
+
+**Qué mide:** cada llamada a un modelo de IA (qué backend, qué modelo, en
+qué proyecto y etapa, tokens de entrada/salida) se registra en
+`usage.jsonl` (raíz del panel). Empieza a contar desde esta versión; lo
+anterior no se puede reconstruir.
+
+**Vista 📊 Medidor (sidebar):**
+- Métricas: llamadas, tokens de entrada, de salida, total y **costo
+  aproximado en USD**.
+- Gráfica de dona: **reparto % por modelo** (qué modelo generó qué
+  porcentaje).
+- Barras: **tokens por proyecto**.
+- Tabla de detalle por modelo (llamadas, entrada/salida, %, USD).
+- **💲 Precios de referencia:** USD por millón de tokens (entrada, salida),
+  **aproximados y editables** en el propio panel. Los tiers gratuitos,
+  modelos `:free` y Ollama local cuestan 0.
+
+**Cómo funciona por dentro:** `llm.py` captura el `usage` que reporta cada
+API (`LAST_USAGE`; best-effort: si el backend no lo reporta, queda en
+blanco) y `pipeline.execute_stage` lo registra con proyecto y etapa. El
+medidor no interrumpe nada si falla.
+
+*Versión del panel: v11 (Publicar en YouTube + Medidor de tokens).*

@@ -148,9 +148,9 @@ if _running:
     st.sidebar.error(f"▶ CORRIENDO\n\n{_running[1]}\n(proyecto #{_running[0]})")
     st.sidebar.caption("No pulses otros botones hasta que termine.")
 view = st.sidebar.radio("Vista", ["📥 Bandeja de temas", "🎬 Proyectos",
-                                  "⚙️ Configuración"])
+                                  "📊 Medidor", "⚙️ Configuración"])
 st.sidebar.divider()
-st.sidebar.caption("Panel v7 · Zenn Factory")
+st.sidebar.caption(f"Panel {pipeline.PANEL_VERSION} · Zenn Factory")
 
 gen_fn = make_generate_fn(backend, model_id)
 
@@ -442,7 +442,9 @@ elif view == "🎬 Proyectos":
 
                         try:
                             ok, log, arts, _ = pipeline.run_reanimar_escena(
-                                gen_fn, p, pipeline.job_dir_of(p),
+                                pipeline._wrap_generate_fn(gen_fn, p,
+                                                           "animacion"),
+                                p, pipeline.job_dir_of(p),
                                 sid_in, regen_code=regen, progress=_cb)
                         finally:
                             st.session_state.pop("running", None)
@@ -531,6 +533,100 @@ elif view == "🎬 Proyectos":
             st.info("Sin miniaturas todavía: pulsa «Correr todo» o ejecuta la etapa 9 (Miniaturas).")
         st.caption(f"Estado puerta miniatura: {mgate['status']}")
 
+        # ---- publicar en YouTube ----
+        st.subheader("🚀 Publicar en YouTube")
+        import youtube_upload as yt
+        yt_state = yt.estado(BASE)
+        if yt_state["nivel"] == "falta_secret":
+            st.warning("**Paso 1 · Credenciales:** falta el archivo "
+                       "`youtube/client_secret.json`.")
+            with st.expander("Cómo conseguirlo (2 minutos, una sola vez)"):
+                st.markdown(
+                    "La API key solo sirve para *leer* YouTube. Para *subir* "
+                    "videos se necesita OAuth:\n"
+                    "1. Entra a [Google Cloud Console](https://console.cloud.google.com/) "
+                    "(puedes usar el mismo proyecto de tu API key).\n"
+                    "2. **APIs y servicios → Biblioteca**: habilita **YouTube Data API v3**.\n"
+                    "3. **APIs y servicios → Credenciales → Crear credenciales → "
+                    "ID de cliente de OAuth** → tipo **Aplicación de escritorio**.\n"
+                    "4. Descarga el JSON, renómbralo a `client_secret.json` y "
+                    "colócalo en la carpeta `youtube/` junto a `app.py`.\n"
+                    "5. Vuelve aquí y pulsa **Conectar mi canal**.")
+        elif yt_state["nivel"] in ("falta_auth", "token_roto"):
+            st.info("**Paso 1 · Conexión:** " + yt_state["mensaje"] + ".")
+            if st.button("🔗 Conectar mi canal de YouTube",
+                         disabled=bool(_running)):
+                with st.spinner("Abriendo el navegador para autorizar…"):
+                    ok, msg = yt.autorizar(BASE)
+                if ok:
+                    st.success(msg)
+                else:
+                    st.error(msg)
+                rerun()
+        else:
+            st.success("**Canal conectado** ✅")
+            if st.button("Desconectar canal", key=f"ytdisc{pid}"):
+                try:
+                    yt.token_path(BASE).unlink()
+                except Exception:
+                    pass
+                st.info("Canal desconectado.")
+                rerun()
+
+        if yt_state["nivel"] == "ok":
+            st.markdown("**Paso 2 · Contenido del video**")
+            job = pipeline.job_dir_of(p)
+            vids = [job / "video" / "final_con_subtitulos.mp4",
+                    job / "video" / "final.mp4"]
+            vids = [str(v) for v in vids if v.exists()]
+            if not vids:
+                st.info("Aún no hay video final: completa la etapa 8 "
+                        "(Ensamblado) y vuelve aquí.")
+            else:
+                paq = yt.parse_paquete(job / "PAQUETE.md")
+                vpath = st.selectbox("Video a subir", vids, key=f"ytvid{pid}")
+                yt_title = st.text_input("Título", value=paq["titulo"][:100],
+                                         key=f"ytt{pid}")
+                yt_desc = st.text_area("Descripción", value=paq["descripcion"],
+                                       height=160, key=f"ytd{pid}")
+                yt_tags = st.text_input(
+                    "Etiquetas (separadas por comas)",
+                    value=", ".join(paq["tags"]), key=f"ytg{pid}")
+                priv = st.radio(
+                    "Privacidad", ["privado", "oculto", "público"],
+                    horizontal=True, key=f"ytp{pid}",
+                    help="Privado: solo tú lo ves. Oculto: solo quien tenga "
+                         "el enlace. Público: aparece en tu canal.")
+                st.caption("💡 Recomendado: súbelo primero como **privado**, "
+                           "revísalo en YouTube Studio y luego hazlo público.")
+                st.markdown("**Paso 3 · Subir**")
+                if st.button("⬆️ Subir video a YouTube", key=f"ytgo{pid}",
+                             disabled=bool(_running), type="primary"):
+                    st.session_state["running"] = (pid, "Subiendo a YouTube")
+                    bar = st.progress(0, text="Iniciando subida…")
+
+                    def _cb(done, total):
+                        mb_d, mb_t = done // 1024 // 1024, total // 1024 // 1024
+                        bar.progress(min(done / max(total, 1), 1.0),
+                                     text=f"Subiendo… {mb_d} MB de {mb_t} MB")
+
+                    try:
+                        vid, url = yt.subir(
+                            BASE, vpath, yt_title, yt_desc,
+                            [t.strip() for t in yt_tags.split(",")
+                             if t.strip()],
+                            privacidad=priv, progress=_cb)
+                        bar.progress(1.0, text="¡Listo!")
+                        st.success(f"**Video subido como {priv}.** Míralo aquí: "
+                                   f"{url}")
+                        st.balloons()
+                        db.set_setting(conn, f"yt_video_{pid}", vid)
+                    except Exception as e:
+                        bar.empty()
+                        st.error(str(e))
+                    finally:
+                        st.session_state.pop("running", None)
+
         # ---- corto-recorte: herramienta ----
         if p["kind"] == "corto-recorte":
             st.subheader("✂️ Recorte del largo")
@@ -562,6 +658,97 @@ elif view == "🎬 Proyectos":
                         else:
                             st.error(log)
                         rerun()
+
+
+# ============================================================ MEDIDOR
+elif view == "📊 Medidor":
+    st.title("📊 Medidor de tokens")
+    st.caption("Cuántos tokens consumió cada modelo, por proyecto y en total. "
+               "El registro empieza con esta versión (v11): lo anterior no "
+               "se puede reconstruir.")
+    import usage as usage_mod
+    import pandas as pd
+    import altair as alt
+
+    def _prices():
+        import json as _json
+        prices = dict(usage_mod.DEFAULT_PRICES)
+        raw = get("usage_prices", "")
+        if raw:
+            try:
+                prices.update(_json.loads(raw))
+            except Exception:
+                pass
+        return prices
+
+    recs = usage_mod.read_all(BASE)
+    if not recs:
+        st.info("Aún no hay datos. Corre cualquier etapa que use IA "
+                "(guion, storyboard, animación…) y aparecerá aquí.")
+    else:
+        prices = _prices()
+        s = usage_mod.summarize(recs, prices)
+        c1, c2, c3, c4, c5 = st.columns(5)
+        c1.metric("Llamadas", f"{s['llamadas']:,}")
+        c2.metric("Entrada", usage_mod.fmt_tokens(s["in"]))
+        c3.metric("Salida", usage_mod.fmt_tokens(s["out"]))
+        c4.metric("Total", usage_mod.fmt_tokens(s["total"]))
+        c5.metric("Costo aprox", f"${s['costo']:.2f} USD")
+        st.divider()
+        g1, g2 = st.columns(2)
+        with g1:
+            st.subheader("Reparto por modelo")
+            dfm = pd.DataFrame(
+                [{"modelo": k, "tokens": v["total"]}
+                 for k, v in s["por_modelo"].items()])
+            if not dfm.empty:
+                pie = alt.Chart(dfm).mark_arc(innerRadius=70).encode(
+                    theta=alt.Theta("tokens:Q"),
+                    color=alt.Color("modelo:N",
+                                    legend=alt.Legend(title="Modelo")),
+                    tooltip=["modelo", "tokens"],
+                ).properties(height=320)
+                st.altair_chart(pie, use_container_width=True)
+        with g2:
+            st.subheader("Tokens por proyecto")
+            dfp = pd.DataFrame(
+                [{"proyecto": f"#{k} {(v['title'] or '')[:30]}",
+                  "tokens": v["total"]}
+                 for k, v in s["por_proyecto"].items()])
+            if not dfp.empty:
+                bars = alt.Chart(dfp).mark_bar().encode(
+                    x=alt.X("tokens:Q", title="tokens"),
+                    y=alt.Y("proyecto:N", sort="-x", title=""),
+                    tooltip=["proyecto", "tokens"],
+                ).properties(height=max(140, 44 * len(dfp)))
+                st.altair_chart(bars, use_container_width=True)
+        st.subheader("Detalle por modelo")
+        dfd = pd.DataFrame(
+            [{"Modelo": k, "Llamadas": v["llamadas"],
+              "Entrada": usage_mod.fmt_tokens(v["in"]),
+              "Salida": usage_mod.fmt_tokens(v["out"]),
+              "Total": usage_mod.fmt_tokens(v["total"]),
+              "%": round(100 * v["total"] / max(s["total"], 1), 1),
+              "USD aprox": round(v["costo"], 3)}
+             for k, v in sorted(s["por_modelo"].items(),
+                                key=lambda kv: -kv[1]["total"])])
+        st.dataframe(dfd, use_container_width=True, hide_index=True)
+        with st.expander("💲 Precios de referencia (USD por millón de tokens)"):
+            st.caption("Aproximados y editables. Los tiers gratuitos, "
+                       "Ollama y modelos :free cuestan 0.")
+            import json as _json
+            txt = st.text_area(
+                "Precios (JSON: modelo → [entrada, salida])",
+                value=_json.dumps(prices, indent=1, ensure_ascii=False),
+                height=240, key="pricebox")
+            if st.button("Guardar precios"):
+                try:
+                    _json.loads(txt)
+                    db.set_setting(conn, "usage_prices", txt)
+                    st.success("Precios guardados.")
+                    rerun()
+                except Exception as e:
+                    st.error(f"JSON inválido: {e}")
 
 
 # ============================================================ CONFIG

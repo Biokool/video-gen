@@ -655,10 +655,6 @@ def main():
     return 0
 
 
-if __name__ == "__main__":
-    sys.exit(main())
-
-
 # ---------- protagonista "El Porqué" para miniaturas ----------
 PLAYERA_T = {
     "naranja": (245, 130, 11), "azul": (46, 155, 230),
@@ -730,3 +726,7 @@ def prota_thumb(d, x, y, s, playera="naranja", expr="sorpresa",
         jline(d, [(x, hip), (x - 0.10 * s, y)], lw, stroke)
         jline(d, [(x, hip), (x + 0.12 * s, y)], lw, stroke)
     return (hcx, hcy, hr)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -5,3 +5,7 @@ manim>=0.19
 edge-tts>=7.0
 piper-tts>=1.2
 soundfile>=0.12
+# Subida a YouTube (sección Publicar). Sin esto, el panel funciona igual;
+# solo la conexión con YouTube queda deshabilitada.
+google-api-python-client>=2.0
+google-auth-oauthlib>=1.2
