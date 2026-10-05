@@ -3,23 +3,23 @@ from zenn_rig import *
 
 class S06(Scene):
     def construct(self):
-        self.add(fondo(INK))
-        self.add(estrellas(n=42, seed=7, color=WHITE))
+        call = callout("¡CAMBIA TODO!", color=ORANGE)
+        call.to_edge(UP, buff=0.55)
 
-        prota = protagonista(pos=(-3, 0, 0), playera=PLAYERA_AZUL, expresion='sorpresa', pose='de_pie')
-        ojo = ojo_grande(pos=(-3, 0.5, 0), escala=0.7, iris=AZUL_MARINO)
-        self.play(Create(prota), Create(ojo))
+        prota = protagonista(pos=LEFT * 4.6 + DOWN * 0.5, playera="azul",
+                             altura=3.0, expresion="sorpresa", pose="senalando")
 
-        linea_recta = Line(start=(-2, -1, 0), end=(2, -1, 0), color=WHITE)
-        self.add(linea_recta)
+        ojo = ojo_grande(pos=RIGHT * 4.4 + DOWN * 0.2, escala=0.9)
 
-        curva_drastica = curva(pos=(0, -1, 0), ancho=4.0, alto=1.5, color=WHITE, acento=RED)
-        self.play(
-            Transform(linea_recta, curva_drastica),
-            cambiar_cara(prota, 'mente_explotada')
-        )
-        self.wait(1)
+        f = lambda x: 0.12 * x ** 3 - 0.04
+        linea = Line(LEFT * 2.0 + DOWN * 1.0, RIGHT * 2.0 + DOWN * 1.0,
+                     color=INK, stroke_width=7)
+        grafica = FunctionGraph(f, x_range=[-2, 2], color=RED, stroke_width=7)
+        punto = Dot(grafica.get_end(), radius=0.11, color=RED)
 
-        callout_text = callout("¡La distancia lo cambia todo!", color=CORAL)
-        self.play(FadeIn(callout_text))
-        self.wait(2)
+        self.play(FadeIn(call), run_time=0.8)
+        self.play(FadeIn(prota), FadeIn(ojo), run_time=0.7)
+        self.wait(0.3)
+        self.play(Transform(linea, grafica), run_time=1.2)
+        self.play(FadeIn(punto), run_time=0.4)
+        self.wait(1.0)

@@ -85,7 +85,11 @@ STAGE_HINTS = {
            "escena a audio/<id>.mp3 con la voz elegida.",
     "animacion": "El modelo genera el código Manim de cada escena (con el "
                  "rig de monigotes) y lo renderiza a video/scenes/. Si una "
-                 "escena falla, intenta repararla solo (máx 2 intentos).",
+                 "escena falla, intenta repararla solo (máx 2 intentos). Si "
+                 "se agota la cuota del backend, la etapa se DETIENE sola "
+                 "(no sigue fallando en cascada): reanuda después, las "
+                 "hechas se omiten. Cada ejecución deja su log completo en "
+                 "jobs/<id>/logs/.",
     "ensamblado": "Une escenas + audios (el audio manda: la imagen se ajusta "
                   "a la voz), genera final.mp4, final.srt y la versión con "
                   "subtítulos quemados.",
@@ -550,7 +554,11 @@ def run_tts_stage(p, job, progress=None):
         extra = f"vo.json creado desde {origen} ({n} líneas). "
     ok, log = run_tts(job, p["voice"], p["language"], progress=progress)
     arts = [str(a) for a in (job / "audio").glob("*.mp3")] if ok else []
-    return ok, extra + log, arts, None
+    full = extra + log
+    logf = _guardar_log(job, "tts", [full])
+    if logf:
+        full += f"\n📄 Log completo de esta ejecución: {logf}"
+    return ok, full, arts, None
 
 
 # ---------- animación: LLM genera Manim + render con autorreparación ----------
@@ -696,6 +704,24 @@ def _probe_duration(path):
         return float(r.stdout.strip())
     except ValueError:
         return 0.0
+
+
+def _guardar_log(job, stage, lineas):
+    """Guarda el log COMPLETO de una ejecución en jobs/<id>/logs/.
+
+    El panel solo muestra la cola en la BD; este archivo conserva cada
+    línea (qué escena se hizo, cuál se omitió, cuál falló y por qué)
+    para revisar cualquier corrida después.
+    Devuelve la ruta del archivo o "".
+    """
+    try:
+        d = Path(job) / "logs"
+        d.mkdir(parents=True, exist_ok=True)
+        fp = d / f"{stage}_{time.strftime('%Y%m%d_%H%M%S')}.log"
+        fp.write_text("\n".join(lineas), encoding="utf-8")
+        return str(fp)
+    except Exception:
+        return ""
 
 
 def _strip_fences(text):
@@ -895,8 +921,13 @@ def run_animacion(generate_fn, p, job, progress=None):
         logs.append(f"~{est // 1000}K tokens estimados en esta etapa "
                     f"({len(scenes)} escenas). Límite Groq gratuito: "
                     "200K/día. Si ya generaste guion+storyboard hoy, "
-                    "reparte entre días o usa otro backend/Ollama local.")
+                    "reparte entre días o usa otro backend/Ollama local."
+                    + (f" Con {len(scenes)} escenas NO cabe en un día: la "
+                       "etapa se detendrá sola ante la cuota y reanudas "
+                       "mañana (las hechas se omiten)." if est > 190000
+                       else ""))
     done = 0
+    paro_cuota, cls_cuota, det_cuota = False, "", ""
     for sc in scenes:
         sid, cls = sc["id"], sc["id"].upper()
         out = vdir / f"{sid}.mp4"
@@ -915,24 +946,58 @@ def run_animacion(generate_fn, p, job, progress=None):
             fallos.append(cls)
             logs.append(f"{cls}: FALLO tras intentos: {err[-300:]}")
             if es_quota:
+                # Cuota agotada: NO seguimos escena por escena fallando en
+                # cascada ("brincando"). Se detiene la etapa aquí; reanudar
+                # es un clic y las hechas se omiten solas.
                 fallos_quota.append(cls)
+                paro_cuota, cls_cuota = True, cls
+                det_cuota = ("cuota DIARIA (TPD) agotada"
+                             if any(w in err.lower()
+                                    for w in ("tokens per day", "tpd"))
+                             else "límite del backend (rate limit)")
+                logs.append(f"⛔ {cls}: {det_cuota} — se DETIENE la etapa "
+                            "aquí para no seguir fallando en cascada.")
+                done += 1
+                prog.item(done, len(scenes), f"{cls} cuota agotada")
+                break
         done += 1
         prog.item(done, len(scenes),
                   f"{cls} lista" if ok1 else f"{cls} falló")
         if getattr(generate_fn, "backend", "") == "groq":
             time.sleep(6)  # OTPM 1000: no saturar tokens de salida/minuto
-    ok = not fallos
-    head = (f"Animación: {len(arts)}/{len(scenes)} escenas renderizadas."
-            if ok else
-            f"Animación parcial: {len(arts)}/{len(scenes)} escenas. "
-            f"Fallaron: {', '.join(fallos)} (reintenta la etapa: las ya "
-            "hechas se omiten).")
-    if not ok and fallos_quota and len(fallos_quota) == len(fallos):
-        head += ("\n⚠️ Todas las fallas fueron de CUOTA del backend "
-                 "(límite diario agotado), no errores de código. Cambia de "
-                 "backend en la barra lateral o reanuda mañana: las escenas "
-                 "ya renderizadas se omiten solas.")
-    return ok, head + "\n" + "\n".join(logs[-20:]), arts, None
+    # Estado real por escena: qué mp4 existe y qué huecos quedan.
+    have = {p.stem.lower() for p in vdir.glob("*.mp4")
+            if p.stat().st_size > 0}
+    faltan = [s["id"].upper() for s in scenes if s["id"] not in have]
+    n_have = len(scenes) - len(faltan)
+    lista = ", ".join(faltan[:20]) + (f" …y {len(faltan) - 20} más"
+                                      if len(faltan) > 20 else "")
+    if paro_cuota:
+        ok = False
+        head = (f"⛔ Animación DETENIDA por cuota en {cls_cuota} "
+                f"({det_cuota}): {n_have}/{len(scenes)} escenas con video. "
+                f"Faltan {len(faltan)}: {lista}. No se siguió intentando "
+                "para no quemar tiempo fallando en cascada."
+                "\nOpciones: (1) reanuda cuando se resetee la cuota — las "
+                "hechas se omiten solas; (2) cambia de backend en la barra "
+                "lateral (Ollama local no tiene cuota); (3) si el proyecto "
+                "tiene más escenas de las que caben en la cuota diaria, "
+                "reparte la animación en 2 días.")
+    elif not faltan:
+        ok = True
+        head = (f"Animación: {len(scenes)}/{len(scenes)} escenas "
+                "renderizadas, sin huecos.")
+    else:
+        ok = False
+        head = (f"Animación parcial: {n_have}/{len(scenes)} con video. "
+                f"Faltan {len(faltan)}: {lista}. Reintenta la etapa o usa "
+                "«Re-animar escena»; las ya hechas se omiten solas.")
+    # Log completo persistente: cada ejecución queda en jobs/<id>/logs/
+    # para revisarla después (el panel solo guarda la cola en la BD).
+    logf = _guardar_log(job, "animacion", [head, "=" * 60] + logs)
+    if logf:
+        head += f"\n📄 Log completo de esta ejecución: {logf}"
+    return ok, head + "\n" + "\n".join(logs[-25:]), arts, None
 
 
 def run_reanimar_escena(generate_fn, p, job, sid, regen_code=True,
@@ -1143,6 +1208,9 @@ def run_ensamblado(p, job, progress=None):
            ("\nVersión con subtítulos quemados generada."
             if r.returncode == 0 else
             "\nAVISO: no se pudo quemar subtítulos (revisa final.srt)."))
+    logf = _guardar_log(job, "ensamblado", [log])
+    if logf:
+        log += f"\n📄 Log completo de esta ejecución: {logf}"
     return True, log, arts, None
 
 

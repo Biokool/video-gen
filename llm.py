@@ -2,11 +2,11 @@
 """Router multi-backend de LLMs del panel Zenn Factory.
 
 Backends con capa gratuita verificada 2026-09/10; catálogos de modelos
-gratuitos renovados en vivo el 2026-10-03 (solo ids gratis por
-plataforma, DeepSeek es el único backend de pago). Los sets gratuitos
-rotan en todos los proveedores; el orden de cada cadena es preferencia,
-no garantía de disponibilidad. Si un modelo falla (404/429/límite),
-se intenta el siguiente automáticamente.
+gratuitos renovados en vivo el 2026-10-03 (y aihubmix el 2026-10-04):
+solo ids gratis por plataforma, DeepSeek es el único backend de pago.
+Los sets gratuitos rotan en todos los proveedores; el orden de cada
+cadena es preferencia, no garantía de disponibilidad. Si un modelo
+falla (404/429/límite), se intenta el siguiente automáticamente.
 
   gemini     Google AI Studio — ~1.500 req/día en Flash, sin tarjeta.
   groq       OpenAI-compatible — rapidísimo (300-1000 tok/s).
@@ -18,7 +18,10 @@ se intenta el siguiente automáticamente.
   tokenharbor Solo los modelos GRATIS del catálogo (ids que terminan en
              `:free`; el resto cargan saldo y aquí no se muestran).
   freellmapi  FreeLLMAPI — GLM/Qwen/Kimi con la bolsa de tokens gratis
-             (10.000 al crear la key).
+              (10.000 al crear la key).
+  aihubmix   AIHubMix — agregador OpenAI-compatible; solo ids `-free`
+             (44 en vivo el 2026-10-04: MiMo/GLM/Qwen/Nemotron a $0),
+             sin tarjeta y sin caducidad; cuota por modelo (RPM + tok/día).
   deepseek   DeepSeek oficial (api.deepseek.com) — de pago, con tu key.
   ollama     Modelos locales vía http://localhost:11434 (lista dinámica
              con `ollama list` — aparece lo que Chino tenga instalado).
@@ -60,6 +63,9 @@ BACKENDS = {
     "freellmapi": {"label": "FreeLLMAPI · gratis",
                    "setting": "freellmapi_key", "env": "FREELLMAPI_API_KEY",
                    "free": "10.000 tokens al crear la key"},
+    "aihubmix":   {"label": "AIHubMix · solo gratis",
+                   "setting": "aihubmix_key", "env": "AIHUBMIX_API_KEY",
+                   "free": "solo ids `-free` (RPM + tokens/día, sin tarjeta)"},
     "deepseek":   {"label": "DeepSeek · oficial",
                    "setting": "deepseek_key", "env": "DEEPSEEK_API_KEY",
                    "free": "de pago (tarifa por token)"},
@@ -69,8 +75,9 @@ BACKENDS = {
 }
 
 # Orden de preferencia para el combo (calidad ES + cuota + velocidad).
-BACKEND_ORDER = ["gemini", "groq", "tokenharbor", "freellmapi", "deepseek",
-                 "cerebras", "openrouter", "mistral", "cohere", "ollama"]
+BACKEND_ORDER = ["gemini", "groq", "tokenharbor", "freellmapi", "aihubmix",
+                 "deepseek", "cerebras", "openrouter", "mistral", "cohere",
+                 "ollama"]
 
 # FreeLLMAPI: por defecto el router LOCAL (start-all.bat, puerto 3001).
 # Si prefieres el hosted, cambia esta URL en Configuración.
@@ -83,13 +90,19 @@ OPENAI_BASES = {
     "mistral": "https://api.mistral.ai/v1",
     "tokenharbor": "https://tokenharbor.ai/v1",
     "freellmapi": FREELLMAPI_BASE,
+    "aihubmix": "https://aihubmix.com/v1",
     "deepseek": "https://api.deepseek.com/v1",
 }
 
 # Backends en los que SOLO se muestran/generan ids con este sufijo:
 # lo demás del catálogo es de pago y no queremos gastar saldo.
-# (Catálogos verificados en vivo el 2026-10-03.)
-FREE_ONLY = {"tokenharbor": ":free", "openrouter": ":free"}
+# (Catálogos verificados en vivo el 2026-10-03; aihubmix el 2026-10-04.)
+FREE_ONLY = {"tokenharbor": ":free", "openrouter": ":free",
+             "aihubmix": "-free"}
+
+# Ids que cumplen el sufijo gratis pero NO sirven para chat/guiones
+# (imágenes, embeddings, clasificadores de seguridad…).
+FREE_EXCLUDE = {"aihubmix": ("image", "embed", "content-safety", "tts")}
 
 # Alias que no terminan en el sufijo pero también son gratis y hay que
 # conservar en la cadena (el meta-router de OpenRouter).
@@ -139,6 +152,12 @@ PREFERRED = {
                     "mimo-v2.5:free"],
     "freellmapi": ["gemini-2.5-flash", "glm-4.7", "kimi-k3",
                    "qwen3.8-flash", "deepseek-v4-flash"],
+    # Descubierto en vivo 2026-10-04 (44 ids `-free`); orden por calidad
+    # de español: MiMo/GLM/Qwen primero, flashes después.
+    "aihubmix": ["xiaomi-mimo-v2.6-pro-free", "xiaomi-mimo-v2.5-pro-free",
+                 "coding-glm-5.3-free", "qwen3.6-plus-preview-free",
+                 "xiaomi-mimo-v2.6-flash-free", "glm-4.7-flash-free",
+                 "ling-3.0-flash-free"],
     # Único backend de pago (sin FREE_ONLY): ids vigentes 2026-10-03.
     "deepseek": ["deepseek-flash", "deepseek-v4-pro"],
 }
@@ -385,7 +404,10 @@ def resolve_chain(backend, model, keys):
         if backend in FREE_ONLY:  # solo ids gratuitos (p.ej. `:free`)
             suf = FREE_ONLY[backend]
             keep = FREE_KEEP.get(backend, set())
-            found = [m for m in found if m.endswith(suf) or m in keep]
+            bad = FREE_EXCLUDE.get(backend, ())
+            found = [m for m in found
+                     if (m.endswith(suf) or m in keep)
+                     and not any(t in m.lower() for t in bad)]
         if found:
             pref = PREFERRED[backend]
             ok = [m for m in pref if m in found]
@@ -443,7 +465,7 @@ def generate(prompt, backend="gemini", model="", system="", keys=None,
                 elif backend == "openrouter":
                     text = _openrouter_generate(m, prompt, system, key)
                 else:  # groq, cerebras, mistral, tokenharbor, freellmapi,
-                        # deepseek
+                        # aihubmix, deepseek
                     text = _openai_chat(_base(backend, keys), key, m,
                                         prompt, system,
                                         max_tokens=max_tokens)

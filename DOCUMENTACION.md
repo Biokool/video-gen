@@ -42,18 +42,25 @@ Orden de preferencia del router (con fallback automático en cadena):
 | 2 | Groq | 1.000 req/día por modelo | openai/gpt-oss-120b, qwen3.8-27b |
 | 3 | Token Harbor | solo ids `:free` (7×24 h por cuenta) | catálogo descubierto filtrado por `:free` |
 | 4 | FreeLLMAPI | 10.000 tokens al crear la key | glm-5.2, glm-4.7, kimi-k3, qwen3.8-max-preview |
-| 5 | DeepSeek oficial | de pago (tarifa por token) | deepseek-chat, deepseek-reasoner |
-| 6 | Cerebras | ~1M tokens/día, el más rápido | lineup rotativo |
-| 7 | OpenRouter `:free` | 50 req/día (1.000 con $10) | nemotron-3-super, gemma-4 |
-| 8 | Mistral (Experiment) | ~1B tok/mes (aceptas training) | mistral-large |
-| 9 | Cohere (trial) | 1.000 llamadas/mes | command-r |
-| 10 | Ollama local | ∞, sin internet | qwen3.6, video-factory-qwen |
+| 5 | AIHubMix | solo ids `-free` (RPM + tokens/día), sin tarjeta | xiaomi-mimo-v2.6-pro-free, coding-glm-5.3-free, qwen3.6-plus-preview-free |
+| 6 | DeepSeek oficial | de pago (tarifa por token) | deepseek-chat, deepseek-reasoner |
+| 7 | Cerebras | ~1M tokens/día, el más rápido | lineup rotativo |
+| 8 | OpenRouter `:free` | 50 req/día (1.000 con $10) | nemotron-3-super, gemma-4 |
+| 9 | Mistral (Experiment) | ~1B tok/mes (aceptas training) | mistral-large |
+| 10 | Cohere (trial) | 1.000 llamadas/mes | command-r |
+| 11 | Ollama local | ∞, sin internet | qwen3.6, video-factory-qwen |
 
 - **Token Harbor** (`https://tokenharbor.ai/v1`, key `thk_live_…`): el combo
   **solo** muestra ids que terminan en `:free`; los de pago jamás entran en
   la cadena, así que no se descuadra la wallet.
 - **FreeLLMAPI** (`https://api.freellmapi.ai/v1`, key `sk_live_…`): todo su
   catálogo sale de la bolsa de 10.000 tokens gratis.
+- **AIHubMix** (`https://aihubmix.com/v1`, key `sk-…`): agregador
+  OpenAI-compatible con **44 ids `-free` en vivo (2026-10-04)** — GPT,
+  Gemini, MiMo, GLM y Qwen a $0, sin tarjeta ni caducidad. El combo solo
+  muestra los `-free` (los de pago jamás entran en la cadena); se descarta
+  además lo que no sirve para chat (`image`, `embed`, `content-safety`,
+  `tts`). Regístrate en aihubmix.com y pega la key en Configuración.
 - **DeepSeek oficial** (`https://api.deepseek.com/v1`): el único de pago de
   la lista, para cuando quieras `deepseek-chat` sin intermediarios.
 - Las tres claves se pegan en **Configuración → Claves de LLM**, igual que
@@ -410,4 +417,40 @@ video-gen/
   desactivado re-renderiza el `.py` existente con CERO tokens (ideal tras
   actualizar el rig). Después re-ejecuta la etapa 8.
 
-*Versión del panel: v8 (anti-encimados, duración garantizada, re-animar escena).*
+## 19. Cambios v9 (2026-10-04)
+
+**Caso real proyecto 25 (89 escenas, Groq 200K TPD):**
+- 89 escenas × ~2.8K tokens ≈ 250K > 200K: en Groq gratis un proyecto así
+  NO termina en un día. El panel ahora lo dice por adelantado en la
+  estimación y propone repartir en 2 días u Ollama local.
+
+**Alto en seco por cuota:**
+- Antes: al agotarse la cuota, la etapa seguía escena por escena fallando
+  en cascada ("brincando", 18 min quemados). Ahora: al primer fallo de
+  cuota/rate-limit la etapa 7 se DETIENE, dice en qué escena paró y cuántas
+  faltan. Reanudar es un clic (las hechas se omiten solas).
+
+**Log completo por ejecución:**
+- Cada corrida de animación, ensamblado y TTS guarda su log ÍNTEGRO en
+  `jobs/<id>/logs/<etapa>_AAAAMMDD_HHMMSS.log` (qué se hizo, qué se omitió,
+  qué falló y por qué). El panel muestra la ruta en el resumen.
+
+**Huecos visibles:**
+- El resumen de la etapa 7 ahora reporta el estado real: "X/89 escenas
+  con video. Faltan N: S03, S06, …" en vez de solo la cola del log.
+
+*Versión del panel: v9 (cuota: alto en seco + log por ejecución + huecos visibles).*
+
+## 20. Cambios v9.1 (2026-10-04)
+
+- **Backend AIHubMix** (`llm.py`): nuevo backend «AIHubMix · solo gratis»
+  con `https://aihubmix.com/v1` (OpenAI-compatible). Filtra por sufijo
+  `-free` (44 ids en vivo el 2026-10-04) y descarta ids no-chat
+  (`image`, `embed`, `content-safety`, `tts`) con `FREE_EXCLUDE`.
+  Cadena preferida: `xiaomi-mimo-v2.6-pro-free` →
+  `xiaomi-mimo-v2.5-pro-free` → `coding-glm-5.3-free` →
+  `qwen3.6-plus-preview-free` → `xiaomi-mimo-v2.6-flash-free` →
+  `glm-4.7-flash-free` → `ling-3.0-flash-free`; con key, `/models`
+  sustituye la cadena por el catálogo real filtrado igual.
+  Key nueva: `AIHUBMIX_API_KEY` en Configuración (sin key, la cadena
+  preferida funciona como fallback).
