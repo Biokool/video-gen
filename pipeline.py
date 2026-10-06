@@ -29,7 +29,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 
-PANEL_VERSION = "v11"  # se muestra en el pie del sidebar; subir en cada release
+PANEL_VERSION = "v12"  # se muestra en el pie del sidebar; subir en cada release
 # Dos layouts soportados:
 #  - anidado: panel/ dentro de zenn-factory/ (jobs/ y thumbnails/ en el padre)
 #  - plano:   todo dentro de video-gen/ (jobs/ y thumbnails/ junto a app.py)
@@ -354,32 +354,40 @@ def run_storyboard(generate_fn, p, job):
 
 # ---------- paquete de publicación (asistida) ----------
 PAQUETE_PROMPT = """Eres el editor de un canal de YouTube de divulgación científica en español (estilo Zenn).
-Genera el paquete de publicación COMPLETO para el video "{title}", con EXACTAMENTE este formato:
+Genera el paquete de publicación COMPLETO para el video "{title}", con EXACTAMENTE este formato.
+
+REGLAS DE FORMATO (obligatorias: romperlas daña la credibilidad del canal):
+- PROHIBIDO markdown: nada de **, ##, ### ni *cursivas*. YouTube lo muestra como texto crudo y se ve como error de automatización.
+- Los encabezados dentro de las secciones son texto plano con emoji, p. ej. "🔍 LO QUE VERÁS:".
+- Viñetas con "•", nunca con guiones.
 
 TITULOS:
-1. <opción 1: máx 60 caracteres, palabra clave al frente, gancho honesto>
+1. <opción 1: máx 60 caracteres. Fórmula: pregunta directa, afirmación fuerte, número o superlativo + palabra clave al frente. Gancho honesto, sin clickbait falso. Ej: "¿Por qué los mosquitos siempre te pican a TI?">
 2. <opción 2>
 3. <opción 3>
 
 DESCRIPCION:
-<2 primeras líneas = el gancho: qué se pregunta el video y qué se lleva el espectador (se ven sin desplegar)>
-<resumen de 2-3 frases con la palabra clave>
+<líneas 1-2: el gancho en segunda persona — la pregunta del video + qué se lleva el espectador. Es lo que se ve sin desplegar: lo más importante de todo>
+<1 línea de valor: qué aprenderá, con la palabra clave>
 
 LO QUE VERAS:
-- <punto 1>
-- <punto 2>
-- <punto 3>
-- <punto 4>
+<4-6 líneas, cada una empezando con "•", puntos concretos del video>
 
 CAPITULOS:
 <elige 5-8 cortes de la LISTA DE MARCAS de abajo, formato "m:ss Título corto". La primera marca debe ser 0:00. Usa solo marcas de la lista.>
 
 FUENTES:
-<las fuentes reales citadas en el guion/investigación, una por línea>
+<las fuentes reales citadas en el guion/investigación, una por línea, formato "Autor (año). Título.">
 
-HASHTAGS: <#tag1 #tag2 #tag3 — máximo 3>
-TAGS: <12-15 etiquetas separadas por comas, primera = frase clave exacta>
-COMENTARIO FIJADO: <una pregunta abierta que invite a responder, sin repetir el título>
+CTA:
+<1 línea invitando a suscribirse, p. ej: "🔔 Suscríbete a El Porqué para resolver el siguiente porqué cada semana.">
+
+PREGUNTA:
+<1 pregunta abierta para los comentarios, sin repetir el título, terminada en "👇">
+
+HASHTAGS: <#tag1 #tag2 #tag3 — de 3 a 5, el primero = la palabra clave principal en minúsculas>
+TAGS: <12-15 etiquetas separadas por comas, en minúsculas, ESPECÍFICAS (nada de "mundo", "ciencia" solos), la primera = la frase clave exacta>
+COMENTARIO FIJADO: <pregunta abierta distinta a la de PREGUNTA, que invite a responder>
 POST COMUNIDAD: <2-3 líneas anunciando el video con la pregunta del tema>
 SHORT SUGERIDO: <escena de la lista (Sxx) que mejor funciona sola en 30-45s y por qué>
 PANTALLA FINAL: <texto y tipo de video a enlazar>
@@ -1507,6 +1515,46 @@ def cut_vertical(src_mp4, dst_mp4, start, end):
            "-c:v", "libx264", "-preset", "medium", "-crf", "20",
            "-c:a", "aac", str(dst_mp4)]
     return run(cmd, timeout=600)
+
+
+def fmt_mmss(secs):
+    m, s = divmod(int(round(secs or 0)), 60)
+    return f"{m:02d}:{s:02d}"
+
+
+def segmento_de_escena(job, sid):
+    """(inicio, fin) en segundos de una escena Sxx, desde los audios TTS."""
+    vo = job / "vo.json"
+    if not vo.exists():
+        return None
+    try:
+        items = json.loads(vo.read_text(encoding="utf-8", errors="replace"))
+    except Exception:
+        return None
+    t = 0.0
+    sid = sid.strip().lower()
+    for it in items:
+        au = job / "audio" / f"{it['id'].lower()}.mp3"
+        dur = _probe_duration(au) if au.exists() else 0.0
+        if it["id"].lower() == sid:
+            return (t, t + dur)
+        t += dur
+    return None
+
+
+def sugerencia_corto(job):
+    """Lee 'SHORT SUGERIDO: Sxx' del PAQUETE.md → (Sxx, t0, t1 en segundos)."""
+    paq = job / "PAQUETE.md"
+    if not paq.exists():
+        return None
+    m = re.search(r"SHORT SUGERIDO:\s*(S\d+)",
+                  paq.read_text(encoding="utf-8", errors="replace"), re.I)
+    if not m:
+        return None
+    seg = segmento_de_escena(job, m.group(1))
+    if not seg:
+        return None
+    return (m.group(1).upper(), seg[0], seg[1])
 
 
 # ---------- dispatcher de etapas ----------

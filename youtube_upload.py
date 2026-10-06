@@ -116,10 +116,11 @@ def _servicio(base):
 
 
 def subir(base, video_path, titulo, descripcion, tags, privacidad="privado",
-          categoria=DEFAULT_CATEGORY, progress=None):
+          categoria=DEFAULT_CATEGORY, progress=None, publicar_el=None):
     """Sube un video con subida reanudable.
 
     progress(recibido, total): callback opcional.
+    publicar_el: "2026-10-10T18:00:00-06:00" (RFC 3339) para programar.
     Devuelve (video_id, url) o lanza RuntimeError con mensaje amigable.
     """
     _, _, _, _, MediaFileUpload, HttpError = _importar()
@@ -131,12 +132,15 @@ def subir(base, video_path, titulo, descripcion, tags, privacidad="privado",
         raise RuntimeError(f"No existe el video: {video_path}")
     if len(titulo) > 100:
         titulo = titulo[:100]
+    status = {"privacyStatus": priv,
+              "selfDeclaredMadeForKids": False}
+    if publicar_el:
+        status["publishAt"] = publicar_el
     body = {"snippet": {"title": titulo,
                         "description": descripcion or "",
                         "tags": [t for t in (tags or []) if t][:500],
                         "categoryId": categoria},
-            "status": {"privacyStatus": priv,
-                       "selfDeclaredMadeForKids": False}}
+            "status": status}
     service = _servicio(base)
     media = MediaFileUpload(str(video_path), chunksize=8 * 1024 * 1024,
                             resumable=True)
@@ -165,51 +169,154 @@ def subir(base, video_path, titulo, descripcion, tags, privacidad="privado",
     return vid, f"https://youtu.be/{vid}" if vid else ""
 
 
+def subir_miniatura(base, video_id, thumb_path):
+    """Sube la miniatura del video con thumbnails().set.
+
+    Requiere cuenta verificada en YouTube; si no, la API lo rechaza y se
+    reporta con mensaje amigable (el video queda publicado sin miniatura
+    personalizada).
+    Devuelve True o lanza RuntimeError.
+    """
+    _, _, _, _, MediaFileUpload, HttpError = _importar()
+    thumb_path = Path(thumb_path)
+    if not thumb_path.exists():
+        raise RuntimeError(f"No existe la miniatura: {thumb_path}")
+    service = _servicio(base)
+    ext = thumb_path.suffix.lower()
+    mime = "image/png" if ext == ".png" else "image/jpeg"
+    media = MediaFileUpload(str(thumb_path), mimetype=mime, resumable=False)
+    try:
+        service.thumbnails().set(videoId=video_id,
+                                 media_body=media).execute()
+    except HttpError as e:
+        msg = str(e)
+        if "forbidden" in msg.lower() or "insufficient" in msg.lower():
+            raise RuntimeError(
+                "YouTube rechazó la miniatura: tu cuenta/canal debe estar "
+                "verificada (youtube.com/verify) para usar miniaturas "
+                "personalizadas. El video sí quedó publicado.") from e
+        raise RuntimeError(
+            f"YouTube rechazó la miniatura: {msg[:300]}") from e
+    return True
+
+
+_PAQ_HEADERS = ["TITULOS:", "DESCRIPCION:", "LO QUE VERAS:", "CAPITULOS:",
+                "FUENTES:", "CTA:", "PREGUNTA:", "HASHTAGS:", "TAGS:",
+                "COMENTARIO FIJADO:", "POST COMUNIDAD:", "SHORT SUGERIDO:",
+                "PANTALLA FINAL:"]
+
+_CTA_DEFAULT = ("🔔 Suscríbete a El Porqué para resolver el siguiente "
+                "porqué cada semana.")
+
+
+def _limpiar_md(t):
+    """Quita artefactos de markdown que YouTube mostraría como texto crudo."""
+    import re
+    t = re.sub(r"\*\*(.+?)\*\*", r"\1", t)      # **X** -> X
+    t = re.sub(r"(?m)^\s*#{1,3}\s*$", "", t)    # líneas ## vacías
+    t = re.sub(r"(?m)^\s*\*{1,2}\s*$", "", t)   # líneas ** vacías
+    t = re.sub(r"(?m)^[ \t]+$", "", t)         # líneas solo con espacios
+    t = re.sub(r"\n{3,}", "\n\n", t)
+    return t.strip()
+
+
+def _extraer_inline(desc):
+    """Saca sub-encabezados inline (formato viejo del panel) de la descripción.
+
+    En paquetes viejos, "LO QUE VERAS:" y "CAPITULOS:" venían dentro de
+    DESCRIPCION: como **LO QUE VERAS:**. Se separan para reemitirlos con
+    el formato canónico (headers con emoji).
+    """
+    import re
+    veras, caps = "", ""
+    m = re.search(r"(?m)^LO QUE VERAS:\s*$", desc)
+    if m:
+        resto = desc[m.end():]
+        desc = desc[:m.start()].strip()
+        mc = re.search(r"(?m)^CAPITULOS:\s*$", resto)
+        if mc:
+            veras = resto[:mc.start()].strip()
+            caps = resto[mc.end():].strip()
+        else:
+            veras = resto.strip()
+    else:
+        mc = re.search(r"(?m)^CAPITULOS:\s*$", desc)
+        if mc:
+            caps = desc[mc.end():].strip()
+            desc = desc[:mc.start()].strip()
+    return desc, veras, caps
+
+
+def _secciones_paquete(txt):
+    """Divide el PAQUETE.md por sus encabezados (## NOMBRE:), en orden."""
+    import re
+    pos = []
+    for h in _PAQ_HEADERS:
+        for m in re.finditer(r"(?m)^#{0,3}\s*" + re.escape(h), txt):
+            pos.append((m.start(), h, m.end()))
+    pos.sort()
+    out = {}
+    for i, (s, h, e) in enumerate(pos):
+        fin = pos[i + 1][0] if i + 1 < len(pos) else len(txt)
+        if h not in out:
+            out[h] = txt[e:fin].strip()
+    return out
+
+
 def parse_paquete(paquete_md):
     """Extrae título/descripción/tags de un PAQUETE.md del panel.
 
+    La descripción se reconstruye en orden canónico (gancho → LO QUE VERÁS
+    → CAPÍTULOS → FUENTES → CTA → pregunta → hashtags) y sin markdown.
     Devuelve {"titulo":..., "descripcion":..., "tags":[...]} con fallbacks.
     """
+    import re
     txt = Path(paquete_md).read_text(encoding="utf-8", errors="replace") \
         if Path(paquete_md).exists() else ""
-    titulo, descripcion, tags = "", "", []
+    sec = _secciones_paquete(txt)
 
-    def seccion(nombre, siguiente=None):
-        import re
-        ini = txt.find(nombre)
-        if ini < 0:
-            return ""
-        ini += len(nombre)
-        fin = len(txt)
-        if siguiente:
-            j = txt.find(siguiente, ini)
-            if j > 0:
-                fin = j
-        return txt[ini:fin].strip()
-
-    # TÍTULOS: toma la opción 1
-    import re
+    titulo = ""
     m = re.search(r"T[ÍI]TULOS:\s*\n1\.\s*(.+)", txt)
     if m:
-        titulo = m.group(1).strip()
+        titulo = _limpiar_md(m.group(1).strip())
     if not titulo:
         m = re.search(r"^1\.\s*(.+)", txt, re.M)
-        titulo = m.group(1).strip() if m else "El Porqué"
+        titulo = _limpiar_md(m.group(1).strip()) if m else "El Porqué"
 
-    desc = seccion("DESCRIPCION:", "LO QUE VERAS:")
-    veras = seccion("LO QUE VERAS:", "CAPITULOS:")
-    fuentes = seccion("FUENTES:", "HASHTAGS:")
-    partes = [p for p in (desc, veras, fuentes) if p]
-    descripcion = "\n\n".join(partes)[:4800]
+    desc = _limpiar_md(sec.get("DESCRIPCION:", ""))
+    veras = _limpiar_md(sec.get("LO QUE VERAS:", ""))
+    caps = _limpiar_md(sec.get("CAPITULOS:", ""))
+    if not veras or not caps:
+        # Paquetes viejos: venían inline dentro de DESCRIPCION:
+        desc, v2, c2 = _extraer_inline(desc)
+        veras = veras or v2
+        caps = caps or c2
+    fuentes = _limpiar_md(sec.get("FUENTES:", ""))
+    cta = _limpiar_md(sec.get("CTA:", "")) or _CTA_DEFAULT
+    pregunta = _limpiar_md(sec.get("PREGUNTA:", ""))
+    hashtags = re.findall(r"#(\w+)", sec.get("HASHTAGS:", ""))[:5]
 
+    partes = [desc]
+    if veras:
+        partes.append("🔍 LO QUE VERÁS:\n" + veras)
+    if caps:
+        partes.append("⏱ CAPÍTULOS:\n" + caps)
+    if fuentes:
+        partes.append("📚 FUENTES:\n" + fuentes)
+    partes.append(cta)
+    if pregunta:
+        partes.append(pregunta)
+    if hashtags:
+        partes.append(" ".join("#" + h for h in hashtags))
+    descripcion = "\n\n".join(p for p in partes if p)[:4800]
+
+    tags = []
     m = re.search(r"^TAGS:\s*(.+)", txt, re.M)
     if m:
         tags = [t.strip().lstrip("#") for t in m.group(1).split(",")
                 if t.strip()][:15]
-    m = re.search(r"^HASHTAGS:\s*(.+)", txt, re.M)
-    if m:
-        for h in re.findall(r"#(\w+)", m.group(1)):
-            if h not in tags:
-                tags.append(h)
+    for h in hashtags:
+        if h.lower() not in [t.lower() for t in tags]:
+            tags.append(h)
     return {"titulo": titulo[:100], "descripcion": descripcion,
             "tags": tags[:20]}

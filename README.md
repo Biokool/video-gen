@@ -84,6 +84,8 @@ si uno falla (404/429/límite), intenta el siguiente de la cadena.
 | OpenRouter :free | 50 req/día (1.000 con $10 de crédito) | nemotron-3-super → gemma-4-31b → llama-3.3-70b → `openrouter/free` |
 | Mistral (La Plateforme) | plan Experiment (~1B tok/mes) | `mistral-small/medium/large-latest` |
 | Cohere (trial) | 1.000 llamadas/mes | `command-a-03-2025`, `command-r-plus` |
+| Cloudflare Workers AI | plan Free: 10.000 neuronas/día (21 modelos OK) | `@cf/meta/llama-3.3-70b-instruct-fp8-fast`, `@cf/qwen/qwen3.8-27b` |
+| NVIDIA API catalog | 10 de 80 ids responden en la cuenta | `nvidia/nemotron-3-super-120b-a12b`, `z-ai/glm-5.3` |
 | Ollama local | ilimitado (tu hardware) | lista dinámica de `ollama list` |
 
 - **ollama**: el combo muestra lo que tengas instalado; nada está hardcodeado.

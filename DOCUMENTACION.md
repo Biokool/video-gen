@@ -42,20 +42,35 @@ Orden de preferencia del router (con fallback automático en cadena):
 | 2 | Groq | 1.000 req/día por modelo | openai/gpt-oss-120b, qwen3.8-27b |
 | 3 | Token Harbor | solo ids `:free` (7×24 h por cuenta) | catálogo descubierto filtrado por `:free` |
 | 4 | FreeLLMAPI | 10.000 tokens al crear la key | glm-5.2, glm-4.7, kimi-k3, qwen3.8-max-preview |
-| 5 | DeepSeek oficial | de pago (tarifa por token) | deepseek-chat, deepseek-reasoner |
-| 6 | Cerebras | ~1M tokens/día, el más rápido | lineup rotativo |
-| 7 | OpenRouter `:free` | 50 req/día (1.000 con $10) | nemotron-3-super, gemma-4 |
-| 8 | Mistral (Experiment) | ~1B tok/mes (aceptas training) | mistral-large |
-| 9 | Cohere (trial) | 1.000 llamadas/mes | command-r |
-| 10 | Ollama local | ∞, sin internet | qwen3.6, video-factory-qwen |
+| 5 | Cloudflare Workers AI | plan Free: 10.000 neuronas/día | @cf/meta/llama-3.3-70b-instruct-fp8-fast, @cf/qwen/qwen3.8-27b |
+| 6 | NVIDIA API catalog | 10 de 80 ids responden en la cuenta | nvidia/nemotron-3-super-120b-a12b, z-ai/glm-5.3 |
+| 7 | DeepSeek oficial | de pago (tarifa por token) | deepseek-chat, deepseek-reasoner |
+| 8 | Cerebras | ~1M tokens/día, el más rápido | lineup rotativo |
+| 9 | OpenRouter `:free` | 50 req/día (1.000 con $10) | nemotron-3-super, gemma-4 |
+| 10 | Mistral (Experiment) | ~1B tok/mes (aceptas training) | mistral-large |
+| 11 | Cohere (trial) | 1.000 llamadas/mes | command-r |
+| 12 | Ollama local | ∞, sin internet | qwen3.6, video-factory-qwen |
 
 - **Token Harbor** (`https://tokenharbor.ai/v1`, key `thk_live_…`): el combo
   **solo** muestra ids que terminan en `:free`; los de pago jamás entran en
   la cadena, así que no se descuadra la wallet.
 - **FreeLLMAPI** (`https://api.freellmapi.ai/v1`, key `sk_live_…`): todo su
   catálogo sale de la bolsa de 10.000 tokens gratis.
+- **Cloudflare Workers AI** (`https://api.cloudflare.com/client/v4/accounts/<id>/ai/v1`,
+  key `cfat_…`): plan **Free con 10.000 neuronas/día**. El catálogo trae
+  69 modelos pero solo **21 corren en plan Free** (verificado en vivo el
+  2026-10-04): el resto devuelve «not available on the Workers Free plan»
+  y el panel lo salta solo. Ids no-chat (embeddings, imagen, audio) y los
+  bloqueados quedan fuera con `FREE_EXCLUDE` / `CF_FREE_BLOCKED`.
 - **DeepSeek oficial** (`https://api.deepseek.com/v1`): el único de pago de
   la lista, para cuando quieras `deepseek-chat` sin intermediarios.
+- **NVIDIA API catalog** (`https://integrate.api.nvidia.com/v1`, key
+  `nvapi-…`): `GET /models` anuncia 80 ids, pero **solo 10 responden en
+  la cuenta** (verificado en vivo el 2026-10-05): 34 devuelven 404
+  «Function … Not found for account» y 3 se quedan sin respuesta >180 s.
+  Los tres grupos se filtran solos (`NV_FREE_BLOCKED` +
+  `FREE_EXCLUDE["nvidia"]`) y el timeout del backend baja a 120 s
+  (`CHAT_TIMEOUT`) para no bloquear la cadena.
 - Las tres claves se pegan en **Configuración → Claves de LLM**, igual que
   el resto; el panel descubre los modelos con `/models` en cuanto hay key.
 
@@ -537,3 +552,105 @@ blanco) y `pipeline.execute_stage` lo registra con proyecto y etapa. El
 medidor no interrumpe nada si falla.
 
 *Versión del panel: v11 (Publicar en YouTube + Medidor de tokens).*
+
+## 23. Cambios v12 (2026-10-04)
+
+### 🖼️ Miniatura sí se sube (fix)
+
+El bug reportado (video publicado sin miniatura): el uploader nunca llamaba
+a la API de miniaturas. Ahora el **Paso 3** es "Miniatura y subida":
+- Selector con las 3 miniaturas del proyecto (por defecto, la aprobada en
+  la puerta) + vista previa.
+- Tras subir el video se llama a `thumbnails().set` automáticamente.
+- Si el canal no está verificado (youtube.com/verify), YouTube rechaza la
+  miniatura pero el video queda publicado; el panel lo avisa sin tronar.
+- El mapeo de privacidad UI→API (`privado→private`, `oculto→unlisted`,
+  `público→public`) quedó integrado (antes la API recibía "privado" crudo).
+
+### 📱 Cortos del video / estrategia Shorts (nuevo)
+
+Nueva sección **📱 Cortos del video (Shorts)** en cada proyecto largo:
+- **Sugerencia automática:** lee `SHORT SUGERIDO: Sxx` del PAQUETE.md y
+  calcula los timestamps reales desde los audios TTS (botón "Usar
+  sugerencia"). O manual: inicio/fin en mm:ss.
+- **✂️ Generar corto vertical:** recorte 1080×1920 con subtítulos quemados
+  (usa el SRT del video largo). YouTube clasifica como Short todo vertical
+  de ≤3 min automáticamente.
+- **Subida como Short:** cada corto generado tiene su título (pre-llenado
+  con el del largo + #Shorts), descripción con palabras clave (reusa los
+  tags del largo + enlace al video completo) y selector de privacidad
+  (recomendado: público). Se registra el ID subido por corto.
+- Estrategia: 1-2 Shorts por video largo traen visitas nuevas al largo.
+
+### 🕒 Programar publicación (nuevo)
+
+En el Paso 2, checkbox **"Programar publicación"** + fecha/hora: el video
+se sube como privado y YouTube lo hace público solo a la hora elegida.
+Útil para la cadencia de 2 videos/semana.
+
+### 📝 Paquete de publicación v2 (research de 7 canales)
+
+Se analizaron Ink Explainer, Aussie Finance, GoodEnoughAnimation, Rico
+Animations, thedailyblurb, CasuallyFinance y un video animado de
+referencia, comparados contra el video publicado del canal. Hallazgos
+aplicados:
+- **Orden canónico de la descripción:** gancho (2 líneas) → 🔍 LO QUE
+  VERÁS: → ⏱ CAPÍTULOS: → 📚 FUENTES: → CTA suscripción → pregunta de
+  engagement → hashtags (3-5) al final.
+- **PROHIBIDO markdown** en la salida (`**`, `##`): YouTube lo muestra
+  como texto crudo y se ve como error de automatización (esto rompía los
+  headers del video publicado).
+- **Los CAPÍTULOS ahora sí llegan a la descripción** (el parser viejo los
+  descartaba) y los **HASHTAGS van al final del cuerpo** (antes solo
+  caían al campo de tags, invisibles sobre el título).
+- El parser limpia artefactos markdown y reconstruye paquetes viejos al
+  formato canónico (probado con formato viejo y nuevo).
+- Títulos: pregunta/afirmación fuerte/número/superlativo + keyword al
+  frente, ≤60 caracteres. Tags: 12-15, minúsculas, específicos.
+
+*Versión del panel: v12 (miniatura en subida + Shorts + programar + paquete v2).*
+
+## 24. Cambios v12.1 (2026-10-04)
+
+- **Backend Cloudflare Workers AI** (`llm.py`): nuevo backend con base
+  `https://api.cloudflare.com/client/v4/accounts/<id>/ai/v1`
+  (OpenAI-compatible) y key `CLOUDFLARE_API_KEY` en Configuración.
+- **Descubrimiento propio**: `GET /models` da 405 en Workers AI, así que
+  `_cloudflare_models()` usa `/ai/models/search` y filtra con
+  `FREE_EXCLUDE` (tareas no-chat) + `CF_FREE_BLOCKED` (ids que no corren
+  en plan Free, verificados en vivo el 2026-10-04). Los errores
+  «not available on the Workers Free plan» / «does not have config» /
+  «must submit the prompt» se clasifican como `skip` en `_rate_kind()`,
+  así la cadena salta al siguiente modelo sin reintentarlo.
+- Cadena preferida (21 modelos OK probados): llama-3.3-70b-fp8-fast →
+  qwen3.8-27b → gpt-oss-120b → mistral-small-3.1-24b → nemotron-3-120b →
+  glm-4.7-flash → llama-4-scout → qwq-32b (+ descubiertos).
+- Cuota: plan Free = **10.000 neuronas/día**; sirve de respaldo cuando se
+  agotan Gemini/Groq/TokenHarbor.
+
+## 25. Cambios v12.2 (2026-10-05)
+
+- **Backend NVIDIA API catalog / NIM** (`llm.py`): nueva entrada con base
+  `https://integrate.api.nvidia.com/v1` y key `NVIDIA_API_KEY`
+  (`nvidia_key` en Configuración).
+- **Sondeo en vivo (2026-10-05, 44 ids de chat de los 80 del catálogo):**
+  - **10 OK**: `nvidia/nemotron-3-super-120b-a12b` (0.6-0.9 s),
+    `z-ai/glm-5.3` (42 s), `openai/gpt-oss-20b`, 
+    `nvidia/nemotron-3.5-lightning-30b-a3b`,
+    `nvidia/nemotron-3-ultra-550b-a55b`, `moonshotai/kimi-k3` (79 s),
+    `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning`,
+    `meta/muse-glimmer-30b`, `poolside/laguna-xs-2.1`,
+    `nvidia/ising-calibration-1.5-31b`.
+  - **34 con 404** «Function … Not found for account» → `NV_FREE_BLOCKED`.
+  - **3 colgados** (>180 s sin respuesta): `deepseek-v4.1-flash`,
+    `gemma-4-31b-it`, `glm-5.3-flash` → también en `NV_FREE_BLOCKED`.
+  - El resto de ids del catálogo no son de chat (embeddings, visión,
+    seguridad, reward, parse…) → `FREE_EXCLUDE["nvidia"]`.
+- **`CHAT_TIMEOUT = {"nvidia": 120}`**: los endpoints no provisionados
+  dejan el request colgado; se corta a 120 s y se pasa al siguiente
+  modelo (los buenos responden en <60 s). Antes eran 300 s por modelo.
+- **`_rate_kind()`**: ahora también clasifica como `wait` los 503 de
+  NVIDIA («service unavailable», «request limit reached»,
+  «ResourceExhausted») y como `skip` los 410 Gone («end of life»).
+- Cadena verificada end-to-end: 10 modelos, `generate()` OK en 8.2 s con
+  `nvidia/nemotron-3-super-120b-a12b` y consumo reportado al Medidor.

@@ -18,7 +18,14 @@ se intenta el siguiente automáticamente.
   tokenharbor Solo los modelos GRATIS del catálogo (ids que terminan en
              `:free`; el resto cargan saldo y aquí no se muestran).
   freellmapi  FreeLLMAPI — GLM/Qwen/Kimi con la bolsa de tokens gratis
-             (10.000 al crear la key).
+              (10.000 al crear la key).
+  cloudflare Cloudflare Workers AI (plan Free: 10.000 neuronas/día).
+             21 ids `@cf/...` verificados en vivo el 2026-10-04; el resto
+             del catálogo no corre en plan Free (se filtra solo).
+  nvidia     NVIDIA API catalog (build.nvidia.com) — 80 ids listados,
+             10 responden en la cuenta (verificado en vivo el 2026-10-05):
+             el resto da 404 "Not found for account" o se queda sin
+             respuesta, y se descartan solos.
   deepseek   DeepSeek oficial (api.deepseek.com) — de pago, con tu key.
   ollama     Modelos locales vía http://localhost:11434 (lista dinámica
              con `ollama list` — aparece lo que Chino tenga instalado).
@@ -60,6 +67,12 @@ BACKENDS = {
     "freellmapi": {"label": "FreeLLMAPI · gratis",
                    "setting": "freellmapi_key", "env": "FREELLMAPI_API_KEY",
                    "free": "10.000 tokens al crear la key"},
+    "cloudflare": {"label": "Cloudflare · Workers AI",
+                   "setting": "cloudflare_key", "env": "CLOUDFLARE_API_KEY",
+                   "free": "plan Free: 10.000 neuronas/día (21 modelos OK)"},
+    "nvidia":     {"label": "NVIDIA API · NIM",
+                   "setting": "nvidia_key", "env": "NVIDIA_API_KEY",
+                   "free": "API catalog: 10 de 80 ids responden (2026-10-05)"},
     "deepseek":   {"label": "DeepSeek · oficial",
                    "setting": "deepseek_key", "env": "DEEPSEEK_API_KEY",
                    "free": "de pago (tarifa por token)"},
@@ -69,8 +82,9 @@ BACKENDS = {
 }
 
 # Orden de preferencia para el combo (calidad ES + cuota + velocidad).
-BACKEND_ORDER = ["gemini", "groq", "tokenharbor", "freellmapi", "deepseek",
-                 "cerebras", "openrouter", "mistral", "cohere", "ollama"]
+BACKEND_ORDER = ["gemini", "groq", "tokenharbor", "freellmapi", "cloudflare",
+                 "nvidia", "deepseek", "cerebras", "openrouter", "mistral",
+                 "cohere", "ollama"]
 
 # FreeLLMAPI: por defecto el router LOCAL (start-all.bat, puerto 3001).
 # Si prefieres el hosted, cambia esta URL en Configuración.
@@ -84,7 +98,15 @@ OPENAI_BASES = {
     "tokenharbor": "https://tokenharbor.ai/v1",
     "freellmapi": FREELLMAPI_BASE,
     "deepseek": "https://api.deepseek.com/v1",
+    "nvidia": "https://integrate.api.nvidia.com/v1",   # API catalog / NIM
 }
+
+# Cloudflare Workers AI: la base incluye la cuenta (no es secreto) porque
+# el endpoint OpenAI-compatible es por cuenta.
+CLOUDFLARE_ACCOUNT = "94e1b02f1e5564b54381b01e2d0a93f3"
+OPENAI_BASES["cloudflare"] = (
+    f"https://api.cloudflare.com/client/v4/accounts/{CLOUDFLARE_ACCOUNT}"
+    "/ai/v1")
 
 # Backends en los que SOLO se muestran/generan ids con este sufijo:
 # lo demás del catálogo es de pago y no queremos gastar saldo.
@@ -94,6 +116,58 @@ FREE_ONLY = {"tokenharbor": ":free", "openrouter": ":free"}
 # Alias que no terminan en el sufijo pero también son gratis y hay que
 # conservar en la cadena (el meta-router de OpenRouter).
 FREE_KEEP = {"openrouter": {"openrouter/free"}}
+
+# Ids del catálogo que NO sirven para chat/guiones (tareas que no son
+# texto: embeddings, imágenes, audio, filtros de seguridad…).
+FREE_EXCLUDE = {"cloudflare": ("embed", "image", "diffusion", "flux",
+                               "whisper", "tts", "audio", "rerank",
+                               "transcri", "resnet", "distilbert", "guard",
+                               "smart-turn", "clef", "m2m", "indictrans",
+                               "detection", "classif", "bge",
+                               "sentence-transformers"),
+                # NVIDIA API catalog: 80 ids, muchos no son de chat.
+                "nvidia": ("embed", "vision", "guard", "safety", "reward",
+                           "parse", "detector", "clip", "deplot", "diffusion",
+                           "cosmos", "neva", "vila", "translate", "chatqa",
+                           "starcoder", "codellama", "codegemma", "coder",
+                           "codestral", "code-instruct")}
+
+# Workers AI: estos ids existen en el catálogo pero NO corren en el plan
+# Free (verificado en vivo el 2026-10-04 con la key real).
+CF_FREE_BLOCKED = {
+    "@cf/zai-org/glm-5.3", "@cf/zai-org/glm-5.3-flash", "@cf/zai-org/glm-5.2",
+    "@cf/moonshotai/kimi-k2.6", "@cf/moonshotai/kimi-k2.7-code",
+    "@cf/deepseek-ai/deepseek-v4-flash-0731",
+    "@cf/deepseek-ai/deepseek-v4-pro-0813",
+    "@cf/swiss-ai/apertus-v1.5-8b", "@cf/utter-project/eurollm-9b-it",
+    "@cf/meta/llama-3.2-11b-vision-instruct",   # exige licencia (agree)
+}
+
+# NVIDIA API catalog: estos ids aparecen en GET /models pero la cuenta
+# responde 404 "Function ... Not found for account" (verificado en vivo
+# el 2026-10-05), así que no entran en la cadena.
+NV_FREE_BLOCKED = {
+    "01-ai/yi-large", "adept/fuyu-8b",
+    "ai21labs/jamba-1.5-large-instruct", "aisingapore/sea-lion-7b-instruct",
+    "databricks/dbrx-instruct", "google/gemma-2b", "google/gemma-3-12b-it",
+    "google/gemma-3-4b-it", "google/recurrentgemma-2b",
+    "ibm/granite-3.0-3b-a800m-instruct", "ibm/granite-3.0-8b-instruct",
+    "meta/llama2-70b", "microsoft/kosmos-2", "microsoft/phi-3.5-moe-instruct",
+    "mistralai/mistral-7b-instruct-v0.3", "mistralai/mistral-large",
+    "mistralai/mistral-large-2-instruct", "mistralai/mixtral-8x22b-v0.1",
+    "moonshotai/kimi-k2.6", "nv-mistralai/mistral-nemo-12b-instruct",
+    "nvidia/llama-3.1-nemotron-51b-instruct",
+    "nvidia/llama-3.1-nemotron-70b-instruct",
+    "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+    "nvidia/mistral-nemo-minitron-8b-8k-instruct",
+    "nvidia/nemotron-4-340b-instruct", "nvidia/nemotron-nano-3-30b-a3b",
+    "writer/palmyra-creative-122b", "writer/palmyra-fin-70b-32k",
+    "writer/palmyra-med-70b", "writer/palmyra-med-70b-32k",
+    "zyphra/zamba2-7b-instruct",
+    # Responden con timeout (probado con 45/60/180 s): no sirven.
+    "deepseek-ai/deepseek-v4.1-flash", "google/gemma-4-31b-it",
+    "z-ai/glm-5.3-flash",
+}
 
 # Alias del router FreeLLMAPI: `auto` deja que su router elija el mejor
 # modelo gratis disponible (auto:smart/auto:fast/auto:cheap = prioridades).
@@ -139,6 +213,25 @@ PREFERRED = {
                     "mimo-v2.5:free"],
     "freellmapi": ["gemini-2.5-flash", "glm-4.7", "kimi-k3",
                    "qwen3.8-flash", "deepseek-v4-flash"],
+    # Workers AI: solo los 21 ids que respondieron en plan Free
+    # (verificado en vivo el 2026-10-04), de mejor a peor para español.
+    "cloudflare": ["@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+                   "@cf/qwen/qwen3.8-27b", "@cf/openai/gpt-oss-120b",
+                   "@cf/mistralai/mistral-small-3.1-24b-instruct",
+                   "@cf/nvidia/nemotron-3-120b-a12b",
+                   "@cf/zai-org/glm-4.7-flash",
+                   "@cf/meta/llama-4-scout-17b-16e-instruct",
+                   "@cf/qwen/qwq-32b"],
+    # NVIDIA API catalog: de los 80 ids del catálogo solo 10 responden en
+    # esta cuenta (verificado en vivo el 2026-10-05), ordenados por
+    # velocidad/calidad para español.
+    "nvidia": ["nvidia/nemotron-3-super-120b-a12b",
+               "z-ai/glm-5.3", "openai/gpt-oss-20b",
+               "nvidia/nemotron-3.5-lightning-30b-a3b",
+               "nvidia/nemotron-3-ultra-550b-a55b",
+               "moonshotai/kimi-k3",
+               "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+               "meta/muse-glimmer-30b"],
     # Único backend de pago (sin FREE_ONLY): ids vigentes 2026-10-03.
     "deepseek": ["deepseek-flash", "deepseek-v4-pro"],
 }
@@ -262,6 +355,11 @@ def _set_usage(backend, model, out):
 # usan el máximo por defecto.
 MAX_TOKENS = {"groq": 1200}  # OTPM 1000: ~1200 tokens ≈ escenas compactas sin truncar
 
+# Timeout por backend (segundos). NVIDIA deja colgados los endpoints que no
+# están provisionados para la cuenta: mejor cortar pronto y pasar al
+# siguiente modelo de la cadena (los buenos responden en <60 s).
+CHAT_TIMEOUT = {"nvidia": 120}
+
 
 def _rate_kind(msg):
     """Clasifica un error de cuota: 'wait' (se libera solo, reintentar),
@@ -274,13 +372,20 @@ def _rate_kind(msg):
             "daily quota", "tokens per day", "tpd",
             "check your plan", "billing",
             "resource_exhausted", "insufficient_quota", "insufficient funds",
-            "account", "suspend")
+            "account", "suspend",
+            # Workers AI (plan Free): modelo no disponible / sin licencia.
+            "free plan", "does not have config", "must submit the prompt",
+            # NVIDIA: modelos retirados del catálogo (HTTP 410 Gone).
+            "end of life")
     if any(p in m for p in skip):
         return "skip"
     wait = ("rate limit", "too many requests", " 429",
             "output tokens per minute", "requests per minute",
             "tokens per minute", "try again", "temporarily",
-            "overloaded", "server busy")
+            "overloaded", "server busy",
+            # NVIDIA: workers saturados o aún desplegando el endpoint.
+            "service unavailable", " 503", "request limit reached",
+            "resourceexhausted")
     if any(p in m for p in wait):
         return "wait"
     return None
@@ -314,6 +419,7 @@ def _openai_chat(base, api_key, model, prompt, system="",
          "temperature": 0.7, "max_tokens": max_tokens},
         headers={"Content-Type": "application/json",
                  "Authorization": f"Bearer {api_key}"},
+        timeout=CHAT_TIMEOUT.get(backend, 300),
     )
     _set_usage(backend, model, out)
     try:
@@ -328,6 +434,19 @@ def _openai_models(base, api_key):
         out = _get_json(f"{base}/models",
                         headers={"Authorization": f"Bearer {api_key}"})
         return [m["id"] for m in out.get("data", []) if m.get("id")]
+    except LLMError:
+        return []
+
+
+def _cloudflare_models(api_key):
+    """Workers AI: el catálogo sale de /ai/models/search (GET /models da
+    405 en el endpoint OpenAI-compatible). Devuelve los `name` (@cf/…)."""
+    try:
+        out = _get_json(
+            f"https://api.cloudflare.com/client/v4/accounts/"
+            f"{CLOUDFLARE_ACCOUNT}/ai/models/search",
+            headers={"Authorization": f"Bearer {api_key}"})
+        return [m["name"] for m in out.get("result", []) if m.get("name")]
     except LLMError:
         return []
 
@@ -413,8 +532,34 @@ def resolve_chain(backend, model, keys):
     if model:
         return [model]
     key = (keys or {}).get(backend, "")
-    if key and backend in OPENAI_BASES:
+    if key and backend == "cloudflare":
+        found = _cloudflare_models(key)
+        if found:
+            bad = FREE_EXCLUDE["cloudflare"]
+            found = [m for m in found
+                     if m not in CF_FREE_BLOCKED
+                     and not any(t in m.lower() for t in bad)]
+        if found:
+            pref = PREFERRED["cloudflare"]
+            ok = [m for m in pref if m in found]
+            return ok + [m for m in found if m not in ok][:3]
+    elif key and backend == "nvidia":
         found = _openai_models(_base(backend, keys), key)
+        if found:
+            bad = FREE_EXCLUDE["nvidia"]
+            found = [m for m in found
+                     if m not in NV_FREE_BLOCKED
+                     and not any(t in m.lower() for t in bad)]
+        if found:
+            pref = PREFERRED["nvidia"]
+            ok = [m for m in pref if m in found]
+            return ok + [m for m in found if m not in ok][:3]
+    elif key and backend in OPENAI_BASES:
+        found = _openai_models(_base(backend, keys), key)
+        if backend in FREE_EXCLUDE:  # quitar ids que no son de chat
+            bad = FREE_EXCLUDE[backend]
+            found = [m for m in found
+                     if not any(t in m.lower() for t in bad)]
         if backend in FREE_ONLY:  # solo ids gratuitos (p.ej. `:free`)
             suf = FREE_ONLY[backend]
             keep = FREE_KEEP.get(backend, set())
@@ -478,7 +623,7 @@ def generate(prompt, backend="gemini", model="", system="", keys=None,
                 elif backend == "openrouter":
                     text = _openrouter_generate(m, prompt, system, key)
                 else:  # groq, cerebras, mistral, tokenharbor, freellmapi,
-                        # deepseek
+                        # cloudflare, deepseek
                     text = _openai_chat(_base(backend, keys), key, m,
                                         prompt, system,
                                         max_tokens=max_tokens,

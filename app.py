@@ -599,8 +599,46 @@ elif view == "🎬 Proyectos":
                          "el enlace. Público: aparece en tu canal.")
                 st.caption("💡 Recomendado: súbelo primero como **privado**, "
                            "revísalo en YouTube Studio y luego hazlo público.")
-                st.markdown("**Paso 3 · Subir**")
-                if st.button("⬆️ Subir video a YouTube", key=f"ytgo{pid}",
+                prog = st.checkbox("🕒 Programar publicación",
+                                   key=f"ytsched{pid}",
+                                   help="El video se sube como privado y "
+                                        "YouTube lo hace público solo.")
+                publicar_el = None
+                if prog:
+                    import datetime as _dt
+                    manana = (_dt.datetime.now() +
+                              _dt.timedelta(days=1)).replace(
+                        hour=18, minute=0, second=0, microsecond=0)
+                    fpub = st.datetime_input("Publicar el", value=manana,
+                                             key=f"ytwhen{pid}")
+                    off = _dt.datetime.now().astimezone().strftime("%z")
+                    off = off[:3] + ":" + off[3:]
+                    publicar_el = fpub.strftime(
+                        "%Y-%m-%dT%H:%M:%S") + off
+                    st.caption(f"Se publicará solo: {publicar_el}")
+                st.markdown("**Paso 3 · Miniatura y subida**")
+                thumbs_yt = sorted(
+                    pipeline.thumbs_dir().glob(f"thumb_{pid}_*.png"))
+                thumb_def = db.get_setting(
+                    conn, f"thumb_choice_{pid}", "") or ""
+                if thumbs_yt:
+                    nombres = [t.name for t in thumbs_yt]
+                    idx = nombres.index(thumb_def) if thumb_def in nombres else 0
+                    thumb_pick = st.selectbox(
+                        "Miniatura que se subirá con el video",
+                        nombres, index=idx, key=f"ytthumb{pid}")
+                    st.image(str(thumbs_yt[nombres.index(thumb_pick)]),
+                             caption="Se subirá junto al video", width=320)
+                    st.caption("La miniatura se sube con `thumbnails().set` "
+                               "después del video. Requiere canal verificado "
+                               "(youtube.com/verify); si no, YouTube la "
+                               "rechaza pero el video queda publicado.")
+                else:
+                    thumb_pick = None
+                    st.info("Sin miniaturas generadas: el video se subirá sin "
+                            "miniatura personalizada.")
+                if st.button("⬆️ Subir video + miniatura a YouTube",
+                             key=f"ytgo{pid}",
                              disabled=bool(_running), type="primary"):
                     st.session_state["running"] = (pid, "Subiendo a YouTube")
                     bar = st.progress(0, text="Iniciando subida…")
@@ -615,17 +653,154 @@ elif view == "🎬 Proyectos":
                             BASE, vpath, yt_title, yt_desc,
                             [t.strip() for t in yt_tags.split(",")
                              if t.strip()],
-                            privacidad=priv, progress=_cb)
-                        bar.progress(1.0, text="¡Listo!")
-                        st.success(f"**Video subido como {priv}.** Míralo aquí: "
-                                   f"{url}")
-                        st.balloons()
+                            privacidad=priv, progress=_cb,
+                            publicar_el=publicar_el)
                         db.set_setting(conn, f"yt_video_{pid}", vid)
+                        if thumb_pick:
+                            th_path = pipeline.thumbs_dir() / thumb_pick
+                            bar.progress(1.0, text="Subiendo miniatura…")
+                            try:
+                                yt.subir_miniatura(BASE, vid, str(th_path))
+                                st.success(f"**Video + miniatura subidos como "
+                                           f"{priv}.** Míralo aquí: {url}")
+                            except Exception as te:
+                                st.warning(f"**Video subido** ({url}) pero "
+                                           f"la miniatura falló: {te}")
+                        else:
+                            st.success(f"**Video subido como {priv}.** "
+                                       f"Míralo aquí: {url}")
+                        st.balloons()
                     except Exception as e:
                         bar.empty()
                         st.error(str(e))
                     finally:
                         st.session_state.pop("running", None)
+
+        # ---- cortos del video largo (estrategia Shorts) ----
+        if p["kind"] == "largo":
+            st.divider()
+            st.subheader("📱 Cortos del video (Shorts)")
+            st.caption("Genera recortes verticales 1080×1920 de los mejores "
+                       "momentos y súbelos como Shorts: traen visitas nuevas "
+                       "al video largo. YouTube clasifica como Short todo "
+                       "vertical de ≤ 3 minutos automáticamente.")
+            job = pipeline.job_dir_of(p)
+            srcs_sh = [job / "video" / "final_con_subtitulos.mp4",
+                       job / "video" / "final.mp4"]
+            srcs_sh = [str(v) for v in srcs_sh if v.exists()]
+            if not srcs_sh:
+                st.info("Primero completa el ensamblado (etapa 8).")
+            else:
+                vsrc = st.selectbox("Video origen", srcs_sh,
+                                    key=f"shsrc{pid}")
+                sug = pipeline.sugerencia_corto(job)
+                if sug:
+                    sid, s0, s1 = sug
+                    st.info(f"💡 El paquete sugiere el corto en **{sid}** "
+                            f"({pipeline.fmt_mmss(s0)} → "
+                            f"{pipeline.fmt_mmss(s1)}).")
+                    if st.button(f"Usar sugerencia {sid}",
+                                 key=f"shsug{pid}"):
+                        st.session_state[f"sht0{pid}"] = pipeline.fmt_mmss(s0)
+                        st.session_state[f"sht1{pid}"] = pipeline.fmt_mmss(s1)
+                        rerun()
+                c1, c2 = st.columns(2)
+                t0 = c1.text_input("Inicio (mm:ss)",
+                                   st.session_state.get(f"sht0{pid}", "00:30"),
+                                   key=f"sht0in{pid}")
+                t1 = c2.text_input("Fin (mm:ss)",
+                                   st.session_state.get(f"sht1{pid}", "01:15"),
+                                   key=f"sht1in{pid}")
+                if st.button("✂️ Generar corto vertical", key=f"shgen{pid}",
+                             disabled=bool(_running)):
+                    stamp = (t0.replace(":", "") + "-" +
+                             t1.replace(":", ""))
+                    dst = job / "video" / f"short_{stamp}.mp4"
+                    with st.spinner("Generando corto…"):
+                        ok, log = pipeline.cut_vertical(vsrc, str(dst),
+                                                        t0, t1)
+                    if ok:
+                        st.success(f"Corto listo: {dst.name}")
+                        st.video(str(dst))
+                    else:
+                        st.error(log)
+                    rerun()
+
+                shorts = sorted(job.glob("video/short_*.mp4"))
+                if shorts:
+                    st.markdown("**Cortos generados**")
+                    paq_s = yt.parse_paquete(job / "PAQUETE.md")
+                    largo_url = ""
+                    lv = db.get_setting(conn, f"yt_video_{pid}", "")
+                    if lv:
+                        largo_url = f"https://youtu.be/{lv}"
+                    desc_base = ((paq_s["descripcion"] or "").strip()
+                                 .splitlines() or [""])
+                    tags_s = paq_s["tags"] or []
+                    for sh in shorts:
+                        subido = db.get_setting(
+                            conn, f"yt_short_{sh.stem}_{pid}", "")
+                        with st.expander(
+                                f"📱 {sh.name}"
+                                f"{' ✅ publicado' if subido else ''}",
+                                expanded=False):
+                            st.video(str(sh))
+                            kt = f"shtitle_{sh.stem}{pid}"
+                            if kt not in st.session_state:
+                                st.session_state[kt] = (
+                                    paq_s["titulo"] + " #Shorts")[:100]
+                            stitle = st.text_input("Título", key=kt)
+                            kd = f"shdesc_{sh.stem}{pid}"
+                            if kd not in st.session_state:
+                                st.session_state[kd] = (
+                                    f"{desc_base[0]}\n\n"
+                                    f"👉 Video completo: {largo_url}\n\n"
+                                    "#Shorts " +
+                                    " ".join("#" + t.replace(" ", "")
+                                             for t in tags_s[:3]))
+                            sdesc = st.text_area("Descripción", key=kd,
+                                                 height=100)
+                            spriv = st.radio(
+                                "Privacidad", ["privado", "oculto", "público"],
+                                index=2, horizontal=True,
+                                key=f"shpriv_{sh.stem}{pid}",
+                                help="Para la estrategia de vistas, el corto "
+                                     "debe ir público.")
+                            if st.button("⬆️ Subir como Short",
+                                         key=f"shup_{sh.stem}{pid}",
+                                         disabled=bool(_running)):
+                                if yt_state["nivel"] != "ok":
+                                    st.error("Conecta tu canal primero "
+                                             "(sección 🚀 Publicar en YouTube).")
+                                else:
+                                    st.session_state["running"] = (
+                                        pid, "Subiendo Short")
+                                    bar = st.progress(
+                                        0, text="Iniciando subida…")
+
+                                    def _cbs(done, total):
+                                        bar.progress(
+                                            min(done / max(total, 1), 1.0),
+                                            text=f"Subiendo… {done//1024//1024} MB "
+                                                 f"de {total//1024//1024} MB")
+
+                                    try:
+                                        vid, url = yt.subir(
+                                            BASE, str(sh), stitle, sdesc,
+                                            tags_s, privacidad=spriv,
+                                            progress=_cbs)
+                                        bar.progress(1.0, text="¡Listo!")
+                                        st.success(f"**Short subido como "
+                                                   f"{spriv}:** {url}")
+                                        st.balloons()
+                                        db.set_setting(
+                                            conn,
+                                            f"yt_short_{sh.stem}_{pid}", vid)
+                                    except Exception as e:
+                                        bar.empty()
+                                        st.error(str(e))
+                                    finally:
+                                        st.session_state.pop("running", None)
 
         # ---- corto-recorte: herramienta ----
         if p["kind"] == "corto-recorte":

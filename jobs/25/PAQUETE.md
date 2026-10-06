@@ -1,48 +1,42 @@
-# 🎬 PAQUETE DE PUBLICACIÓN — "¿Cómo se ve el mundo en cada nivel de visión?"
+TITULOS:
+1. ¿Cómo se ve el mundo si encoges hasta ser una bacteria?
+2. La visión humana: el mundo a escalas que tu cerebro no comprende
+3. ¿Por qué no puedes ver una célula ni una galaxia a simple vista?
 
-## TITULOS:
-1. Visión en cada escala: de células a galaxias
-2. Visión humana: así cambia el mundo de cerca y lejos
-3. Visión: cómo ve tu cerebro lo microscópico y lo cósmico
+DESCRIPCION:
+¿Alguna vez te has preguntado cómo se vería el mundo desde el ojo de una bacteria o desde una galaxia? En este video descubrirás cómo tu cerebro construye la realidad a cada escala, desde lo microscópico hasta lo cósmico.
+Aprenderás qué es la agudeza visual y por qué la ciencia te da herramientas para ver lo invisible.
 
-## DESCRIPCION:
-¿Alguna vez te has preguntado cómo se ve el mundo si encogieras hasta ser una célula o te alejaras hasta una galaxia? En este video descubrirás por qué tu visión no es un espejo de la realidad, sino una construcción de tu cerebro, y cómo la ciencia te permite ver lo invisible.
+LO QUE VERAS:
+• Por qué tu visión es máxima a pocos metros de distancia
+• Qué pasa cuando intentas ver una célula sin microscopio
+• Cómo se ve el mundo microscópico: células, moléculas y ADN
+• Por qué las estrellas se ven como puntos de luz
+• Cómo la ciencia amplía tu percepción con telescopios y microscopios
 
-La visión humana está optimizada para distancias intermedias, pero el mundo real opera en escalas muy distintas. A través de la biología celular y la astronomía, exploramos cómo se ve el mundo en cada nivel de visión: desde los orgánulos de una célula hasta las estrellas más lejanas.
-
-**LO QUE VERAS:**
-- Por qué tu agudeza visual es máxima a pocos metros y se pierde con la distancia.
-- Qué esconde el universo microscópico: células, moléculas y estructuras invisibles.
-- Cómo se ven las estrellas y galaxias desde la Tierra y por qué son solo puntos de luz.
-- Por qué la ciencia, con microscopios y telescopios, es tu mejor herramienta para ver lo que tus ojos no alcanzan.
-
-**CAPITULOS:**
+CAPITULOS:
 0:00 Introducción
-0:32 La hormiga de cerca
-1:26 El límite de la visión
-2:03 El universo microscópico
-3:30 Próxima Centauri y el cosmos
-4:10 Telescopios y luz lejana
-5:54 La pregunta central
-6:50 La ciencia como herramienta
+0:20 Tu visión no es un espejo perfecto
+0:32 La hormiga a un centímetro
+1:26 El límite de la agudeza visual
+2:03 El reino microscópico
+3:08 El desafío de lo cósmico
+4:06 Galaxias: remolinos de luz
+6:05 La ciencia como superpoder
 
-## FUENTES:
-- Westheimer, G. (2001). *The Visual Brain.* MIT Press.
-- Alberts, B., Johnson, A., Lewis, J., Raff, M., Roberts, K., & Walter, P. (2015). *Molecular Biology of the Cell* (6th ed.). W. W. Norton & Company.
-- Sagan, C. (1980). *Cosmos.* Random House.
+FUENTES:
+Westheimer, G. (2001). The Visual Brain.
+Alberts, B., et al. (2015). Molecular Biology of the Cell (6th ed.).
+Sagan, C. (1980). Cosmos.
 
-## HASHTAGS: #Ciencia #Visión #Universo
+CTA:
+🔔 Suscríbete a El Porqué para resolver el siguiente porqué cada semana.
 
-## TAGS: cómo se ve el mundo en cada nivel de visión, visión humana, agudeza visual, percepción visual, cerebro y visión, mundo microscópico, células humanas, microscopio, telescopio, estrellas, galaxias, cosmos, divulgación científica, biología celular, astronomía
+PREGUNTA:
+Si pudieras cambiar tu visión a voluntad, ¿qué escala elegirías: una bacteria o una galaxia? 👇
 
-## COMENTARIO FIJADO:
-¿Qué escala te impresiona más: la de una célula o la de una galaxia? Cuéntamelo en los comentarios 👇
-
-## POST COMUNIDAD:
-¿Cómo se ve el mundo si encoges hasta ser una célula o te alejas hasta una galaxia? En el nuevo video exploramos cómo cambia tu visión según la escala y por qué la ciencia es el mejor visor de todos. Míralo y cuéntanos qué nivel te voló la cabeza. 🔬🌌
-
-## SHORT SUGERIDO:
-**S07–S09 (0:32–0:41):** "Imagina que miras una hormiga a un centímetro de ti. Ves cada pelito de sus patas, cada detalle de su cuerpo diminuto. ¡Increíble, verdad?" Funciona perfecto como Short porque es un mini-misterio visual con un gancho inmediato: el contraste entre lo que vemos de cerca y lo que perdemos al alejarnos. Es autónomo, genera curiosidad y engancha justo en la idea central del video sin necesidad de contexto previo.
-
-## PANTALLA FINAL:
-"Descubre cómo percibe el mundo tu cerebro" → Enlazar a video relacionado sobre percepción visual o funcionamiento del cerebro.
+HASHTAGS: #visión #microscopio #telescopio #células #cosmos
+TAGS: cómo se ve el mundo en cada nivel de visión, visión humana, agudeza visual, microscopio, telescopio, células humanas, galaxias, percepción visual, divulgación científica, ciencia para curiosos, el porqué, zenn estilo, curiosidades de la ciencia, escala microscópica, escala cósmica
+COMENTARIO FIJADO: ¿Qué te ha sorprendido más: saber que las células son un universo diminuto o que las estrellas son soles lejanos? Te leo aquí abajo.
+POST COMUNIDAD: Nuevo video: ¿Cómo se ve el mundo en cada nivel de visión? 🔬✨ Desde una hormiga hasta una galaxia, tu cerebro construye realidades muy distintas según la escala. Ya está disponible en el canal. ¡No te lo pierdas!
+SHORT SUGERIDO: S07 a S16 — la secuencia de la hormiga alejándose (1
