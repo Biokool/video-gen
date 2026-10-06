@@ -1,0 +1,230 @@
+[
+ {
+  "id": "s01",
+  "text": "¡Hola! Bienvenidos a El Porqué, donde cada video responde una pregunta que quizás nunca te habías hecho... pero deberías."
+ },
+ {
+  "id": "s02",
+  "text": "Imagina esto: te despiertas, la boca seca, la garganta áspera."
+ },
+ {
+  "id": "s03",
+  "text": "Intentas beber agua, pero no hay."
+ },
+ {
+  "id": "s04",
+  "text": "Pasan las horas, el sol aprieta, y la sed se vuelve una obsesión."
+ },
+ {
+  "id": "s05",
+  "text": "¿Qué le está pasando a tu cuerpo en esa batalla interna?"
+ },
+ {
+  "id": "s06",
+  "text": "¿Sabías que con solo perder el 1% de tu peso corporal en agua, tu cerebro ya empieza a fallar?"
+ },
+ {
+  "id": "s07",
+  "text": "Tu cuerpo es una máquina increíblemente precisa, y la primera señal de que algo anda mal con el agua es inconfundible: la sed."
+ },
+ {
+  "id": "s08",
+  "text": "No es solo una molestia, es un grito de auxilio de tu hipotálamo, el centro de control en tu cerebro."
+ },
+ {
+  "id": "s09",
+  "text": "Cuando la concentración de sales en tu sangre, lo que llamamos osmolaridad plasmática, sube, el hipotálamo detecta el peligro y te ruega que bebas."
+ },
+ {
+  "id": "s010",
+  "text": "Normalmente, esa osmolaridad se mantiene entre 280 y 295 mOsm/kg."
+ },
+ {
+  "id": "s011",
+  "text": "Pero sin agua, se dispara por encima de 300 mOsm/kg, enviando a todo el sistema a alerta máxima (McKinley & Johnson, 2004, News in Physiological Sciences)."
+ },
+ {
+  "id": "s012",
+  "text": "Pero antes de que sientas esa sed abrasadora, tu cuerpo ya ha activado su plan de emergencia."
+ },
+ {
+  "id": "s013",
+  "text": "Los riñones, esos filtros maestros, reducen drásticamente la producción de orina."
+ },
+ {
+  "id": "s014",
+  "text": "De los 1-2 litros que evacúas al día, pasarán a producir menos de 500 mililitros, y será tan concentrada que te sorprenderá su color."
+ },
+ {
+  "id": "s015",
+  "text": "Es un intento desesperado por aferrarse a cada gota de líquido."
+ },
+ {
+  "id": "s016",
+  "text": "La ciencia lo confirma: una deshidratación leve, apenas un 1-2% de tu peso corporal, ya impacta tu función cognitiva y rendimiento físico (Popkin et al., 2010, Nutrition Reviews)."
+ },
+ {
+  "id": "s017",
+  "text": "Pero, ¿qué pasa cuando esa pérdida se agrava y el agua ya no está en tus vasos sanguíneos?"
+ },
+ {
+  "id": "s018",
+  "text": "Piensa en tu sangre como un río."
+ },
+ {
+  "id": "s019",
+  "text": "Si el nivel del agua baja, el río se vuelve más lento y espeso."
+ },
+ {
+  "id": "s020",
+  "text": "Eso mismo le sucede a tu sangre."
+ },
+ {
+  "id": "s021",
+  "text": "El volumen de plasma, la parte líquida de tu sangre, disminuye."
+ },
+ {
+  "id": "s022",
+  "text": "Esto hace que tu sangre se vuelva más viscosa, más difícil de bombear."
+ },
+ {
+  "id": "s023",
+  "text": "Para compensar, tu corazón no tiene más remedio que trabajar más duro."
+ },
+ {
+  "id": "s024",
+  "text": "Empieza a latir más rápido, aumentando su frecuencia cardíaca para intentar mantener la presión arterial y asegurar que el oxígeno y los nutrientes lleguen a tus órganos."
+ },
+ {
+  "id": "s025",
+  "text": "Un dato brutal: por cada 1% de peso corporal que pierdes en agua, tu corazón puede aumentar su frecuencia entre 3 y 5 latidos por minuto (Cheuvront & Kenefick, 2014, Comprehensive Physiology)."
+ },
+ {
+  "id": "s026",
+  "text": "Es como si le pidieras a un motor que corra a toda velocidad con la mitad del aceite."
+ },
+ {
+  "id": "s027",
+  "text": "La eficiencia baja, el desgaste aumenta."
+ },
+ {
+  "id": "s028",
+  "text": "Y tu abuela, que siempre decía \"bebe agua para que la sangre fluya\", tenía parte de razón: la fluidez de tu sangre es vital."
+ },
+ {
+  "id": "s029",
+  "text": "Pero, ¿qué ocurre cuando el cerebro, ese órgano que consume el 20% de tu energía, también empieza a sentir la falta de líquido?"
+ },
+ {
+  "id": "s030",
+  "text": "La deshidratación no es solo física, es mental."
+ },
+ {
+  "id": "s031",
+  "text": "Tu cerebro es casi un 80% agua, y cuando no la tiene, se resiente de inmediato."
+ },
+ {
+  "id": "s032",
+  "text": "Las neuronas necesitan un ambiente acuoso para funcionar correctamente, para enviar esas señales eléctricas que te permiten pensar, recordar y reaccionar."
+ },
+ {
+  "id": "s033",
+  "text": "Sin agua, el proceso se ralentiza, la neblina mental aparece."
+ },
+ {
+  "id": "s034",
+  "text": "¿Alguna vez te has sentido lento, irritable o con dificultad para concentrarte al final de un día caluroso sin beber suficiente?"
+ },
+ {
+  "id": "s035",
+  "text": "No es coincidencia."
+ },
+ {
+  "id": "s036",
+  "text": "Estudios demuestran que la capacidad de atención y la memoria a corto plazo pueden disminuir entre un 10% y un 20% con una deshidratación significativa (Popkin et al., 2010)."
+ },
+ {
+  "id": "s037",
+  "text": "Imagina intentar resolver un problema complejo o recordar un nombre importante cuando tu cerebro funciona a media máquina."
+ },
+ {
+  "id": "s038",
+  "text": "Es como intentar ver una película en un televisor con la señal entrecortada."
+ },
+ {
+  "id": "s039",
+  "text": "Tu juicio se nubla, tus reflejos son más lentos."
+ },
+ {
+  "id": "s040",
+  "text": "Pero lo más sorprendente es cómo tu cuerpo, a nivel celular, intenta una última defensa."
+ },
+ {
+  "id": "s041",
+  "text": "Mientras tu cerebro lucha, tus células están librando su propia batalla."
+ },
+ {
+  "id": "s042",
+  "text": "Para mantener la concentración de líquidos en la sangre y proteger los órganos vitales, las células de tu cuerpo empiezan a liberar su propia agua."
+ },
+ {
+  "id": "s043",
+  "text": "Es un sacrificio."
+ },
+ {
+  "id": "s044",
+  "text": "Imagina que tu casa se está inundando, y para salvar lo más importante, tienes que vaciar tus propias reservas."
+ },
+ {
+  "id": "s045",
+  "text": "Esto afecta la función de cada célula, desde las de tus músculos hasta las de tus órganos internos."
+ },
+ {
+  "id": "s046",
+  "text": "Tu cuerpo es un experto en el arte de la supervivencia, pero hasta él tiene límites."
+ },
+ {
+  "id": "s047",
+  "text": "La deshidratación extrema puede llevar a un desequilibrio electrolítico grave, afectando el sodio y el potasio, cruciales para el funcionamiento nervioso y muscular."
+ },
+ {
+  "id": "s048",
+  "text": "Es un efecto dominó que, si no se revierte, puede tener consecuencias muy graves."
+ },
+ {
+  "id": "s049",
+  "text": "La sabiduría popular dice que uno puede aguantar tres días sin agua, pero la realidad es que cada hora cuenta, y tu cuerpo está constantemente haciendo malabares para mantener el equilibrio vital."
+ },
+ {
+  "id": "s050",
+  "text": "Pero, ¿cuál es el mensaje más importante que tu cuerpo te envía en esas 24 horas?"
+ },
+ {
+  "id": "s051",
+  "text": "Después de 24 horas sin beber agua, tu cuerpo no está simplemente 'sediento'."
+ },
+ {
+  "id": "s052",
+  "text": "Está en un estado de emergencia fisiológica, realizando una serie de sacrificios internos para mantenerte vivo."
+ },
+ {
+  "id": "s053",
+  "text": "La gran revelación es esta: tu cuerpo, en su increíble inteligencia, está dispuesto a deshidratar sus propias células y ralentizar tu mente con tal de proteger la función de tu corazón y tu cerebro."
+ },
+ {
+  "id": "s054",
+  "text": "Es una orquesta de adaptaciones desesperadas, recordándonos que el agua no es solo una bebida, es la base misma de nuestra existencia."
+ },
+ {
+  "id": "s055",
+  "text": "Esto fue El Porqué."
+ },
+ {
+  "id": "s056",
+  "text": "Nos vemos en el próximo video... para resolver el siguiente porqué."
+ },
+ {
+  "id": "s057",
+  "text": "Si te gustó este viaje por el interior de tu cuerpo, no olvides suscribirte y activar la campanita para no perderte ningún Porqué."
+ }
+]

@@ -39,12 +39,13 @@ def usage_file(base):
 
 
 def record(base, pid, title, stage, backend, model, prompt_tokens,
-           completion_tokens):
+           completion_tokens, estimado=False):
     """Agrega una línea al registro. Nunca falla (el medidor no rompe nada)."""
     try:
         rec = {"ts": time.time(), "pid": pid, "title": title, "stage": stage,
                "backend": backend or "", "model": model or "",
-               "prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens}
+               "prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens,
+               "estimado": bool(estimado)}
         with open(usage_file(base), "a", encoding="utf-8") as f:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
     except Exception:

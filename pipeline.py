@@ -29,7 +29,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 
-PANEL_VERSION = "v12"  # se muestra en el pie del sidebar; subir en cada release
+PANEL_VERSION = "v13"  # se muestra en el pie del sidebar; subir en cada release
 # Dos layouts soportados:
 #  - anidado: panel/ dentro de zenn-factory/ (jobs/ y thumbnails/ en el padre)
 #  - plano:   todo dentro de video-gen/ (jobs/ y thumbnails/ junto a app.py)
@@ -338,18 +338,83 @@ def run_storyboard(generate_fn, p, job):
     out = job / "STORYBOARD.md"
     out.write_text(text, encoding="utf-8")
     n = text.count("### S")
-    # Verificación anti-truncado: la suma de palabras de VOZ debe cubrir
-    # el grueso del guion; si no, el modelo cortó la respuesta.
+    # Anti-truncado ESTRUCTURAL: si el storyboard no cubre el guion, la etapa
+    # FALLA (no avisa y sigue). Un storyboard cortado = video cortado.
     voz_words = sum(len(m.group(1).split())
                     for m in re.finditer(r"VOZ:\s*(.+)", text))
     guion_words = len(re.sub(r"^#.*$", "", script, flags=re.M).split())
-    aviso = ""
     if guion_words > 0 and voz_words < 0.7 * guion_words:
-        aviso = (f" ⚠️ POSIBLE TRUNCADO: el storyboard cubre ~{voz_words} "
-                 f"palabras de {guion_words} del guion. Reintenta la etapa "
-                 f"con otro backend o en otro momento.")
+        return False, (
+            f"⛔ STORYBOARD TRUNCADO: cubre ~{voz_words} palabras de "
+            f"{guion_words} del guion (mínimo 70%). Si continuara, el video "
+            f"saldría cortado (como el proyecto 18: 3 min en vez de 9). "
+            f"Opciones: 1) pulsa «↪️ Continuar storyboard» aquí abajo para "
+            f"que el modelo complete las escenas faltantes desde "
+            f"S{n + 1:02d} sin regenerar desde cero; 2) reintenta la etapa "
+            f"con otro backend."), [str(out)], None
     return True, (f"Storyboard con {model}: {n} escenas en {out} "
-                  f"(~{voz_words} palabras de VOZ).{aviso}"), [str(out)], None
+                  f"(~{voz_words} palabras de VOZ)."), [str(out)], None
+
+
+def run_continuar_storyboard(generate_fn, p, job):
+    """Continúa un storyboard truncado desde la última escena existente.
+
+    No regenera desde cero: pide al modelo solo las escenas faltantes
+    (las partes del guion aún sin cubrir) y las agrega a STORYBOARD.md.
+    Devuelve (ok, log, artefactos, None).
+    """
+    if not generate_fn:
+        return (False, "Necesita un backend LLM.", [], None)
+    sb = job / "STORYBOARD.md"
+    if not sb.exists():
+        return False, "No hay STORYBOARD.md: corre la etapa storyboard.", [], None
+    text = sb.read_text(encoding="utf-8", errors="replace")
+    nums = [int(m.group(1)) for m in re.finditer(r"### S(\d+)", text)]
+    if not nums:
+        return False, "El storyboard no tiene escenas ### Sxx.", [], None
+    n = max(nums)
+    sp = find_script(p)
+    script = Path(sp).read_text(encoding="utf-8", errors="replace") if sp else ""
+    prompt = (
+        f"Este storyboard quedó TRUNCADO en S{n:02d}. Continúa desde "
+        f"S{n + 1:02d} cubriendo ÚNICAMENTE las partes del guion que aún no "
+        f"tienen escena, hasta la despedida final del guion (tono cálido, "
+        f"cierre del canal). Mismo formato exacto por escena:\n"
+        f"### SXX\nVOZ: <texto literal del guion>\nVISUAL: <descripción>\n\n"
+        f"REGLAS: escenas de 8-12s (~25-35 palabras de VOZ); PROTAGONISTA en "
+        f"todas; NO repitas escenas ya existentes.\n\n"
+        f"STORYBOARD EXISTENTE (referencia, no lo repitas):\n{text[-6000:]}\n\n"
+        f"GUION COMPLETO:\n{script[:12000]}")
+    try:
+        new_text, model = generate_fn(
+            prompt, system="Eres director de animación minimalista.")
+    except Exception as e:
+        return False, f"Error del modelo: {e}", [], None
+    # Quédate solo con bloques nuevos (número > n)
+    partes = re.split(r"(?m)^(?=### S\d+)", new_text)
+    nuevos = []
+    for bl in partes:
+        m = re.match(r"### S(\d+)", bl.strip())
+        if m and int(m.group(1)) > n:
+            nuevos.append(bl.strip())
+    if not nuevos:
+        return False, ("El modelo no devolvió escenas nuevas (S{n + 1:02d}+). "
+                       "Reintenta con otro backend."), [str(sb)], None
+    with open(sb, "a", encoding="utf-8") as f:
+        f.write("\n\n" + "\n\n".join(nuevos) + "\n")
+    total = n + len(nuevos)
+    # Revalida cobertura
+    full = sb.read_text(encoding="utf-8", errors="replace")
+    voz_words = sum(len(m.group(1).split())
+                    for m in re.finditer(r"VOZ:\s*(.+)", full))
+    guion_words = len(re.sub(r"^#.*$", "", script, flags=re.M).split())
+    if guion_words > 0 and voz_words < 0.7 * guion_words:
+        return False, (
+            f"Se agregaron {len(nuevos)} escenas (total S{total:02d}) pero la "
+            f"cobertura sigue baja (~{voz_words}/{guion_words} palabras). "
+            f"Pulsa «↪️ Continuar storyboard» otra vez."), [str(sb)], None
+    return True, (f"Storyboard completado con {model}: {len(nuevos)} escenas "
+                  f"nuevas, total {total} (S01–S{total:02d})."), [str(sb)], None
 
 
 # ---------- paquete de publicación (asistida) ----------
@@ -1578,7 +1643,8 @@ def _wrap_generate_fn(generate_fn, p, stage):
                 BASE, p.get("id"), p.get("title", ""), stage,
                 u.get("backend") or getattr(generate_fn, "backend", ""),
                 model, u.get("prompt_tokens"),
-                u.get("completion_tokens"))
+                u.get("completion_tokens"),
+                estimado=u.get("estimado", False))
         except Exception:
             pass
         return text, model

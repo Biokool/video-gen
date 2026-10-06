@@ -313,7 +313,9 @@ def _ollama_generate(model, prompt, system=""):
         except LLMError as e2:
             raise LLMError(f"Ollama no responde en {OLLAMA_URL} ({e2}). "
                            "¿Está corriendo `ollama serve`?")
-    _set_usage("ollama", model, out)
+    _set_usage("ollama", model, out,
+               (system or "") + "\n" + (prompt or ""),
+               (out.get("response") or ""))
     text = (out.get("response") or "").strip()
     if not text and out.get("thinking"):
         raise LLMError("El modelo local solo devolvió razonamiento "
@@ -327,14 +329,17 @@ def _ollama_generate(model, prompt, system=""):
 LAST_USAGE = None
 
 
-def _set_usage(backend, model, out):
+def _set_usage(backend, model, out, prompt="", response=""):
     """Extrae {prompt_tokens, completion_tokens} del JSON crudo (best-effort).
 
     OpenAI-compatibles (groq/deepseek/openrouter/cerebras/mistral/...):
     out["usage"]. Gemini: out["usageMetadata"]. Ollama: prompt_eval_count.
+    Si el backend no reporta uso, se ESTIMA por longitud (≈4 chars/token)
+    y se marca estimado=True para que el Medidor lo indique con ~.
     """
     global LAST_USAGE
     pt = ct = None
+    estimado = False
     try:
         o = out or {}
         u = o.get("usage") or {}
@@ -346,8 +351,13 @@ def _set_usage(backend, model, out):
             pt, ct = o.get("prompt_eval_count"), o.get("eval_count")
     except Exception:
         pt = ct = None
+    if pt is None:
+        pt = max(1, len(prompt or "") // 4)
+        ct = max(1, len(response or "") // 4)
+        estimado = True
     LAST_USAGE = {"backend": backend, "model": model,
-                  "prompt_tokens": pt, "completion_tokens": ct}
+                  "prompt_tokens": pt, "completion_tokens": ct,
+                  "estimado": estimado}
 
 
 # Límite de salida por minuto (OTPM) de Groq: pedir más de 1.000 tokens
@@ -421,11 +431,13 @@ def _openai_chat(base, api_key, model, prompt, system="",
                  "Authorization": f"Bearer {api_key}"},
         timeout=CHAT_TIMEOUT.get(backend, 300),
     )
-    _set_usage(backend, model, out)
     try:
-        return out["choices"][0]["message"]["content"].strip()
+        _resp_oa = out["choices"][0]["message"]["content"].strip()
     except (KeyError, IndexError, TypeError):
         raise LLMError(f"Respuesta inesperada de {model}: {str(out)[:200]}")
+    _set_usage(backend, model, out,
+               (system or "") + "\n" + (prompt or ""), _resp_oa)
+    return _resp_oa
 
 
 def _openai_models(base, api_key):
@@ -464,7 +476,9 @@ def _openrouter_generate(model, prompt, system, api_key):
                  "Authorization": f"Bearer {api_key}"},
         timeout=300,
     )
-    _set_usage("openrouter", model, out)
+    _set_usage("openrouter", model, out,
+               (system or "") + "\n" + (prompt or ""),
+               ((out.get("choices") or [{}])[0].get("message", {}).get("content") or ""))
     try:
         return out["choices"][0]["message"]["content"].strip()
     except (KeyError, IndexError, TypeError):
@@ -484,7 +498,13 @@ def _gemini_generate(api_key, model, prompt, system=""):
         f":generateContent?key={api_key}",
         body,
     )
-    _set_usage("gemini", model, out)
+    _parts_gem = []
+    try:
+        _parts_gem = out["candidates"][0]["content"]["parts"]
+    except (KeyError, IndexError, TypeError):
+        pass
+    _set_usage("gemini", model, out, (system or "") + "\n" + (prompt or ""),
+               "".join(p.get("text", "") for p in _parts_gem))
     try:
         parts = out["candidates"][0]["content"]["parts"]
         return "".join(p.get("text", "") for p in parts).strip()
@@ -519,7 +539,8 @@ def _cohere_chat(api_key, model, prompt, system=""):
         headers={"Content-Type": "application/json",
                  "Authorization": f"Bearer {api_key}"},
     )
-    _set_usage("cohere", model, out)
+    _set_usage("cohere", model, out, (system or "") + "\n" + (prompt or ""),
+               out.get("text") or "")
     text = out.get("text")
     if not text:
         raise LLMError(f"Respuesta inesperada de {model}: {str(out)[:200]}")

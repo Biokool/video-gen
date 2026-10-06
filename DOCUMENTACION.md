@@ -42,35 +42,20 @@ Orden de preferencia del router (con fallback automático en cadena):
 | 2 | Groq | 1.000 req/día por modelo | openai/gpt-oss-120b, qwen3.8-27b |
 | 3 | Token Harbor | solo ids `:free` (7×24 h por cuenta) | catálogo descubierto filtrado por `:free` |
 | 4 | FreeLLMAPI | 10.000 tokens al crear la key | glm-5.2, glm-4.7, kimi-k3, qwen3.8-max-preview |
-| 5 | Cloudflare Workers AI | plan Free: 10.000 neuronas/día | @cf/meta/llama-3.3-70b-instruct-fp8-fast, @cf/qwen/qwen3.8-27b |
-| 6 | NVIDIA API catalog | 10 de 80 ids responden en la cuenta | nvidia/nemotron-3-super-120b-a12b, z-ai/glm-5.3 |
-| 7 | DeepSeek oficial | de pago (tarifa por token) | deepseek-chat, deepseek-reasoner |
-| 8 | Cerebras | ~1M tokens/día, el más rápido | lineup rotativo |
-| 9 | OpenRouter `:free` | 50 req/día (1.000 con $10) | nemotron-3-super, gemma-4 |
-| 10 | Mistral (Experiment) | ~1B tok/mes (aceptas training) | mistral-large |
-| 11 | Cohere (trial) | 1.000 llamadas/mes | command-r |
-| 12 | Ollama local | ∞, sin internet | qwen3.6, video-factory-qwen |
+| 5 | DeepSeek oficial | de pago (tarifa por token) | deepseek-chat, deepseek-reasoner |
+| 6 | Cerebras | ~1M tokens/día, el más rápido | lineup rotativo |
+| 7 | OpenRouter `:free` | 50 req/día (1.000 con $10) | nemotron-3-super, gemma-4 |
+| 8 | Mistral (Experiment) | ~1B tok/mes (aceptas training) | mistral-large |
+| 9 | Cohere (trial) | 1.000 llamadas/mes | command-r |
+| 10 | Ollama local | ∞, sin internet | qwen3.6, video-factory-qwen |
 
 - **Token Harbor** (`https://tokenharbor.ai/v1`, key `thk_live_…`): el combo
   **solo** muestra ids que terminan en `:free`; los de pago jamás entran en
   la cadena, así que no se descuadra la wallet.
 - **FreeLLMAPI** (`https://api.freellmapi.ai/v1`, key `sk_live_…`): todo su
   catálogo sale de la bolsa de 10.000 tokens gratis.
-- **Cloudflare Workers AI** (`https://api.cloudflare.com/client/v4/accounts/<id>/ai/v1`,
-  key `cfat_…`): plan **Free con 10.000 neuronas/día**. El catálogo trae
-  69 modelos pero solo **21 corren en plan Free** (verificado en vivo el
-  2026-10-04): el resto devuelve «not available on the Workers Free plan»
-  y el panel lo salta solo. Ids no-chat (embeddings, imagen, audio) y los
-  bloqueados quedan fuera con `FREE_EXCLUDE` / `CF_FREE_BLOCKED`.
 - **DeepSeek oficial** (`https://api.deepseek.com/v1`): el único de pago de
   la lista, para cuando quieras `deepseek-chat` sin intermediarios.
-- **NVIDIA API catalog** (`https://integrate.api.nvidia.com/v1`, key
-  `nvapi-…`): `GET /models` anuncia 80 ids, pero **solo 10 responden en
-  la cuenta** (verificado en vivo el 2026-10-05): 34 devuelven 404
-  «Function … Not found for account» y 3 se quedan sin respuesta >180 s.
-  Los tres grupos se filtran solos (`NV_FREE_BLOCKED` +
-  `FREE_EXCLUDE["nvidia"]`) y el timeout del backend baja a 120 s
-  (`CHAT_TIMEOUT`) para no bloquear la cadena.
 - Las tres claves se pegan en **Configuración → Claves de LLM**, igual que
   el resto; el panel descubre los modelos con `/models` en cuanto hay key.
 
@@ -610,47 +595,38 @@ aplicados:
 
 *Versión del panel: v12 (miniatura en subida + Shorts + programar + paquete v2).*
 
-## 24. Cambios v12.1 (2026-10-04)
+## 24. Cambios v13 (2026-10-05)
 
-- **Backend Cloudflare Workers AI** (`llm.py`): nuevo backend con base
-  `https://api.cloudflare.com/client/v4/accounts/<id>/ai/v1`
-  (OpenAI-compatible) y key `CLOUDFLARE_API_KEY` en Configuración.
-- **Descubrimiento propio**: `GET /models` da 405 en Workers AI, así que
-  `_cloudflare_models()` usa `/ai/models/search` y filtra con
-  `FREE_EXCLUDE` (tareas no-chat) + `CF_FREE_BLOCKED` (ids que no corren
-  en plan Free, verificados en vivo el 2026-10-04). Los errores
-  «not available on the Workers Free plan» / «does not have config» /
-  «must submit the prompt» se clasifican como `skip` en `_rate_kind()`,
-  así la cadena salta al siguiente modelo sin reintentarlo.
-- Cadena preferida (21 modelos OK probados): llama-3.3-70b-fp8-fast →
-  qwen3.8-27b → gpt-oss-120b → mistral-small-3.1-24b → nemotron-3-120b →
-  glm-4.7-flash → llama-4-scout → qwq-32b (+ descubiertos).
-- Cuota: plan Free = **10.000 neuronas/día**; sirve de respaldo cuando se
-  agotan Gemini/Groq/TokenHarbor.
+### ⛔ Storyboard truncado ahora FALLA la etapa (era solo un aviso)
 
-## 25. Cambios v12.2 (2026-10-05)
+Causa raíz del video de 3 min (proyecto 18): el guion tenía 6 bloques
+(~9:30 planeados) pero el storyboard solo cubrió 10 escenas (40% del
+guion). v12 lo detectaba pero solo lo escribía en el log y el pipeline
+seguía → video corto silencioso. Ahora la etapa **falla ruidosamente**.
 
-- **Backend NVIDIA API catalog / NIM** (`llm.py`): nueva entrada con base
-  `https://integrate.api.nvidia.com/v1` y key `NVIDIA_API_KEY`
-  (`nvidia_key` en Configuración).
-- **Sondeo en vivo (2026-10-05, 44 ids de chat de los 80 del catálogo):**
-  - **10 OK**: `nvidia/nemotron-3-super-120b-a12b` (0.6-0.9 s),
-    `z-ai/glm-5.3` (42 s), `openai/gpt-oss-20b`, 
-    `nvidia/nemotron-3.5-lightning-30b-a3b`,
-    `nvidia/nemotron-3-ultra-550b-a55b`, `moonshotai/kimi-k3` (79 s),
-    `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning`,
-    `meta/muse-glimmer-30b`, `poolside/laguna-xs-2.1`,
-    `nvidia/ising-calibration-1.5-31b`.
-  - **34 con 404** «Function … Not found for account» → `NV_FREE_BLOCKED`.
-  - **3 colgados** (>180 s sin respuesta): `deepseek-v4.1-flash`,
-    `gemma-4-31b-it`, `glm-5.3-flash` → también en `NV_FREE_BLOCKED`.
-  - El resto de ids del catálogo no son de chat (embeddings, visión,
-    seguridad, reward, parse…) → `FREE_EXCLUDE["nvidia"]`.
-- **`CHAT_TIMEOUT = {"nvidia": 120}`**: los endpoints no provisionados
-  dejan el request colgado; se corta a 120 s y se pasa al siguiente
-  modelo (los buenos responden en <60 s). Antes eran 300 s por modelo.
-- **`_rate_kind()`**: ahora también clasifica como `wait` los 503 de
-  NVIDIA («service unavailable», «request limit reached»,
-  «ResourceExhausted») y como `skip` los 410 Gone («end of life»).
-- Cadena verificada end-to-end: 10 modelos, `generate()` OK en 8.2 s con
-  `nvidia/nemotron-3-super-120b-a12b` y consumo reportado al Medidor.
+**↪️ Continuar storyboard (nuevo):** si la etapa falla por truncado, aparece
+el botón «↪️ Continuar storyboard» en la etapa: pide al modelo SOLO las
+escenas faltantes (desde S{N+1}, sin regenerar desde cero — ahorra tokens)
+y las agrega a STORYBOARD.md. Revalida cobertura; si sigue baja, se puede
+pulsar otra vez (iterativo).
+
+**Nudge de longitud en Puerta 1:** si el guion tiene <900 palabras en un
+proyecto largo, la puerta muestra advertencia (objetivo 8–12 min ≈
+1200–1800 palabras) antes de aprobar.
+
+### 🚫 Publicar exige PAQUETE.md (nuevo gate)
+
+Si no existe `PAQUETE.md`, la sección Publicar muestra error bloqueante
+("corre la etapa 10 primero") en vez de rellenar título="El Porqué" y
+descripción vacía en silencio. Si el paquete parece incompleto, avisa
+antes de subir.
+
+### 📊 Medidor: estimación cuando el backend no reporta uso (fix)
+
+La cadena de registro funcionaba, pero si el backend no devuelve `usage`
+en su respuesta, todo quedaba en cero ("no funciona"). Ahora
+`llm._set_usage` **estima por longitud** (≈4 chars/token) y marca el
+registro como estimado. El Medidor muestra cuántas llamadas fueron
+estimadas y hace cuánto fue el último registro (diagnóstico visible).
+
+*Versión del panel: v13 (storyboard anti-truncado + gate de paquete + medidor con estimación).*
