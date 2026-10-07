@@ -668,3 +668,37 @@ Lista de escenas afectadas por proyecto (patrón `font_size>72` o
 `.move_to()/.shift()` en textos): se entrega con el ZIP.
 
 *Versión del panel: v14 (layout por construcción: _Seguro + validador de solape).*
+
+## 26. Cambios v15 (2026-10-06) — pack visual + CTR (todo gratis)
+
+Tras el research de canales del nicho (Memorias de Pez, Quantum Fracture,
+CdeCiencia, Robot de Platón) y el análisis de @CausayMarca. Nicho
+confirmado: curiosidad científica generalista en español ("Zenn en
+español", hueco vacío).
+
+**Rig (`scripts/zenn_rig.py`):**
+- Nuevos props: `adn(pos, escala)`, `grafica_barras(pos, valores, ancho,
+  etiquetas)`, `lupa(pos, escala)` — más vocabulario visual científico.
+- `fondo_papel()`: fondo crema cálido opcional (self.add(fondo_papel()));
+  look editorial tipo Memorias de Pez. Default sigue blanco.
+
+**Miniaturas (CTR):**
+- El LLM ahora propone también EXPRESION (sorpresa/feliz/preocupado según
+  la emoción del tema) y PLAYERA por variante; el render las aplica por
+  concepto. Fallback con keywords (miedo/peligro → preocupado, etc.).
+- Texto gancho: el fallback elige hasta 4 palabras con más peso (cifras y
+  sustantivos largos primero) en vez de las primeras 5.
+
+**Pipeline:**
+- Títulos del PAQUETE: sufijo " | En N minutos" (fórmula Memorias de Pez);
+  N = duración real del video (final.mp4 o suma de audios TTS).
+- TOPIC_PROMPT: la mezcla ahora incluye 1 EXPERIMENTO MENTAL
+  "¿Qué pasaría si...?" por tanda (formato de 5,6M vistas del Robot de
+  Platón): 3 ciencia + 2 cultura + 1 cotidiana + 1 experimento + 1 serie.
+- FUENTES: el prompt del paquete ya las pedía del guion/investigación; se
+  mantienen en el formato canónico 📚 FUENTES.
+
+**Monetización:** el umbral YPP se duplica el 1-feb-2027 (8.000 h). Sprint:
+2 videos/semana sin pausa. RPM realista del nicho en español: $1-3.
+
+*Versión del panel: v15 (pack visual + CTR).*

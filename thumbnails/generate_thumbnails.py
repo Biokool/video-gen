@@ -536,9 +536,12 @@ def render(concept, style, path, seed):
     # suelo
     jline(d, [(690, 648), (1245, 648)], 8, stroke)
     # protagonista oficial señalando al objeto, con cara expresiva
-    prota_thumb(d, 790, 648, 330, playera=style.get("playera", "naranja"),
-                expr=style.get("expr", "sorpresa"), pose=style["pose"],
-                stroke=stroke)
+    # (expresión y playera vienen del concepto; el estilo da el default)
+    prota_thumb(d, 790, 648, 330,
+                playera=concept.get("playera",
+                                    style.get("playera", "naranja")),
+                expr=concept.get("expr", style.get("expr", "sorpresa")),
+                pose=style["pose"], stroke=stroke)
     # objeto del tema, grande
     PROPS.get(concept.get("prop", "pregunta"),
               PROPS["pregunta"])(d, 1085, 325)
@@ -592,10 +595,24 @@ def fallback_concepts(title):
     clean = re.sub(r"[¿?¡!]", " ", title).lower().strip()
     clean = re.sub(r"^(por qué|porque)\s+", "", clean)
     words = [w for w in clean.split() if w not in _STOPWORDS] or clean.split()
-    text = " ".join(words[:5]).upper() or "EL PORQUÉ"
-    return [{"text": text, "prop": prop},
-            {"text": text, "prop": "pregunta"},
-            {"text": text, "prop": prop}]
+    # palabras gancho: primero cifras/mayúsculas del título, luego las más
+    # largas (sustantivos); máx 4 para impacto en miniatura
+    scored = []
+    for w in words:
+        s = len(w) * 2 + (10 if any(c.isdigit() for c in w) else 0)
+        if w.upper() in title.upper().split():
+            s += 3
+        scored.append((s, w))
+    scored.sort(reverse=True)
+    hook = [w for _, w in scored[:4]]
+    text = " ".join(hook).upper() or "EL PORQUÉ"
+    expr = "preocupado" if any(k in t for k in
+                               ("miedo", "peligro", "veneno", "guerra",
+                                "error", "desastre")) else "sorpresa"
+    return [{"text": text, "prop": prop, "expr": expr, "playera": "naranja"},
+            {"text": text, "prop": "pregunta", "expr": "sorpresa",
+             "playera": "azul"},
+            {"text": text, "prop": prop, "expr": expr, "playera": "verde"}]
 
 
 def find_db():

@@ -29,7 +29,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 
-PANEL_VERSION = "v14"  # se muestra en el pie del sidebar; subir en cada release
+PANEL_VERSION = "v15"  # se muestra en el pie del sidebar; subir en cada release
 # Dos layouts soportados:
 #  - anidado: panel/ dentro de zenn-factory/ (jobs/ y thumbnails/ en el padre)
 #  - plano:   todo dentro de video-gen/ (jobs/ y thumbnails/ junto a app.py)
@@ -426,10 +426,11 @@ REGLAS DE FORMATO (obligatorias: romperlas daña la credibilidad del canal):
 - Los encabezados dentro de las secciones son texto plano con emoji, p. ej. "🔍 LO QUE VERÁS:".
 - Viñetas con "•", nunca con guiones.
 
-TITULOS:
-1. <opción 1: máx 60 caracteres. Fórmula: pregunta directa, afirmación fuerte, número o superlativo + palabra clave al frente. Gancho honesto, sin clickbait falso. Ej: "¿Por qué los mosquitos siempre te pican a TI?">
+TITULOS (máx 60 caracteres cada uno, INCLUYENDO el sufijo):
+1. <opción 1: fórmula pregunta directa, afirmación fuerte, número o superlativo + palabra clave al frente. Gancho honesto, sin clickbait falso. Ej: "¿Por qué los mosquitos siempre te pican a TI?">
 2. <opción 2>
 3. <opción 3>
+A las 3 opciones agrégales al final " | En {dur_min} minutos" (promesa de duración, fórmula de Memorias de Pez; el total con sufijo no pasa de 60 caracteres: acorta el título base si hace falta).
 
 DESCRIPCION:
 <líneas 1-2: el gancho en segunda persona — la pregunta del video + qué se lleva el espectador. Es lo que se ve sin desplegar: lo más importante de todo>
@@ -494,10 +495,34 @@ def run_paquete(generate_fn, p, job):
     if inv.exists():
         script += "\n\nINVESTIGACIÓN:\n" + inv.read_text(
             encoding="utf-8", errors="replace")[:3000]
+    # Duración real del video (para el sufijo "| En N minutos" de los
+    # títulos, fórmula de Memorias de Pez): final.mp4 si existe, si no
+    # suma de los audios TTS.
+    dur_min = 10
+    final = job / "video" / "final_con_subtitulos.mp4"
+    if not final.exists():
+        final = job / "video" / "final.mp4"
+    if final.exists():
+        d = _probe_duration(final)
+        if d:
+            dur_min = max(1, int(round(d / 60)))
+    else:
+        t = 0.0
+        try:
+            for it in json.loads((job / "vo.json").read_text(
+                    encoding="utf-8")):
+                au = job / "audio" / f"{it['id'].lower()}.mp3"
+                if au.exists():
+                    t += _probe_duration(au) or 0.0
+        except Exception:
+            pass
+        if t > 60:
+            dur_min = max(1, int(round(t / 60)))
     try:
         text, model = generate_fn(
             PAQUETE_PROMPT.format(title=p["title"], script=script,
-                                  marks=_scene_marks(job)),
+                                  marks=_scene_marks(job),
+                                  dur_min=dur_min),
             system="Eres un editor de YouTube preciso y directo.")
     except Exception as e:
         return False, f"Error del modelo: {e}", [], None
@@ -674,7 +699,9 @@ PERSONAJE PRINCIPAL — "EL PORQUÉ" (protagonista en TODAS las escenas):
 - Fondos: fondo(color) pantalla completa; estrellas(n); luna(pos, radio, bg)
 - Props clásicos: sol(), calendario(pos), pagina_calendario(), reloj_pared(),
   pastel(pos), red_seguridad(), caja(etiqueta, pos), camino(), casa(pos),
-  oficina(pos), digitos(pos)
+  oficina(pos), digitos(pos), adn(pos, escala), grafica_barras(pos, valores,
+  ancho, etiquetas), lupa(pos, escala), fondo_papel() [fondo crema cálido
+  opcional: self.add(fondo_papel()) al inicio]
 - Props con color (v2): perro(pos, color, escala), gato(pos, color, escala),
   dino(pos, color, escala), fuego(pos, escala), lapida(texto, pos),
   curva(pos, ancho, alto) [gráfica con punto rojo], planeta(pos, radio, color),
@@ -1608,10 +1635,33 @@ THUMB_PROPS = ["reloj", "calendario", "cerebro", "tierra", "cohete",
                "bombilla", "corazon", "libro", "moneda", "pregunta", "agujero",
                "perro", "dino", "dragon", "curva", "lapida", "luna"]
 
+_THUMB_EXPRS = {"sorpresa", "feliz", "preocupado"}
+_THUMB_PLAYERAS = {"naranja", "azul", "verde", "roja", "amarilla", "rosa",
+                   "teal", "morada", "negra", "blanca"}
+# Expresión por defecto según tema (fallback sin LLM)
+_EXPR_KEYWORDS = [
+    (("miedo", "peligro", "tóxico", "toxinas", "veneno", "guerra",
+      "terremoto", "apocalipsis", "desastre", "error"), "preocupado"),
+    (("feliz", "felicidad", "amor", "éxito", "exito", "ganar", "récord",
+      "record", "increíble", "increible"), "feliz"),
+]
+
+
+def _fallback_expr(title):
+    t = title.lower()
+    for keys, expr in _EXPR_KEYWORDS:
+        if any(k in t for k in keys):
+            return expr
+    return "sorpresa"
+
 THUMB_CONCEPT_PROMPT = """Eres diseñador de miniaturas de YouTube para un canal de divulgación científica.
 Video: "{title}"
-Propón 3 variantes. Cada variante: un TEXTO de 3-5 palabras en MAYÚSCULAS
-y un OBJETO de esta lista exacta: {props}.
+Propón 3 variantes. Cada variante: un TEXTO de 3-5 palabras en MAYÚSCULAS,
+un OBJETO de esta lista exacta: {props}, una EXPRESION del protagonista
+(sorpresa, feliz, preocupado — según la emoción del tema: misterio/peligro
+→ preocupado, dato asombroso → sorpresa, dato positivo → feliz) y una
+PLAYERA (naranja, azul, verde, roja, amarilla, rosa, teal, morada, negra,
+blanca — varía por variante).
 REGLA CLAVE: el TEXTO debe contener SIEMPRE el sustantivo o fenómeno
 principal del título (p. ej. si el video es de un hoyo negro, el texto
 debe decir HOYO NEGRO). Nunca cortes la frase antes de esa palabra.
@@ -1619,12 +1669,18 @@ Responde EXACTAMENTE así, sin texto extra:
 VARIANTE 1
 TEXTO: <...>
 OBJETO: <...>
+EXPRESION: <...>
+PLAYERA: <...>
 VARIANTE 2
 TEXTO: <...>
 OBJETO: <...>
+EXPRESION: <...>
+PLAYERA: <...>
 VARIANTE 3
 TEXTO: <...>
 OBJETO: <...>
+EXPRESION: <...>
+PLAYERA: <...>
 """
 
 _KEYWORD_PROPS = [
@@ -1666,7 +1722,8 @@ def _fallback_concept(title):
 
 
 def thumbnail_concepts(generate_fn, title):
-    """Devuelve 3 conceptos [{text, prop}]. LLM si hay; si no, heurística."""
+    """Devuelve 3 conceptos [{text, prop, expr, playera}]. LLM si hay;
+    si no, heurística."""
     if generate_fn:
         try:
             text, _ = generate_fn(
@@ -1677,20 +1734,33 @@ def thumbnail_concepts(generate_fn, title):
             for block in text.split("VARIANTE")[1:]:
                 m_text = re.search(r"TEXTO:\s*(.+)", block)
                 m_prop = re.search(r"OBJETO:\s*(\w+)", block)
+                m_expr = re.search(r"EXPRESION:\s*(\w+)", block)
+                m_play = re.search(r"PLAYERA:\s*(\w+)", block)
                 if m_text:
                     prop = (m_prop.group(1).lower() if m_prop else "pregunta")
                     if prop not in THUMB_PROPS:
                         prop = "pregunta"
+                    expr = (m_expr.group(1).lower() if m_expr
+                            else "sorpresa")
+                    if expr not in _THUMB_EXPRS:
+                        expr = "sorpresa"
+                    playera = (m_play.group(1).lower() if m_play
+                               else "naranja")
+                    if playera not in _THUMB_PLAYERAS:
+                        playera = "naranja"
                     concepts.append({"text": m_text.group(1).strip()[:60],
-                                     "prop": prop})
+                                     "prop": prop, "expr": expr,
+                                     "playera": playera})
             if len(concepts) >= 3:
                 return concepts[:3]
         except Exception:
             pass
     text, prop = _fallback_concept(title)
-    return [{"text": text, "prop": prop},
-            {"text": text, "prop": "pregunta"},
-            {"text": text, "prop": prop}]
+    expr = _fallback_expr(title)
+    return [{"text": text, "prop": prop, "expr": expr, "playera": "naranja"},
+            {"text": text, "prop": "pregunta", "expr": "sorpresa",
+             "playera": "azul"},
+            {"text": text, "prop": prop, "expr": expr, "playera": "verde"}]
 
 
 def thumbs_dir():
@@ -1941,13 +2011,15 @@ hispanohablantes curiosos. El formato "curiosidad animada" en español está
 casi vacío: tenemos ventaja si los títulos y ángulos son mejores que los
 canales top en inglés (Ink Explainer, Simple Paint, theblurb).
 
-MEZCLA estos 4 tipos:
+MEZCLA estos 5 tipos:
 - 3 CURIOSIDADES CIENTÍFICAS con hueco de curiosidad (datos que rompen una
   creencia común; la ciencia real citada después es nuestra ventaja).
 - 2 de CULTURA ALTERNATIVA: lo que cree la cultura popular / mitos /
   historia poco contada, contrastado con lo que dice la ciencia.
-- 2 PREGUNTAS COTIDIANAS con respuesta sorprendente ("¿por qué...?" de la
+- 1 PREGUNTA COTIDIANA con respuesta sorprendente ("¿por qué...?" de la
   vida diaria que nadie se había planteado).
+- 1 EXPERIMENTO MENTAL "¿Qué pasaría si...?" (formato serie de alto
+  rendimiento: ej. "¿Qué pasaría si la Tierra fuera del tamaño de Júpiter?").
 - 1 de SERIE "EN CADA NIVEL DE X": formato infinito y adictivo
   (ej: "¿Cómo es el frío en cada nivel de temperatura?", "Tu cuerpo en
   cada nivel de falta de sueño").
