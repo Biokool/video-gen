@@ -3,14 +3,11 @@ from zenn_rig import *
 
 class S041(Scene):
     def construct(self):
-        prota = protagonista(pos=LEFT*3.5 + DOWN*1.2, playera=PLAYERA_AMARILLA, altura=2.5, expresion='pensando', pose='de_pie')
-        brain = curva(pos=RIGHT*3.5, ancho=5.2, alto=2.8, color=INK, acento=RED)
-        shield = red_seguridad(width=4.5, height=0.7, pos=DOWN*1.5)
-        txt = callout("Mientras tu cerebro lucha, tus células están librando su propia batalla.")
-        txt.shift(UP*2)
+        prota = protagonista(pos=DOWN*1.2+LEFT*3.5, playera="amarilla", altura=2.4, expresion="enfocado", pose="de_pie")
+        cerebro = curva(pos=RIGHT*3.5+UP*1.0, ancho=2.5, alto=1.5, color=INK, acento=RED)
+        celula = caja(etiqueta="escudo", pos=RIGHT*3.5+DOWN*1.0, width=1.5)
 
-        self.play(FadeIn(prota), run_time=1.0)
-        self.play(Create(brain), run_time=1.0)
-        self.play(FadeIn(shield), run_time=1.0)
-        self.play(Write(txt), run_time=1.0)
-        self.wait(1.0)
+        self.play(FadeIn(prota), run_time=1)
+        self.play(FadeIn(cerebro), run_time=1)
+        self.play(FadeIn(celula), run_time=1)
+        self.wait(2)

@@ -3,12 +3,14 @@ from zenn_rig import *
 
 class S038(Scene):
     def construct(self):
-        prota = protagonista(pos=DOWN*1.2+LEFT*3.5, playera=PLAYERA_ROJA, altura=2.6, expresion="enojado", pose="de_pie")
-        tv = caja(etiqueta="TV", width=1.5).move_to(LEFT*2+UP*0.5)
-        movie = pagina_calendario(width=1.7).move_to(RIGHT*2+UP*0.5)
-        call = callout(text="Señal entrecortada", color=ORANGE, font_size=96)
-
-        self.play(FadeIn(prota), FadeIn(tv), FadeIn(movie), run_time=0.8)
+        prota = protagonista(pos=LEFT*3.5+DOWN*1.2, playera="roja", altura=2.6, expresion="enojado", pose="de_pie")
+        tv = caja(etiqueta="TV", pos=RIGHT*3.5, width=1.8)
+        signal = curva(pos=RIGHT*3.5+UP*2.0, ancho=2.5, alto=0.6, color=INK, acento=RED)
+        film = pagina_calendario(width=1.7)
+        film.shift(RIGHT*3.5+DOWN*2.0)
+        right_group = VGroup(tv, signal, film)
+        etiqueta_texto = etiqueta("Señal entrecortada", pos=RIGHT*5.0, color=INK, font_size=40, ancho_max=5.5)
+        self.play(FadeIn(prota), run_time=1)
+        self.play(FadeIn(right_group), run_time=1.5)
+        self.play(FadeIn(etiqueta_texto), run_time=1)
         self.wait(0.5)
-        self.play(FadeIn(call), run_time=0.6)
-        self.wait(2.0)

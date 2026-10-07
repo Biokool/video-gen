@@ -630,3 +630,41 @@ registro como estimado. El Medidor muestra cuántas llamadas fueron
 estimadas y hace cuánto fue el último registro (diagnóstico visible).
 
 *Versión del panel: v13 (storyboard anti-truncado + gate de paquete + medidor con estimación).*
+
+## 25. Cambios v14 (2026-10-06)
+
+### 🖼️ Layout garantizado por construcción (fix de encimados y cortes)
+
+Causa raíz de las capturas del proyecto 32: el LLM generaba
+`callout(..., font_size=96)` (bandas gigantes) y luego `.move_to(RIGHT*4...)`
+que las sacaba de la resolución. El validador v10 no lo atrapaba: solo
+revisaba `Text()` crudo y la geometría de `banda_titulo`, no de `callout`.
+
+**Rig (`scripts/zenn_rig.py`) — blindaje estructural:**
+- Nuevo `_Seguro(VGroup)`: cualquier `.move_to()/.shift()` posterior queda
+  recortado al encuadre automáticamente. Es imposible sacar un texto de la
+  resolución por código (probado con render real).
+- Nuevo `_encuadrar()`: mete el elemento al marco seguro (x ±6.9,
+  y de -2.3 a 3.6, sin invadir subtítulos).
+- `callout()` ahora es COMPACTO: `font_size` 96→60 por defecto,
+  `ancho_max` 11.9→7.0, nuevo parámetro `pos=` y devuelve `_Seguro`.
+- `etiqueta()`, `banda_titulo()`, `titulo_seguro()` también devuelven
+  `_Seguro` (clamp automático).
+
+**Validador (`pipeline.py`) — dos chequeos nuevos:**
+- `font_size>72` rechazado en `callout/etiqueta/banda_titulo/titulo_seguro`
+  (antes solo se revisaba `Text()` crudo).
+- `_checar_solape_texto()`: sigue `.move_to()/.shift()` (encadenados o en
+  sentencias separadas), calcula la caja final del callout/etiqueta y la
+  del protagonista, y RECHAZA si se enciman — con instrucción concreta
+  ("pon el callout al lado contrario con pos=") para la autorreparación.
+
+**Prompt:** `callout()` documentado con `pos=` y regla "al lado contrario
+del protagonista, nunca encima".
+
+**Escenas viejas:** las ya renderizadas conservan el código viejo. Hay que
+re-animarlas con el botón «🔁 Re-animar escena» (con LLM) y reensamblar.
+Lista de escenas afectadas por proyecto (patrón `font_size>72` o
+`.move_to()/.shift()` en textos): se entrega con el ZIP.
+
+*Versión del panel: v14 (layout por construcción: _Seguro + validador de solape).*

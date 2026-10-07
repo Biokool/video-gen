@@ -3,14 +3,11 @@ from zenn_rig import *
 
 class S023(Scene):
     def construct(self):
-        prota = protagonista(pos=ORIGIN, playera=PLAYERA_VERDE, altura=3.0, expresion='decidido', pose='de_pie')
-        heart = callout("❤", color=RED, font_size=96).shift(LEFT*2 + UP*1)
-        weight = etiqueta("⚖️", pos=RIGHT*2 + UP*1, color=INK, font_size=40)
+        prota = protagonista(pos=DOWN*1.2+LEFT*3.5, playera="verde", altura=2.6, expresion="decidido", pose="de_pie")
+        heart = etiqueta("❤️", pos=RIGHT*2+UP*0.5, color=RED, font_size=40)
+        weight = caja("peso", pos=RIGHT*2+DOWN*0.5)
 
-        self.play(FadeIn(prota), run_time=1)
-        self.play(FadeIn(heart), FadeIn(weight), run_time=1)
-        self.play(heart.animate.scale(1.2), run_time=0.5)
-        self.play(heart.animate.scale(1/1.2), run_time=0.5)
-        self.play(heart.animate.scale(1.2), run_time=0.5)
-        self.play(heart.animate.scale(1/1.2), run_time=0.5)
-        self.wait(0.5)
+        self.play(FadeIn(prota), FadeIn(heart), FadeIn(weight))
+        self.play(heart.animate.scale(1.3), run_time=0.5)
+        self.play(heart.animate.scale(1/1.3), run_time=0.5)
+        self.wait(1.5)

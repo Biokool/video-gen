@@ -3,26 +3,37 @@ from zenn_rig import *
 
 class S025(Scene):
     def construct(self):
-        # Protagonista
-        prota = protagonista(pos=ORIGIN, playera="verde", altura=3.0, expresion='sorpresa', pose='de_pie')
-        # Callout con el dato
-        dato = callout(text="1%")
-        dato.move_to(UP*2)
-        # Etiqueta con el aumento de latidos
-        latido = etiqueta("+3-5 lpm", pos=(0, -1), color=INK, font_size=40, ancho_max=5.5)
-        # Acento rojo al latido
-        latido_ac = red_accent(latido, scale=1.25)
+        prota = protagonista(pos=DOWN*1.2+LEFT*3.5, playera="verde", altura=2.6, expresion='sorpresa', pose='de_pie')
+        callout_txt = callout(text="1%", color=ORANGE, pos=RIGHT*3.4+UP*1)
+        latido = etiqueta("+3-5 lpm", pos=ORIGIN, color=INK, font_size=40)
+        heart = Circle(radius=0.3, color=RED, fill_opacity=0.6)
+        heart.move_to(prota.get_center() + RIGHT*1.0 + UP*0.2)
 
-        # Animaciones
-        self.play(FadeIn(prota), run_time=1.5)
+        self.play(FadeIn(prota), run_time=1)
         self.wait(0.5)
-        self.play(FadeIn(dato), run_time=1.0)
-        self.wait(0.5)
-        self.play(FadeIn(latido), run_time=1.0)
-        self.wait(0.5)
-        self.play(Create(latido_ac), run_time=0.5)
-        self.wait(0.5)
-        self.play(prota.animate.shift(UP*0.2), run_time=0.5)
+        self.play(FadeIn(callout_txt), run_time=0.8)
+        self.wait(0.4)
+        self.play(FadeIn(heart), run_time=0.6)
         self.wait(0.3)
-        self.play(prota.animate.shift(DOWN*0.2), run_time=0.5)
-        self.wait(4.5)  # completar ~13 segundos totales
+        self.play(FadeIn(latido), run_time=0.6)
+        self.wait(0.5)
+        self.play(
+            heart.animate.scale(1.3),
+            latido.animate.scale(1.1),
+            run_time=0.3
+        )
+        self.play(
+            heart.animate.scale(1/1.3),
+            latido.animate.scale(1/1.1),
+            run_time=0.3
+        )
+        self.wait(2)
+        self.play(
+            heart.animate.scale(1.2),
+            run_time=0.2
+        )
+        self.play(
+            heart.animate.scale(1/1.2),
+            run_time=0.2
+        )
+        self.wait(8)

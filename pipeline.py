@@ -29,7 +29,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 
-PANEL_VERSION = "v13"  # se muestra en el pie del sidebar; subir en cada release
+PANEL_VERSION = "v14"  # se muestra en el pie del sidebar; subir en cada release
 # Dos layouts soportados:
 #  - anidado: panel/ dentro de zenn-factory/ (jobs/ y thumbnails/ en el padre)
 #  - plano:   todo dentro de video-gen/ (jobs/ y thumbnails/ junto a app.py)
@@ -665,7 +665,11 @@ PERSONAJE PRINCIPAL — "EL PORQUÉ" (protagonista en TODAS las escenas):
   expresion(fig, tipo): "normal", "feliz", "preocupado", "sorpresa",
   "triste", "miedo", "dormido"
 - title_card(texto, color) -> tarjeta de capítulo a pantalla completa
-- callout(texto, color=ORANGE, font_size=96) / arrow(start, end) / red_accent(obj)
+- callout(texto, color, pos) -> dato destacado COMPACTO (se auto-ajusta;
+  nunca sale del encuadre aunque pidas pos lejana: el rig lo recorta).
+  pos p. ej. pos=RIGHT*3.4+UP*1, SIEMPRE al lado contrario del
+  protagonista, NUNCA encima. PROHIBIDO font_size>72 (gigante = rechazo).
+  / arrow(start, end) / red_accent(obj)
 - split_screen(izq, der) / clock_montage(radius)
 - Fondos: fondo(color) pantalla completa; estrellas(n); luna(pos, radio, bg)
 - Props clásicos: sol(), calendario(pos), pagina_calendario(), reloj_pared(),
@@ -737,6 +741,10 @@ y de -4 a 4):
   para etiquetas, etiqueta(). El texto crudo grande se corta en los
   bordes (también se rechaza por validación).
 - Etiquetas: usa etiqueta(texto, (x, y)) con y >= -1.9.
+- callout(): dato compacto con pos= (p. ej. pos=RIGHT*3.4+UP*1), al lado
+  CONTRARIO del protagonista; NUNCA encima de él. El rig impide que salga
+  del encuadre, pero el validador RECHAZA el solape con el protagonista:
+  si el prota va a la izquierda, el callout va a la derecha y viceversa.
 - SEPARACIÓN: un elemento grande por zona (izquierda/derecha,
   arriba/abajo); deja >=1.5 unidades entre elementos; NADA puede tapar
   a otro: ni bocadillos sobre texto, ni figuras sobre etiquetas,
@@ -893,6 +901,151 @@ def _num(node, default):
     return default
 
 
+# Helpers de texto cuyo posicionamiento se valida contra el protagonista.
+_TEXTO_POS = {"callout", "etiqueta"}
+# Tamaños por defecto del rig (scripts/zenn_rig.py)
+_TXT_DEF = {"callout": {"font_size": 60, "ancho_max": 7.0, "pad": 0.7},
+            "etiqueta": {"font_size": 40, "ancho_max": 5.5, "pad": 0.0}}
+
+
+def _nombre_llamada(node):
+    f = node.func
+    if isinstance(f, ast.Attribute):
+        return f.attr
+    if isinstance(f, ast.Name):
+        return f.id
+    return ""
+
+
+def _texto_de(call, helper):
+    """Texto del helper (arg 0 o kwarg text/texto)."""
+    if call.args:
+        try:
+            return str(ast.literal_eval(call.args[0]))
+        except Exception:
+            return ""
+    for kw in call.keywords:
+        if kw.arg in ("text", "texto"):
+            try:
+                return str(ast.literal_eval(kw.value))
+            except Exception:
+                return ""
+    return ""
+
+
+def _cajas_texto(tree):
+    """Cajas de callout()/etiqueta(): (centro, w, h) finales.
+
+    Sigue .move_to()/.shift() encadenados (`x = callout(...).move_to(E)`)
+    o en sentencias separadas (`x.move_to(E)`). Si la posición no es
+    evaluable, se omite (el rig la encuadra en runtime de todos modos).
+    """
+    nodos = sorted(ast.walk(tree),
+                   key=lambda n: (getattr(n, "lineno", 0),
+                                  getattr(n, "col_offset", 0)))
+    # var -> [helper, call, [(mov, expr)]] en orden de aparición
+    vars_txt = {}
+    for node in nodos:
+        if isinstance(node, ast.Assign) and len(node.targets) == 1 \
+                and isinstance(node.targets[0], ast.Name):
+            v, moves = node.value, []
+            while isinstance(v, ast.Call) and isinstance(v.func, ast.Attribute) \
+                    and v.func.attr in ("move_to", "shift"):
+                moves.append((v.func.attr,
+                              v.args[0] if v.args else None))
+                v = v.func.value
+            if isinstance(v, ast.Call) and _nombre_llamada(v) in _TEXTO_POS:
+                vars_txt[node.targets[0].id] = [_nombre_llamada(v), v,
+                                                list(reversed(moves))]
+    for node in nodos:
+        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
+            c, f = node.value, node.value.func
+            if isinstance(f, ast.Attribute) and f.attr in ("move_to", "shift") \
+                    and isinstance(f.value, ast.Name) \
+                    and f.value.id in vars_txt:
+                vars_txt[f.value.id][2].append(
+                    (f.attr, c.args[0] if c.args else None))
+    cajas = []
+    for var, (helper, call, moves) in vars_txt.items():
+        d = _TXT_DEF[helper]
+        fs = _num(_kw(call, "font_size", default=None), d["font_size"])
+        am = _num(_kw(call, "ancho_max", default=None), d["ancho_max"])
+        texto = _texto_de(call, helper)
+        # centro base: kwarg pos= (callout) o arg 1 pos (etiqueta)
+        base = _kw(call, "pos", default=None)
+        if base is None and helper == "etiqueta" and len(call.args) >= 2:
+            base = call.args[1]
+        centro = (0.0, 0.0)
+        if base is not None:
+            v = _eval_vec(base)
+            if v and v[0] == "vec":
+                centro = v[1]
+            else:
+                continue  # no evaluable: el rig lo encuadra en runtime
+        for mov, expr in moves:
+            if expr is None:
+                continue
+            v = _eval_vec(expr)
+            if not v or v[0] != "vec":
+                centro = None
+                break
+            if mov == "move_to":
+                centro = v[1]
+            else:
+                centro = (centro[0] + v[1][0], centro[1] + v[1][1])
+        if centro is None:
+            continue
+        w = min(am, max(1.0, len(texto) * fs * 0.009)) + d["pad"]
+        h = fs * 0.02 + d["pad"]
+        cajas.append((helper, centro, w, h))
+    return cajas
+
+
+def _cajas_prota(tree):
+    """Cajas del protagonista: (centro, w, h) desde pos/altura."""
+    cajas = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        nm = _nombre_llamada(node)
+        if nm == "protagonista":
+            pos = _kw(node, "pos", posicional=0, default=None)
+            alt = _num(_kw(node, "altura", posicional=2, default=None), 3.0)
+        elif nm == "version_prota":
+            pos = _kw(node, "pos", posicional=1, default=None)
+            alt = _num(_kw(node, "altura", posicional=2, default=None), 3.0)
+        else:
+            continue
+        if pos is None:
+            continue
+        v = _eval_vec(pos)
+        if not v or v[0] != "vec":
+            continue
+        px, py = v[1]
+        cajas.append(((px, py + alt / 2), 0.5 * alt, alt))
+    return cajas
+
+
+def _checar_solape_texto(tree):
+    """Ningún callout/etiqueta puede tapar al protagonista.
+
+    El rig ya impide que salgan del encuadre (_Seguro); aquí se valida
+    que no se encimen con el conductor de la escena.
+    """
+    protas = _cajas_prota(tree)
+    if not protas:
+        return ""
+    for helper, (cx, cy), w, h in _cajas_texto(tree):
+        for (px, py), pw, ph in protas:
+            if abs(cx - px) < (w + pw) / 2 and abs(cy - py) < (h + ph) / 2:
+                return (f"El {helper}() tapa al protagonista (centros a "
+                        f"{abs(cx - px):.1f}/{abs(cy - py):.1f} unidades). "
+                        f"Pon el {helper} al lado CONTRARIO del protagonista "
+                        f"con pos= (p. ej. prota a la izquierda → "
+                        f"{helper} con pos=RIGHT*3.4+UP*1), nunca encima.")
+    return ""
+
+
 def _checar_banda_vs_prota(tree):
     """La banda superior no puede tapar la cabeza del protagonista.
 
@@ -982,12 +1135,18 @@ def _validar_escena(code, cls):
     err_l = _checar_banda_vs_prota(tree)
     if err_l:
         return err_l
+    # Layout: ningún callout/etiqueta puede tapar al protagonista.
+    err_s = _checar_solape_texto(tree)
+    if err_s:
+        return err_s
     # Text() crudo gigante = texto cortado en bordes. Para títulos usar el
     # rig (banda_titulo/titulo_seguro/callout), que se auto-ajusta.
     for node in ast.walk(tree):
         if isinstance(node, ast.Call):
             f = node.func
-            if isinstance(f, ast.Name) and f.id == "Text":
+            nm = f.attr if isinstance(f, ast.Attribute) else (
+                f.id if isinstance(f, ast.Name) else "")
+            if nm == "Text":
                 fs = _num(_kw(node, "font_size", default=None), 48)
                 if fs > 60:
                     return (f"Text() con font_size={fs:.0f} se sale de la "
@@ -995,6 +1154,14 @@ def _validar_escena(code, cls):
                             "font_size>60: usa banda_titulo(), "
                             "titulo_seguro(), callout() o etiqueta(), que se "
                             "auto-ajustan solos.")
+            elif nm in ("callout", "etiqueta", "banda_titulo",
+                        "titulo_seguro", "title_card"):
+                fs = _num(_kw(node, "font_size", default=None), 0)
+                if fs > 72:
+                    return (f"{nm}() con font_size={fs:.0f} produce un "
+                            "elemento gigante que tapa al protagonista. "
+                            "PROHIBIDO font_size>72 en helpers de texto: usa "
+                            "el tamaño por defecto (callout=60, etiqueta=40).")
     return ""
 
 

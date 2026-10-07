@@ -211,17 +211,27 @@ def stick_group(n, center=ORIGIN, spacing=1.4, height=2.0,
     return figs
 
 
-def callout(text, color=ORANGE, font_size=96):
-    """Dato/cifra destacada con fondo. El texto se encoge solo si es
-    largo: nunca se sale de la pantalla ni se corta en los bordes."""
+def callout(text, color=ORANGE, font_size=60, ancho_max=7.0, pos=None):
+    """Dato/cifra destacada COMPACTA con fondo.
+
+    - El texto se encoge solo si excede `ancho_max` (7.0): nunca es
+      gigante ni se sale de la pantalla.
+    - `pos`: posición del centro (p. ej. pos=RIGHT*3.4+UP*1). Si no se da,
+      queda al centro.
+    - Devuelve un grupo _Seguro: cualquier .move_to()/.shift() posterior
+      queda recortado al encuadre automáticamente.
+    """
     label = _ajustar(Text(text, font=FONT, weight="BOLD",
                           font_size=font_size, color=WHITE),
-                     ANCHO_SEGURO - 0.7)
+                     ancho_max - 0.7)
     pad = 0.35
     bg = Rectangle(width=label.width + pad * 2,
                    height=label.height + pad * 2,
                    fill_color=color, fill_opacity=1, stroke_width=0)
-    return VGroup(bg, label)
+    grp = _Seguro(bg, label)
+    if pos is not None:
+        grp.move_to(np.array([float(pos[0]), float(pos[1]), 0.0]))
+    return _encuadrar(grp)
 
 
 def arrow(start, end, color=INK, width=8):
@@ -730,6 +740,76 @@ def _ajustar(t, ancho_max):
     return t
 
 
+# Marco seguro del encuadre 16:9 (14.22 x 8): ningún elemento de texto
+# puede salir de aquí. La franja y<-2.3 es de subtítulos quemados.
+_SEGURO_X = 6.9
+_SEGURO_Y_MIN = -2.3
+_SEGURO_Y_MAX = 3.6
+
+
+def _encuadrar(mobj):
+    """Mete el mobject al marco seguro moviéndolo lo mínimo necesario.
+
+    Garantía por construcción: aunque el código pida pos=RIGHT*4 o haga
+    .move_to() fuera de pantalla, el elemento termina visible y sin
+    invadir subtítulos. No cambia el tamaño, solo la posición.
+    """
+    try:
+        w, h = float(mobj.width), float(mobj.height)
+        c = mobj.get_center()
+    except Exception:
+        return mobj
+    dx = dy = 0.0
+    if w < 2 * _SEGURO_X:
+        lo, hi = c[0] - w / 2, c[0] + w / 2
+        if lo < -_SEGURO_X:
+            dx = -_SEGURO_X - lo
+        elif hi > _SEGURO_X:
+            dx = _SEGURO_X - hi
+    if h < (_SEGURO_Y_MAX - _SEGURO_Y_MIN):
+        lo, hi = c[1] - h / 2, c[1] + h / 2
+        if lo < _SEGURO_Y_MIN:
+            dy = _SEGURO_Y_MIN - lo
+        elif hi > _SEGURO_Y_MAX:
+            dy = _SEGURO_Y_MAX - hi
+    if dx or dy:
+        # shift con guard: si es _Seguro, no re-entrar a su override
+        # (evita recursión infinita).
+        guard = "_clamp_guard"
+        tenia = getattr(mobj, guard, False)
+        try:
+            if not tenia:
+                try:
+                    object.__setattr__(mobj, guard, True)
+                except Exception:
+                    pass
+            mobj.shift(np.array([dx, dy, 0.0]))
+        finally:
+            if not tenia:
+                try:
+                    object.__setattr__(mobj, guard, False)
+                except Exception:
+                    pass
+    return mobj
+
+
+class _Seguro(VGroup):
+    """VGroup de texto que nunca sale del marco seguro.
+
+    Cualquier .move_to()/.shift() posterior queda recortado al encuadre
+    automáticamente: es imposible sacarlo de la resolución por código.
+    """
+    def move_to(self, *a, **k):
+        super().move_to(*a, **k)
+        return _encuadrar(self)
+
+    def shift(self, *a, **k):
+        if getattr(self, "_clamp_guard", False):
+            return super().shift(*a, **k)
+        super().shift(*a, **k)
+        return _encuadrar(self)
+
+
 def banda_titulo(texto, color=ORANGE, y=ZONA_TITULO_Y, ancho_max=ANCHO_SEGURO):
     """Banda de título a lo ancho con texto auto-ajustado.
 
@@ -741,7 +821,7 @@ def banda_titulo(texto, color=ORANGE, y=ZONA_TITULO_Y, ancho_max=ANCHO_SEGURO):
     banda = Rectangle(width=ancho_max + 0.6, height=label.height + 0.75,
                       color=color, fill_color=color, fill_opacity=1,
                       stroke_width=0)
-    return VGroup(banda, label).move_to(np.array([0.0, y, 0.0]))
+    return _encuadrar(_Seguro(banda, label).move_to(np.array([0.0, y, 0.0])))
 
 
 def titulo_seguro(texto, color=INK, font_size=64, y=ZONA_TITULO_Y,
@@ -749,18 +829,23 @@ def titulo_seguro(texto, color=INK, font_size=64, y=ZONA_TITULO_Y,
     """Texto de título que nunca se sale del encuadre (auto-escala)."""
     t = _ajustar(Text(texto, font=FONT, font_size=font_size, color=color),
                  ancho_max)
-    return t.move_to(np.array([0.0, y, 0.0]))
+    grp = _Seguro(t)
+    grp.move_to(np.array([0.0, y, 0.0]))
+    return _encuadrar(grp)
 
 
 def etiqueta(texto, pos, color=INK, font_size=40, ancho_max=5.5):
-    """Etiqueta pequeña auto-ajustada. `pos` = (x, y).
+    """Etiqueta pequeña auto-ajustada. `pos` = (x, y) o vector Manim.
 
     Si pides una y muy baja, se sube sola para no invadir subtítulos.
+    Devuelve un grupo _Seguro: nunca sale del encuadre.
     """
     t = _ajustar(Text(texto, font=FONT, font_size=font_size, color=color),
                  ancho_max)
     x, y = float(pos[0]), max(float(pos[1]), ZONA_TEXTO_MIN_Y + 0.35)
-    return t.move_to(np.array([x, y, 0.0]))
+    grp = _Seguro(t)
+    grp.move_to(np.array([x, y, 0.0]))
+    return _encuadrar(grp)
 
 
 def tarjeta_canal(texto="EL PORQUÉ", subtitulo="curiosidad científica"):
