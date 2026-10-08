@@ -786,3 +786,28 @@ Verificado: guion de 1799 palabras → 3 partes, 30 escenas S01-S30
 continuas, 1620 palabras VOZ (90%); errores de conexión → wait.
 
 *Versión del panel: v18 (storyboard por partes, reintentos de conexión).*
+
+## 30. Cambios v18.1 (2026-10-07) — cadenas de modelos gratis re-sincronizadas
+
+Una copia anterior de `llm.py` había devuelto la tabla `PREFERRED` a ids
+comprobados muertos. Reaplicado lo verificado en vivo:
+
+- `gemini`: 9 flash (3.8/3.7/3.6/3.5, flash-latest y 3 lites); 2.5-pro ya no existe.
+- `groq`: fuera `llama-3.3-70b-versatile` (404), entra `allam-2-7b`;
+  `FREE_EXCLUDE` (whisper/guard/safeguard/orpheus) y `MAX_TOKENS` 1200 →
+  **1000** (con 1200, `qwen3.8-27b` devuelve 400 "Request too large"; 512 y 1024 van).
+- `tokenharbor`: fuera `qwen3.8-flash:free` (404); la bolsa de 7 días sigue
+  agotada (429, se renueva sola).
+- `freellmapi`: fuera `gemini-2.5-flash` (404) y alias `fusion` restaurado.
+- `mistral`: `ministral-14b-latest` al frente (small/medium/magistral en 429);
+  `FREE_EXCLUDE` (fim/vibe-cli).
+- `openrouter`: ids alineados al catálogo `:free` del 2026-10-05 (la key
+  sigue dando 401: regenerar).
+- `cloudflare`: +4 ids (`qwen3-30b-a3b-fp8`, `gemma-sea-lion-v4-27b`,
+  `gemma-4-26b`, `deepseek-r1-distill`) → cadena de 15.
+
+Verificado: `resolve_chain()` en 8 backends sin ids muertos y `generate()`
+real OK en gemini (86 s), groq (6.7 s), cloudflare (2.7 s) y mistral
+(335 s con reintentos 429). Panel reiniciado.
+
+*Versión del panel: v18.1 (PREFERRED re-sincronizado con lo verificado en vivo).*
