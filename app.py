@@ -493,18 +493,28 @@ elif view == "🎬 Proyectos":
             words = count_words(text)
             st.write(f"**{words} palabras** ≈ {estimate_minutes(words):.1f} min a 155 ppm "
                      f"· estado: **{gate['status']}**")
-            if p["kind"] == "largo" and words < 900:
-                st.warning(f"⚠️ Guion corto para un video largo: {words} palabras "
-                           f"≈ {estimate_minutes(words):.1f} min. El objetivo del "
-                           f"canal es 8–12 min (~1200–1800 palabras). Si lo apruebas "
-                           f"así, el video saldrá corto. Considera «🤖 Reescribir "
-                           f"con crítica» pidiendo expandir.")
+            guion_corto = (p["kind"] == "largo"
+                           and words < pipeline.MIN_PALABRAS_GUION)
+            if guion_corto:
+                st.error(f"⛔ Guion corto para el estándar del canal: {words} palabras "
+                         f"≈ {estimate_minutes(words):.1f} min. El mínimo es "
+                         f"{pipeline.MIN_PALABRAS_GUION} palabras (≈8 min). "
+                         f"La aprobación está bloqueada: usa «🤖 Reescribir con "
+                         f"crítica» pidiendo expandir, o «🔁 Pedir cambios».")
+            elif p["kind"] == "largo" and words < 1500:
+                st.warning(f"⚠️ Guion justo: {words} palabras ≈ "
+                           f"{estimate_minutes(words):.1f} min. Apunta a 1500+ "
+                           f"para asegurar 8 minutos con cobertura del storyboard.")
             with st.expander("Leer guion completo"):
                 st.text(text[:20000])
             comment = st.text_area("Comentario (si pides cambios)", key="gc")
             g1, g2, g3 = st.columns(3)
             with g1:
-                if st.button("✅ Aprobar guion"):
+                if guion_corto:
+                    st.button("✅ Aprobar guion", disabled=True,
+                              help="Bloqueado: el guion no alcanza el mínimo "
+                                   "del canal.")
+                elif st.button("✅ Aprobar guion"):
                     db.set_approval(conn, pid, "guion", "aprobado")
                     db.set_stage(conn, pid, "guion", "ok", "Guion aprobado por humano.")
                     st.success("Guion aprobado. Puedes seguir con «Correr todo».")
@@ -523,7 +533,11 @@ elif view == "🎬 Proyectos":
                                 gen_fn, p["title"],
                                 pipeline.prompt_maestro() +
                                 "\n\nCRÍTICA A CORREGIR:\n" + crit,
-                                target_words=words)
+                                target_words=pipeline.MIN_PALABRAS_GUION)
+                            nw = count_words(new)
+                            if nw < pipeline.MIN_PALABRAS_GUION:
+                                new, nw, used = pipeline.expandir_guion(
+                                    gen_fn, new)
                         outp = pipeline.job_dir_of(p) / "GUION.md"
                         outp.write_text(new, encoding="utf-8")
                         db.set_approval(conn, pid, "guion", "pendiente")

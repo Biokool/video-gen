@@ -29,7 +29,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 
-PANEL_VERSION = "v15"  # se muestra en el pie del sidebar; subir en cada release
+PANEL_VERSION = "v17"  # se muestra en el pie del sidebar; subir en cada release
 # Dos layouts soportados:
 #  - anidado: panel/ dentro de zenn-factory/ (jobs/ y thumbnails/ en el padre)
 #  - plano:   todo dentro de video-gen/ (jobs/ y thumbnails/ junto a app.py)
@@ -243,6 +243,42 @@ def draft_script(generate_fn, question, prompt_maestro, target_words=1300):
     return text, model
 
 
+# Mínimo estructural del canal: 8 min ≈ 1300 palabras a 155 ppm.
+# Un guion más corto produce un video corto (fuga detectada en jobs/27 y 32).
+MIN_PALABRAS_GUION = 1300
+
+
+def expandir_guion(generate_fn, guion_actual, research=""):
+    """Expande un guion corto hasta el mínimo del canal (hasta 2 intentos).
+
+    Devuelve (texto_final, palabras). No falla en silencio: si tras los
+    intentos sigue corto, la Puerta 1 bloquea la aprobación.
+    """
+    texto, model, _ = guion_actual, "", 0
+    for intento in range(2):
+        palabras = count_words(texto)
+        if palabras >= MIN_PALABRAS_GUION:
+            break
+        faltan = MIN_PALABRAS_GUION - palabras
+        prompt = (
+            f"Este guion tiene {palabras} palabras de narración y necesita "
+            f"mínimo {MIN_PALABRAS_GUION} (faltan ~{faltan}). "
+            f"EXPÁNDELO: añade datos, ejemplos y contexto de la investigación, "
+            f"desarrolla los bloques más cortos y, si hace falta, agrega un "
+            f"bloque nuevo antes del cierre. PROHIBIDO repetir información o "
+            f"rellenar con paja: cada frase nueva debe aportar un dato real. "
+            f"Mantén saludo fijo, hook, picos y despedida fija. Devuelve el "
+            f"guion COMPLETO (no solo lo añadido), en español.\n\n"
+            f"GUION ACTUAL:\n{texto[:14000]}"
+            + (f"\n\nINVESTIGACIÓN:\n{research[:4000]}" if research else ""))
+        try:
+            texto, model = generate_fn(
+                prompt, system="Eres guionista de divulgación científica.")
+        except Exception:
+            break
+    return texto, count_words(texto), model
+
+
 CRITIC_PROMPT = """Eres el editor crítico de un canal de divulgación. Revisa este guion y responde SOLO con:
 1. Palabras de narración (número aproximado).
 2. ¿Responde UNA sola pregunta? (sí/no + cuál)
@@ -279,11 +315,15 @@ def run_guion_draft(generate_fn, p, job, kind="largo"):
             prompt_maestro() + research, target_words=target)
     except Exception as e:
         return False, f"Error del modelo: {e}", [], None
+    words = count_words(txt)
+    expandio = ""
+    if kind == "largo" and words < MIN_PALABRAS_GUION:
+        txt, words, used = expandir_guion(generate_fn, txt, research)
+        expandio = f" (expansión automática: {words} palabras)"
     out = job / "GUION.md"
     out.write_text(txt, encoding="utf-8")
-    words = count_words(txt)
     log = (f"Borrador con {used}: {words} palabras ≈ "
-           f"{estimate_minutes(words):.1f} min.\n"
+           f"{estimate_minutes(words):.1f} min.{expandio}\n"
            "PENDIENTE: léelo abajo y apruébalo en la Puerta 1.")
     # Ojo: estado 'en-curso' — la etapa solo se cierra con tu aprobación.
     return True, log, [str(out)], "en-curso"
@@ -295,6 +335,11 @@ minimalistas de colores vivos (estilo Zenn / Memorias de Pez).
 Divide este guion en escenas numeradas. Por escena: el texto de narración LITERAL
 y una descripción visual de 1 línea (qué personaje u objeto se ve, con qué
 expresión y colores).
+
+REGLA DE ORO — VOZ LITERAL: el campo VOZ debe copiar el texto del guion
+palabra por palabra, SIN resumir, SIN parafrasear y SIN recortar frases.
+Si resumes, el video sale más corto que el guion y la etapa se RECHAZA
+automáticamente (se exige 90% de cobertura palabra por palabra).
 
 REGLAS:
 - RITMO POR DEFECTO: escenas CORTAS de 8-12 segundos (~25-35 palabras de VOZ
@@ -340,13 +385,14 @@ def run_storyboard(generate_fn, p, job):
     n = text.count("### S")
     # Anti-truncado ESTRUCTURAL: si el storyboard no cubre el guion, la etapa
     # FALLA (no avisa y sigue). Un storyboard cortado = video cortado.
+    # Umbral 90%: con 70% un guion de 1300 palabras pierde ~400 (casi 3 min).
     voz_words = sum(len(m.group(1).split())
                     for m in re.finditer(r"VOZ:\s*(.+)", text))
     guion_words = len(re.sub(r"^#.*$", "", script, flags=re.M).split())
-    if guion_words > 0 and voz_words < 0.7 * guion_words:
+    if guion_words > 0 and voz_words < 0.9 * guion_words:
         return False, (
             f"⛔ STORYBOARD TRUNCADO: cubre ~{voz_words} palabras de "
-            f"{guion_words} del guion (mínimo 70%). Si continuara, el video "
+            f"{guion_words} del guion (mínimo 90%). Si continuara, el video "
             f"saldría cortado (como el proyecto 18: 3 min en vez de 9). "
             f"Opciones: 1) pulsa «↪️ Continuar storyboard» aquí abajo para "
             f"que el modelo complete las escenas faltantes desde "

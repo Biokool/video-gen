@@ -702,3 +702,81 @@ español", hueco vacío).
 2 videos/semana sin pausa. RPM realista del nicho en español: $1-3.
 
 *Versión del panel: v15 (pack visual + CTR).*
+
+## 27. Cambios v16 (2026-10-07) — fix content=null de proveedores
+
+Reporte: etapa 5/10 Storyboard falló con `Error del modelo: 'NoneType'
+object has no attribute 'strip'` tras 58s.
+
+Causa raíz: algunos proveedores (modelos gratis saturados, filtro de
+contenido o corte por max_tokens) devuelven `choices[0].message.content =
+null`. En `_openai_chat()` y `_openrouter_generate()` el `.strip()` se
+aplicaba directo sobre ese null → `AttributeError`, que NO es `LLMError`
+y por tanto no lo capturaba `generate()`: la cadena no avanzaba al
+siguiente modelo y la etapa moría con un mensaje críptico.
+
+Fix: extracción null-safe en ambos backends; si el contenido viene
+vacío/null se lanza `LLMError("contenido vacío (content=null)")` y la
+cadena avanza al siguiente modelo como fue diseñada. Aplica a groq,
+cerebras, mistral, tokenharbor, freellmapi, cloudflare, deepseek
+(vía `_openai_chat`) y openrouter. Los demás backends ya eran seguros
+(ollama, gemini, cohere auditados).
+
+Verificado con mocks: null → LLMError, la cadena avanza al siguiente
+modelo, y el caso normal sigue funcionando.
+
+*Versión del panel: v16 (content=null ya no mata la etapa).*
+
+## 28. Cambios v17 (2026-10-07) — fix videos cortos (4-5 min en vez de 8+)
+
+Reporte: los videos salen de 4-5 minutos aunque el objetivo es 8+.
+
+Causa raíz (doble fuga, medida en jobs/27 y jobs/32):
+1. El guion nace corto: el prompt pide 1300-1900 palabras pero el modelo
+   entrega 900-1160 y nada lo obliga a corregir (draft de un solo intento,
+   crítico sin rechazo, Puerta 1 avisaba solo si <900). jobs/27: 900
+   palabras; jobs/32: 1161.
+2. El storyboard recorta 18-26%: el prompt dice "texto LITERAL" pero el
+   modelo resume/parafrasea, y el chequeo v13 exigía solo 70% de cobertura
+   (70% de 900 = 630 palabras ≈ 4 min). jobs/27: 665 palabras VOZ (74%)
+   → ~4.6 min; jobs/32: 947 (82%) → ~6.5 min.
+
+Fix estructural:
+- `MIN_PALABRAS_GUION = 1300`: `run_guion_draft` expande automáticamente
+  (hasta 2 intentos, con datos de la investigación, sin paja) si el
+  borrador sale corto. El "🤖 Reescribir con crítica" también apunta a 1300.
+- Puerta 1: si el guion tiene <1300 palabras, la aprobación se BLOQUEA
+  (botón deshabilitado + error explicativo); entre 1300-1500 hay aviso.
+- Storyboard: cobertura mínima 70% → 90%, y regla de oro "VOZ LITERAL,
+  sin resumir" en el prompt (resumir = rechazo automático).
+
+Verificado: expansión 900→1399 en 2 intentos; jobs/27 (74%) ahora falla
+correctamente; 95% pasa.
+
+*Versión del panel: v17 (guiones de 1300+ palabras, cobertura 90%).*
+
+## 29. Cambios v18 (2026-10-07) — revisión en vivo de todos los modelos gratis
+
+Sondeo real (chat corto) de **todos los backends con key** para
+refrescar `PREFERRED` y los filtros. Solo se tocaron proveedores ya
+agregados; no se añadió ninguno nuevo.
+
+| Backend | Estado en vivo | Acción |
+|---|---|---|
+| Gemini | 45 ids; 9 flash OK (2.5-pro ya no existe) | `PREFERRED` ampliado: 3.8/3.7/3.6/3.5 + lites |
+| Groq | `/models` ya responde (11 ids); `llama-3.3-70b-versatile` → 404 | quitado; `allam-2-7b` entra; `FREE_EXCLUDE` (whisper/guard/safeguard/orpheus) |
+| Groq OTPM | 1.200 tokens rompía `qwen3.8-27b` | `MAX_TOKENS["groq"] = 1000` (probado 512/1024 OK, 1200 no) |
+| Token Harbor | 4 `:free`; `qwen3.8-flash:free` terminó (404); bolsa 7 días agotada (429) | quitado de `PREFERRED`; la cuota se renueva sola |
+| FreeLLMAPI | router local OK, 627 ids; `auto` y `fusion` responden | `fusion` añadido a `ROUTER_ALIASES`; `gemini-2.5-flash` (404) fuera |
+| Mistral | 46 ids; solo `ministral-14b-latest` y `codestral-*` responden (small/medium/magistral en 429) | `ministral-14b-latest` pasa al frente; `FREE_EXCLUDE` (fim/vibe-cli) |
+| OpenRouter | descubrimiento OK (17 ids `:free`), **chat 401 «User not found»** | `PREFERRED` alineado al catálogo; **falta regenerar la key** |
+| Cloudflare | 15 ids OK; añadidos `qwen3-30b-a3b-fp8`, `gemma-sea-lion-v4-27b`, `gemma-4-26b`, `deepseek-r1-distill` | `PREFERRED` a 12 |
+| NVIDIA | 10 de 80 OK (§25) | sin cambios |
+| Ollama | 8 locales (1 de embeddings ya excluido) | sin cambios |
+| Cerebras / Cohere | **sin key** | nada que refrescar |
+
+Verificación final: `resolve_chain()` OK en los 9 backends con key y
+`generate()` real OK en gemini (6.5 s), groq (24.6 s), cloudflare (4.6 s)
+y nvidia (4.9 s).
+
+*Versión del panel: v18 (cadenas de modelos gratis verificadas en vivo).*
