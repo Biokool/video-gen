@@ -29,7 +29,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 
-PANEL_VERSION = "v18"  # se muestra en el pie del sidebar; subir en cada release
+PANEL_VERSION = "v19"  # se muestra en el pie del sidebar; subir en cada release
 # Dos layouts soportados:
 #  - anidado: panel/ dentro de zenn-factory/ (jobs/ y thumbnails/ en el padre)
 #  - plano:   todo dentro de video-gen/ (jobs/ y thumbnails/ junto a app.py)
@@ -336,10 +336,13 @@ Divide este guion en escenas numeradas. Por escena: el texto de narración LITER
 y una descripción visual de 1 línea (qué personaje u objeto se ve, con qué
 expresión y colores).
 
-REGLA DE ORO — VOZ LITERAL: el campo VOZ debe copiar el texto del guion
-palabra por palabra, SIN resumir, SIN parafrasear y SIN recortar frases.
-Si resumes, el video sale más corto que el guion y la etapa se RECHAZA
-automáticamente (se exige 90% de cobertura palabra por palabra).
+REGLA DE ORO — CORTAR, NO RESUMIR: tu trabajo es DIVIDIR el texto del
+guion en bloques de 25-35 palabras, NO reescribirlo. Cada campo VOZ debe
+ser un fragmento COPIADO TAL CUAL del guion, palabra por palabra, sin
+cambiar ni una coma y sin saltarte ningún párrafo. Tú decides DÓNDE
+CORTAR entre escenas; el texto se queda intacto. Si resumes o parafraseas,
+la etapa se RECHAZA automáticamente (se exige 90% de cobertura palabra
+por palabra y se cuenta).
 
 REGLAS:
 - RITMO POR DEFECTO: escenas CORTAS de 8-12 segundos (~25-35 palabras de VOZ
@@ -375,8 +378,25 @@ def _partir_guion(script, max_palabras=650):
     cabe.
     """
     paras = [pp for pp in re.split(r"\n\s*\n", script) if pp.strip()]
+    # Párrafo gigante sin saltos: córtalo por frases para que sí se parta.
+    trozos = []
+    for pp in paras:
+        if len(pp.split()) > max_palabras:
+            frases = re.split(r"(?<=[.!?…])\s+", pp)
+            ac, cw = [], 0
+            for fr in frases:
+                w = len(fr.split())
+                if cw + w > max_palabras and ac:
+                    trozos.append(" ".join(ac))
+                    ac, cw = [], 0
+                ac.append(fr)
+                cw += w
+            if ac:
+                trozos.append(" ".join(ac))
+        else:
+            trozos.append(pp)
     partes, actual, cuenta = [], [], 0
-    for par in paras:
+    for par in trozos:
         w = len(par.split())
         if cuenta + w > max_palabras and actual:
             partes.append("\n\n".join(actual))
@@ -405,6 +425,34 @@ def _renumerar_desde(text, desde):
                   lambda m: f"### S{mapa[int(m.group(1))]:02d}", text)
 
 
+def _voz_words(text):
+    """Palabras totales en los campos VOZ: del storyboard."""
+    return sum(len(m.group(1).split())
+               for m in re.finditer(r"VOZ:\s*(.+)", text))
+
+
+def _prompt_parte(i, n_partes, parte, siguiente):
+    """Prompt del storyboard para una parte, con objetivo de cobertura."""
+    pw = len(parte.split())
+    objetivo = int(pw * 0.9)
+    bordes = ""
+    if i == 0:
+        bordes = ("Esta es la PRIMERA parte: la primera escena es la "
+                  "bienvenida (tarjeta_canal + saludo del guion). ")
+    if i == n_partes - 1:
+        bordes += ("Esta es la ÚLTIMA parte: termina con la despedida "
+                   "final del guion (tono cálido, cierre del canal).")
+    return (
+        f"PARTE {i + 1} de {n_partes} del guion "
+        f"(esta parte tiene ~{pw} palabras). Genera el storyboard SÓLO "
+        f"de esta parte. {bordes}La primera escena es S{siguiente:02d} "
+        f"(continúa la numeración, NO reinicies en S01).\n"
+        f"OBJETIVO MEDIBLE: los campos VOZ sumados deben tener al menos "
+        f"{objetivo} palabras (90% de esta parte). Cuéntalas antes de "
+        f"responder.\n\n" +
+        STORYBOARD_PROMPT.format(script=parte[:6000]))
+
+
 def run_storyboard(generate_fn, p, job):
     if not generate_fn:
         return (False, "Necesita un backend LLM: configura una key en "
@@ -421,20 +469,9 @@ def run_storyboard(generate_fn, p, job):
     partes = (_partir_guion(script) if guion_words > 1000 else [script])
     textos, model, siguiente = [], "", 1
     for i, parte in enumerate(partes):
+        parte_words = len(parte.split())
         if len(partes) > 1:
-            bordes = ""
-            if i == 0:
-                bordes = ("Esta es la PRIMERA parte: la primera escena es la "
-                          "bienvenida (tarjeta_canal + saludo del guion). ")
-            if i == len(partes) - 1:
-                bordes += ("Esta es la ÚLTIMA parte: termina con la despedida "
-                           "final del guion (tono cálido, cierre del canal).")
-            prompt = (
-                f"PARTE {i + 1} de {len(partes)} del guion. Genera el "
-                f"storyboard SÓLO de esta parte. {bordes}La primera escena "
-                f"es S{siguiente:02d} (continúa la numeración, NO reinicies "
-                f"en S01).\n\n" +
-                STORYBOARD_PROMPT.format(script=parte[:6000]))
+            prompt = _prompt_parte(i, len(partes), parte, siguiente)
         else:
             prompt = STORYBOARD_PROMPT.format(script=script[:12000])
         try:
@@ -443,6 +480,25 @@ def run_storyboard(generate_fn, p, job):
         except Exception as e:
             return False, (f"Error del modelo en parte {i + 1}/{len(partes)}: "
                            f"{e}"), [], None
+        # Validación POR PARTE: si el modelo resumió/recortó, se reintenta
+        # una vez con instrucción explícita (jobs/37: las partes salían al
+        # 64-87% por compresión, no por corte de tokens).
+        vw = _voz_words(text)
+        if vw < 0.9 * parte_words:
+            retry_prompt = (
+                f"Tu versión anterior cubrió solo ~{vw} de {parte_words} "
+                f"palabras: RESUMISTE. Repite la PARTE {i + 1} copiando el "
+                f"texto literal del guion sin cambiar ni una palabra y sin "
+                f"saltarte ningún párrafo. Objetivo: ≥{int(parte_words * 0.9)} "
+                f"palabras en VOZ.\n\n" + prompt)
+            try:
+                text2, model2 = generate_fn(
+                    retry_prompt,
+                    system="Eres director de animación minimalista.")
+                if _voz_words(text2) > vw:
+                    text, model, vw = text2, model2, _voz_words(text2)
+            except Exception:
+                pass
         text = _renumerar_desde(text, siguiente)
         textos.append(text)
         nums = [int(m.group(1)) for m in re.finditer(r"### S(\d+)", text)]

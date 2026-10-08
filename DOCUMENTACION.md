@@ -787,27 +787,63 @@ continuas, 1620 palabras VOZ (90%); errores de conexión → wait.
 
 *Versión del panel: v18 (storyboard por partes, reintentos de conexión).*
 
-## 30. Cambios v18.1 (2026-10-07) — cadenas de modelos gratis re-sincronizadas
+## 30. Cambios v19 (2026-10-08) — validación de cobertura POR PARTE
 
-Una copia anterior de `llm.py` había devuelto la tabla `PREFERRED` a ids
-comprobados muertos. Reaplicado lo verificado en vivo:
+Reporte: la etapa 5 seguía fallando (⛔ TRUNCADO: 960/1274 palabras, 75%,
+jobs/37) aun con el storyboard por partes de v18.
 
-- `gemini`: 9 flash (3.8/3.7/3.6/3.5, flash-latest y 3 lites); 2.5-pro ya no existe.
-- `groq`: fuera `llama-3.3-70b-versatile` (404), entra `allam-2-7b`;
-  `FREE_EXCLUDE` (whisper/guard/safeguard/orpheus) y `MAX_TOKENS` 1200 →
-  **1000** (con 1200, `qwen3.8-27b` devuelve 400 "Request too large"; 512 y 1024 van).
-- `tokenharbor`: fuera `qwen3.8-flash:free` (404); la bolsa de 7 días sigue
-  agotada (429, se renueva sola).
-- `freellmapi`: fuera `gemini-2.5-flash` (404) y alias `fusion` restaurado.
-- `mistral`: `ministral-14b-latest` al frente (small/medium/magistral en 429);
-  `FREE_EXCLUDE` (fim/vibe-cli).
-- `openrouter`: ids alineados al catálogo `:free` del 2026-10-05 (la key
-  sigue dando 401: regenerar).
-- `cloudflare`: +4 ids (`qwen3-30b-a3b-fp8`, `gemma-sea-lion-v4-27b`,
-  `gemma-4-26b`, `deepseek-r1-distill`) → cadena de 15.
+Causa raíz: no era (solo) corte de tokens — el modelo COMPRIME en vez de
+copiar literal: 16-21 palabras por escena en lugar de 25-35, y salta
+párrafos (la parte 1 cubrió su trozo al 64%). La validación era solo
+global; cada parte se daba por buena sin revisarla.
 
-Verificado: `resolve_chain()` en 8 backends sin ids muertos y `generate()`
-real OK en gemini (86 s), groq (6.7 s), cloudflare (2.7 s) y mistral
-(335 s con reintentos 429). Panel reiniciado.
+Fix:
+- Validación POR PARTE: tras generar cada trozo se mide su cobertura
+  (VOZ vs palabras del trozo); si baja de 90%, se reintenta UNA vez con
+  instrucción explícita ("tu versión anterior cubrió solo X de Y
+  palabras: REPÍTELA copiando literal sin resumir"). Se queda la mejor
+  versión de cada parte.
+- El prompt de cada parte ahora incluye su conteo de palabras y el
+  objetivo medible (≥90%), con orden de contarlo antes de responder.
+- Regla de oro reformulada: "CORTAR, NO RESUMIR — tú decides DÓNDE CORTAR
+  entre escenas; el texto se queda intacto".
+- `_partir_guion` ahora también corta párrafos gigantes sin saltos de
+  línea (por frases), para que el peor caso también se parta.
 
-*Versión del panel: v18.1 (PREFERRED re-sincronizado con lo verificado en vivo).*
+Verificado con mocks: guion sin párrafos → 3 partes; partes comprimidas →
+reintento literal → 60 escenas S01-S60 continuas, cobertura 107%.
+
+*Versión del panel: v19 (cobertura validada por parte, no solo global).*
+
+## 31. Cambios v19.1 (2026-10-08) — bloqueo de red y rotación entre backends
+
+Reporte: etapa 5 (storyboard) falló en 2s con
+`Ningún modelo de 'groq' respondió / HTTP 403: Access denied. Please
+check your network settings.`
+
+Causa: **Groq estaba bloqueando la IP** (venía de una VPN): el 403 salía
+en `/models` y en los 4 modelos, así que reintentar o rotar dentro de
+Groq no servía de nada. Al quitar la VPN volvió a responder
+(`/models` 200, 11 ids).
+
+Fix en `llm.py`:
+
+- `_rate_kind` añade `'blocked'`: "access denied" / "check your network"
+  / "not available in your region" → no se reintenta y se corta esa
+  cadena entera (antes caía como error duro y seguía perdiendo el tiempo
+  con el mismo backend). Un 403 genérico de un modelo concreto pasa a
+  `'skip'` (salta al siguiente modelo, no aborta el backend).
+- **Rotación automática de backend**: si el backend elegido no respondió
+  (bloqueo, cuota, 404…), `generate()` prueba los demás backends
+  gratuitos con key (orden `BACKEND_ORDER`, 3 modelos por backend,
+  excluidos `deepseek` —de pago— y `ollama` —necesita su modelo—) y
+  devuelve `"<modelo> · <backend>"` cuando uno responde. El mensaje de
+  error final ya no recomienda un "modo auto" que no existe: sugiere
+  esperar, cambiar de backend en el panel y revisar la key.
+
+Verificado: `rate_kind("HTTP 403: Access denied…") = blocked`;
+`generate(backend="groq", model="openai/gpt-oss-120b")` → OK 0.7s;
+con la key de OpenRouter corrupta → rotó solo a `gemini-2.5-flash · gemini`
+(8.1s); sin alternativas → mensaje claro. Panel reiniciado (health ok).
+
+*Versión del panel: v19.1 (rotación automática entre backends).*

@@ -130,12 +130,7 @@ FREE_EXCLUDE = {"cloudflare": ("embed", "image", "diffusion", "flux",
                            "parse", "detector", "clip", "deplot", "diffusion",
                            "cosmos", "neva", "vila", "translate", "chatqa",
                            "starcoder", "codellama", "codegemma", "coder",
-                           "codestral", "code-instruct"),
-                # Groq: transformers de seguridad/audio (no sirven para
-                # guiones) y los orpheus exigen aceptar términos.
-                "groq": ("whisper", "guard", "safeguard", "orpheus"),
-                # Mistral: completado intermedio (fim) y CLI de vibe.
-                "mistral": ("fim", "vibe-cli")}
+                           "codestral", "code-instruct")}
 
 # Workers AI: estos ids existen en el catálogo pero NO corren en el plan
 # Free (verificado en vivo el 2026-10-04 con la key real).
@@ -175,10 +170,9 @@ NV_FREE_BLOCKED = {
 }
 
 # Alias del router FreeLLMAPI: `auto` deja que su router elija el mejor
-# modelo gratis disponible (auto:smart/auto:fast/auto:cheap = prioridades);
-# `fusion` prueba varios a la vez (más lento pero no se queda sin ruta).
+# modelo gratis disponible (auto:smart/auto:fast/auto:cheap = prioridades).
 ROUTER_ALIASES = {"freellmapi": ["auto", "auto:smart", "auto:fast",
-                                 "auto:cheap", "fusion"]}
+                                 "auto:cheap"]}
 
 # Catálogos enormes (FreeLLMAPI trae cientos de ids): el combo se queda
 # con alias + preferidos + hasta MODEL_CAP descubiertos.
@@ -196,49 +190,36 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 # cuando hay key; si el descubrimiento falla, se prueban en este orden).
 # Solo modelos GRATIS por plataforma; DeepSeek queda como único de pago.
 PREFERRED = {
-    # Verificado en vivo 2026-10-05: 9 flash OK; 2.5-pro ya no existe.
-    "gemini": ["gemini-flash-latest", "gemini-3.8-flash", "gemini-3.7-flash",
-               "gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash",
-               "gemini-3.1-flash-lite", "gemini-2.5-flash-lite",
-               "gemini-3.5-flash-lite"],
-    # 2026-10-05: llama-3.3-70b-versatile → 404; gpt-oss es el que va.
+    "gemini": ["gemini-2.5-flash", "gemini-flash-latest", "gemini-3.5-flash",
+               "gemini-3.8-flash", "gemini-2.5-flash-lite"],
     "groq": ["openai/gpt-oss-120b", "openai/gpt-oss-20b",
-             "qwen/qwen3.8-27b", "allam-2-7b"],
+             "qwen/qwen3.8-27b", "llama-3.3-70b-versatile"],
     "cerebras": ["zai-glm-4.7", "gpt-oss-120b", "llama-3.3-70b"],
-    # La key responde 401 "User not found" (regenerarla); ids alineados
-    # con el catálogo :free descubierto el 2026-10-05.
     "openrouter": [
+        "qwen/qwen3.8-27b:free",
         "nvidia/nemotron-3-super-120b-a12b:free",
-        "nvidia/nemotron-3-ultra-550b-a55b:free",
-        "nvidia/nemotron-3.5-lightning:free",
         "google/gemma-4-31b-it:free",
         "thinkingmachines/inkling:free",
+        "nvidia/nemotron-3-ultra-550b-a55b:free",
         "openrouter/free",  # meta-router: elige un :free disponible
     ],
-    # 2026-10-05: small/medium/magistral en 429; ministral responde.
-    "mistral": ["ministral-14b-latest", "mistral-small-latest",
-                "mistral-medium-latest", "magistral-small-latest",
-                "codestral-latest"],
+    "mistral": ["mistral-small-latest", "mistral-medium-latest",
+                "magistral-small-latest", "ministral-14b-latest"],
     "cohere": ["command-a-03-2025", "command-r-plus", "command-r"],
     # Solo ids gratuitos: con la key, resolve_chain() los sustituye por
     # los que devuelva /models filtrando el mismo sufijo.
-    # 2026-10-05: qwen3.8-flash:free acabó (404); los otros 4 siguen.
-    "tokenharbor": ["mimo-v2.6-flash:free", "deepseek-v4.1-flash:free",
-                    "deepseek-v4-flash:free", "mimo-v2.5:free"],
-    # 2026-10-05: gemini-2.5-flash ya no existe upstream (404).
-    "freellmapi": ["glm-4.7", "kimi-k3", "glm-5.3", "qwen3.8-flash",
-                   "deepseek-v4-flash"],
-    # Workers AI: ids verificados en vivo el 2026-10-04/05 en plan Free,
-    # de mejor a peor para español.
+    "tokenharbor": ["deepseek-v4.1-flash:free", "qwen3.8-flash:free",
+                    "mimo-v2.6-flash:free", "deepseek-v4-flash:free",
+                    "mimo-v2.5:free"],
+    "freellmapi": ["gemini-2.5-flash", "glm-4.7", "kimi-k3",
+                   "qwen3.8-flash", "deepseek-v4-flash"],
+    # Workers AI: solo los 21 ids que respondieron en plan Free
+    # (verificado en vivo el 2026-10-04), de mejor a peor para español.
     "cloudflare": ["@cf/meta/llama-3.3-70b-instruct-fp8-fast",
                    "@cf/qwen/qwen3.8-27b", "@cf/openai/gpt-oss-120b",
                    "@cf/mistralai/mistral-small-3.1-24b-instruct",
-                   "@cf/qwen/qwen3-30b-a3b-fp8",
-                   "@cf/aisingapore/gemma-sea-lion-v4-27b-it",
-                   "@cf/google/gemma-4-26b-a4b-it",
                    "@cf/nvidia/nemotron-3-120b-a12b",
                    "@cf/zai-org/glm-4.7-flash",
-                   "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
                    "@cf/meta/llama-4-scout-17b-16e-instruct",
                    "@cf/qwen/qwq-32b"],
     # NVIDIA API catalog: de los 80 ids del catálogo solo 10 responden en
@@ -382,7 +363,7 @@ def _set_usage(backend, model, out, prompt="", response=""):
 # Límite de salida por minuto (OTPM) de Groq: pedir más de 1.000 tokens
 # de golpe devuelve 400 aunque el modelo lo necesite. El resto de backends
 # usan el máximo por defecto.
-MAX_TOKENS = {"groq": 1000}  # OTPM 1000: 1200 rompe qwen3.8-27b (400); 1024 y 512 van bien  # OTPM 1000: ~1200 tokens ≈ escenas compactas sin truncar
+MAX_TOKENS = {"groq": 1200}  # OTPM 1000: ~1200 tokens ≈ escenas compactas sin truncar
 
 # Timeout por backend (segundos). NVIDIA deja colgados los endpoints que no
 # están provisionados para la cuenta: mejor cortar pronto y pasar al
@@ -391,12 +372,20 @@ CHAT_TIMEOUT = {"nvidia": 120}
 
 
 def _rate_kind(msg):
-    """Clasifica un error de cuota: 'wait' (se libera solo, reintentar),
+    """Clasifica un error: 'blocked' (bloqueo de red/región: no reintentar
+    ni seguir con este backend), 'wait' (se libera solo, reintentar),
     'skip' (cuota diaria/facturación: saltar al siguiente modelo),
     None (no es cuota)."""
     m = (msg or "").lower()
     if "too large for model" in m:
         return None   # error duro de cuota: reintentar no arregla nada
+    # Groq responde 403 "Access denied. Please check your network
+    # settings." cuando bloquea la IP/país (p. ej. con VPN): reintentar
+    # no sirve, hay que rotar de backend.
+    if any(p in m for p in ("access denied", "check your network",
+                            "not available in your region",
+                            "unsupported country", "country not supported")):
+        return "blocked"
     skip = ("exceeded your current quota", "quota exceeded",
             "daily quota", "tokens per day", "tpd",
             "check your plan", "billing",
@@ -405,7 +394,9 @@ def _rate_kind(msg):
             # Workers AI (plan Free): modelo no disponible / sin licencia.
             "free plan", "does not have config", "must submit the prompt",
             # NVIDIA: modelos retirados del catálogo (HTTP 410 Gone).
-            "end of life")
+            "end of life",
+            # 403 genérico de un modelo concreto: saltar, no abortar.
+            "http 403", "forbidden")
     if any(p in m for p in skip):
         return "skip"
     wait = ("rate limit", "too many requests", " 429",
@@ -646,7 +637,9 @@ def generate(prompt, backend="gemini", model="", system="", keys=None,
 
     keys: dict {"gemini": "...", "groq": "...", ...}. `api_key` es el
     legado de openrouter (se respeta si keys no lo trae).
-    Recorre la cadena del backend hasta que un modelo responda.
+    Recorre la cadena del backend hasta que un modelo responda. Si el
+    backend elegido cae entero (bloqueo de red, cuota, ids retirados),
+    rota a los demás backends gratuitos con key antes de rendirse.
     """
     global LAST_USAGE
     LAST_USAGE = None  # cada llamada reporta su propio consumo
@@ -665,31 +658,37 @@ def generate(prompt, backend="gemini", model="", system="", keys=None,
     if not key:
         raise LLMError(
             f"Falta {BACKENDS[backend]['env']} para el backend "
-            f"'{BACKENDS[backend]['label']}'. Ponla en Configuración.")
+            f"'{BACKENDS[backend]['label']}'. Ponla en Configuraci\u00f3n.")
+
+    def _call(b, m):
+        k = keys.get(b, "")
+        if b == "gemini":
+            return _gemini_generate(k, m, prompt, system)
+        if b == "cohere":
+            return _cohere_chat(k, m, prompt, system)
+        if b == "openrouter":
+            return _openrouter_generate(m, prompt, system, k)
+        # groq, cerebras, mistral, tokenharbor, freellmapi, cloudflare,
+        # deepseek, nvidia
+        return _openai_chat(_base(b, keys), k, m, prompt, system,
+                            max_tokens=MAX_TOKENS.get(b, 8192), backend=b)
 
     chain = resolve_chain(backend, model, keys)
-    max_tokens = MAX_TOKENS.get(backend, 8192)
     errors = []
+    bloqueado = False
     for m in chain:
         for attempt in range(3):  # 3 intentos si el proveedor pide esperar
             try:
-                if backend == "gemini":
-                    text = _gemini_generate(key, m, prompt, system)
-                elif backend == "cohere":
-                    text = _cohere_chat(key, m, prompt, system)
-                elif backend == "openrouter":
-                    text = _openrouter_generate(m, prompt, system, key)
-                else:  # groq, cerebras, mistral, tokenharbor, freellmapi,
-                        # cloudflare, deepseek
-                    text = _openai_chat(_base(backend, keys), key, m,
-                                        prompt, system,
-                                        max_tokens=max_tokens,
-                                        backend=backend)
+                text = _call(backend, m)
                 if not text:
-                    raise LLMError("respuesta vacía")
+                    raise LLMError("respuesta vac\u00eda")
                 return text, m
             except LLMError as e:
                 kind = _rate_kind(str(e))
+                if kind == "blocked":
+                    bloqueado = True
+                    errors.append(f"{m}: bloqueo de red/regi\u00f3n ({e})")
+                    break
                 if kind == "wait" and attempt < 2:
                     wait = _rate_wait(str(e))
                     time.sleep(wait)   # cuota por minuto: se libera sola
@@ -700,12 +699,31 @@ def generate(prompt, backend="gemini", model="", system="", keys=None,
                     break              # no tiene caso reintentar el mismo
                 errors.append(f"{m}: {e}")
                 break
-    raise LLMError(f"Ningún modelo de '{backend}' respondió.\n" +
-                   "\n".join(errors) +
-                   "\nQué probar: 1) en Configuración usa modo auto (sin "
-                   "modelo fijo) para que rote entre modelos; 2) cambia de "
-                   "backend (Groq/Cerebras/Cloudflare suelen responder); "
-                   "3) espera 2-3 min (cuota por minuto).")
+        if bloqueado:
+            break   # el backend est\u00e1 bloqueado entero: a otro
+
+    # Rotaci\u00f3n autom\u00e1tica: si el backend elegido no respondi\u00f3,
+    # probamos los dem\u00e1s gratuitos con key (nunca DeepSeek, que es de
+    # pago, ni Ollama, que necesita su modelo en el combo).
+    for b in BACKEND_ORDER:
+        if b == backend or b in ("deepseek", "ollama") or not keys.get(b):
+            continue
+        for m in resolve_chain(b, "", keys)[:3]:
+            try:
+                text = _call(b, m)
+                if text:
+                    return text, f"{m} \u00b7 {b}"
+            except LLMError as e:
+                errors.append(f"[rotado a {b}] {m}: {e}")
+                continue
+
+    detalle = "\n".join(errors[:10])
+    raise LLMError(f"Ning\u00fan modelo de '{backend}' respondi\u00f3.\n" +
+                   detalle +
+                   "\nQu\u00e9 probar: 1) espera 2-3 min (cuota por minuto); "
+                   "2) cambia de backend en el panel (Gemini/Cloudflare/"
+                   "Mistral suelen responder); 3) revisa la key en "
+                   "Configuraci\u00f3n.")
 
 
 def backend_options():
