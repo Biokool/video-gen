@@ -29,7 +29,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 
-PANEL_VERSION = "v17"  # se muestra en el pie del sidebar; subir en cada release
+PANEL_VERSION = "v18"  # se muestra en el pie del sidebar; subir en cada release
 # Dos layouts soportados:
 #  - anidado: panel/ dentro de zenn-factory/ (jobs/ y thumbnails/ en el padre)
 #  - plano:   todo dentro de video-gen/ (jobs/ y thumbnails/ junto a app.py)
@@ -366,6 +366,45 @@ GUION:
 """
 
 
+def _partir_guion(script, max_palabras=650):
+    """Parte el guion en trozos de ~max_palabras sin cortar párrafos.
+
+    Un storyboard completo de un guion largo no cabe en el límite de
+    salida de los modelos gratis (Groq: 1000 tokens duros): el modelo se
+    corta a la mitad y el video sale truncado. Por partes, cada trozo sí
+    cabe.
+    """
+    paras = [pp for pp in re.split(r"\n\s*\n", script) if pp.strip()]
+    partes, actual, cuenta = [], [], 0
+    for par in paras:
+        w = len(par.split())
+        if cuenta + w > max_palabras and actual:
+            partes.append("\n\n".join(actual))
+            actual, cuenta = [], 0
+        actual.append(par)
+        cuenta += w
+    if actual:
+        partes.append("\n\n".join(actual))
+    return partes
+
+
+def _renumerar_desde(text, desde):
+    """Si el modelo reinició la numeración en S01, la recorre desde `desde`.
+
+    Mapea en orden de aparición: primera escena encontrada -> S(desde).
+    """
+    nums = [int(m.group(1)) for m in re.finditer(r"### S(\d+)", text)]
+    if not nums or nums[0] == desde:
+        return text
+    vistos = []
+    for nn in nums:
+        if nn not in vistos:
+            vistos.append(nn)
+    mapa = {old: desde + i for i, old in enumerate(vistos)}
+    return re.sub(r"### S(\d+)",
+                  lambda m: f"### S{mapa[int(m.group(1))]:02d}", text)
+
+
 def run_storyboard(generate_fn, p, job):
     if not generate_fn:
         return (False, "Necesita un backend LLM: configura una key en "
@@ -374,12 +413,42 @@ def run_storyboard(generate_fn, p, job):
     if not sp:
         return False, "Sin guion: primero genera el borrador (etapa guion).", [], None
     script = Path(sp).read_text(encoding="utf-8", errors="replace")
-    try:
-        text, model = generate_fn(
-            STORYBOARD_PROMPT.format(script=script[:12000]),
-            system="Eres director de animación minimalista.")
-    except Exception as e:
-        return False, f"Error del modelo: {e}", [], None
+    guion_words = len(re.sub(r"^#.*$", "", script, flags=re.M).split())
+    # Anti-truncado ESTRUCTURAL (2 capas): además del chequeo de cobertura,
+    # los guiones largos se generan POR PARTES. Un storyboard completo de
+    # ~1800 palabras no cabe en la salida de los modelos gratis y el modelo
+    # se corta a la mitad (jobs/37: 53%). Por partes sí cabe.
+    partes = (_partir_guion(script) if guion_words > 1000 else [script])
+    textos, model, siguiente = [], "", 1
+    for i, parte in enumerate(partes):
+        if len(partes) > 1:
+            bordes = ""
+            if i == 0:
+                bordes = ("Esta es la PRIMERA parte: la primera escena es la "
+                          "bienvenida (tarjeta_canal + saludo del guion). ")
+            if i == len(partes) - 1:
+                bordes += ("Esta es la ÚLTIMA parte: termina con la despedida "
+                           "final del guion (tono cálido, cierre del canal).")
+            prompt = (
+                f"PARTE {i + 1} de {len(partes)} del guion. Genera el "
+                f"storyboard SÓLO de esta parte. {bordes}La primera escena "
+                f"es S{siguiente:02d} (continúa la numeración, NO reinicies "
+                f"en S01).\n\n" +
+                STORYBOARD_PROMPT.format(script=parte[:6000]))
+        else:
+            prompt = STORYBOARD_PROMPT.format(script=script[:12000])
+        try:
+            text, model = generate_fn(
+                prompt, system="Eres director de animación minimalista.")
+        except Exception as e:
+            return False, (f"Error del modelo en parte {i + 1}/{len(partes)}: "
+                           f"{e}"), [], None
+        text = _renumerar_desde(text, siguiente)
+        textos.append(text)
+        nums = [int(m.group(1)) for m in re.finditer(r"### S(\d+)", text)]
+        if nums:
+            siguiente = max(nums) + 1
+    text = "\n\n".join(textos)
     out = job / "STORYBOARD.md"
     out.write_text(text, encoding="utf-8")
     n = text.count("### S")
@@ -388,7 +457,6 @@ def run_storyboard(generate_fn, p, job):
     # Umbral 90%: con 70% un guion de 1300 palabras pierde ~400 (casi 3 min).
     voz_words = sum(len(m.group(1).split())
                     for m in re.finditer(r"VOZ:\s*(.+)", text))
-    guion_words = len(re.sub(r"^#.*$", "", script, flags=re.M).split())
     if guion_words > 0 and voz_words < 0.9 * guion_words:
         return False, (
             f"⛔ STORYBOARD TRUNCADO: cubre ~{voz_words} palabras de "

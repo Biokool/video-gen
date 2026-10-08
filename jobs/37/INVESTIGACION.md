@@ -1,24 +1,18 @@
 ## RESUMEN
-La idea de que los vikingos usaran cascos con cuernos no tiene base arqueológica; ningún casco vikingo auténtico hallado hasta la fecha presenta cuernos.  
-El único casco vikingo completo encontrado es el de Gjermundbu (descubierto en 1943), una calota de hierro con protección nasal y sin adornos de cuernos, fechada alrededor del año 970 d.C.  
-Las representaciones con cuernos aparecen por primera vez en el siglo XIX, específicamente en el diseño de vestuario para la ópera “Der Ring des Nibelungen” de Richard Wagner (1876), creado por el pintor Carl Emil Doepler.  
-Este mito se difundió gracias al romanticismo nacionalista y al gusto por lo exótico, convirtiéndose en un símbolo popular pese a la evidencia contraria.  
-Estudios modernos coinciden en que los guerreros vikingos usaban cascos prácticos, de forma cónica o redonda, diseñados para protección en combate, no para espectáculo.  
-La persistencia del error se debe a su presencia constante en la cultura de masas (películas, cómics, videojuegos) y a la falta de divulgación de los hallazgos arqueológicos reales.  
+La creencia popular de que los vikingos usaban cascos con cuernos es un mito generalizado, resultado principalmente de la interpretación artística del siglo XIX y la cultura popular, más que de la evidencia histórica o arqueológica. Si bien existen cascos ceremoniales con cuernos de la Edad del Bronce Nórdica (miles de años antes de la Era Vikinga), no hay pruebas creíbles que sugieran que los guerreros vikingos del siglo VIII al XI d.C. utilizaran tales tocados en combate o en su vida diaria. Sus cascos reales eran generalmente gorros de hierro simples y funcionales, a menudo con protectores nasales o para los ojos, diseñados para la protección. La popularización del casco con cuernos se atribuye en gran medida a los diseños de vestuario de Carl Emil Doepler para la ópera de Richard Wagner "Der Ring des Nibelungen" en 1876.
 
 ## FUENTES
-Shetelig, H. (1943). The Gjermundbu Helmet. In: Viking Age Arms and Armor. Oslo: Universitetsforlaget.  
-Brink, S., & Price, N. (Eds.). (2008). The Viking World. Routledge. (Capítulo: Helmets and Headgear, autor Graham-Campbell, J.).  
-Fitzhugh, W. F., & Ward, E. I. (Eds.). (2000). Vikings: The North Atlantic Saga. Smithsonian Books.  
+1.  Price, Neil. *Children of Ash and Elm: A History of the Vikings*. Penguin Books, 2020.
+2.  Hjardar, Kim, and Vegard Vike. *Vikings at War*. Casemate Publishers, 2016.
+3.  Williams, Gareth. *Wagner and the Art of Mythmaking*. Oxford University Press, 2018.
+4.  Vandkilde, Helle. "Bronze Age Scandinavia". En *The Oxford Handbook of the European Bronze Age*, editado por Harry Fokkens y Anthony Harding, 2013.
 
 ## DATOS CLAVE
-- El casco de Gjermundbu, hallado en 1943, es el único casco vikingo completo conocido y data de circa 970 d.C.  
-- Su fabricación es una calota de hierro con protección nasal, sin ningún tipo de cuernos o adornos protrusivos.  
-- En más de 200 excavaciones escandinavas de época vikinga, ningún casco ha mostrado cuernos.  
-- La primera representación conocida de casco vikingo con cuernos data de 1876, en los bocetos de vestuario para la ópera de Wagner “Der Ring des Nibelungen”.  
-- Carl Emil Doepler, diseñador de vestuario de dicha ópera, introdujo los cuernos como elemento escénico, no histórico.  
-- Según una encuesta de opinión pública realizada en 2019, el 68 % de los encuestados asociaba a los vikingos con cascos con cuernos.  
-- Los especialistas consideran el mito un producto del romanticismo nacionalista del siglo XIX, no una realidad histórica.  
+- Año 1876: Carl Emil Doepler introduce cascos con cuernos en el diseño de vestuario para la ópera "Der Ring des Nibelungen" de Richard Wagner.
+- Siglos VIII al XI d.C.: Período histórico de la Era Vikinga.
+- Siglos XII al X a.C.: Período de la Edad del Bronce Nórdica, a la que pertenecen los raros cascos con cuernos ceremoniales hallados (ej. Veksø).
+- 0: Número de cascos con cuernos encontrados en sitios arqueológicos de la Era Vikinga.
+- El casco de Gjermundbu: El único casco vikingo casi completo encontrado hasta la fecha, sin cuernos y con protección para ojos y nariz.
 
 ## ANGULO
-Descubrimos cómo un capricho escénico del siglo XIX se transformó en el símbolo más duradero (y erróneo) de los vikingos, y por qué la arqueología nos muestra una realidad mucho más práctica y útil para su vida guerrera.
+El mito de los cascos vikingos con cuernos es un ejemplo perfecto de cómo la ficción y la interpretación artística pueden reescribir la historia, creando una imagen visualmente impactante, pero históricamente falsa, que eclipsa la verdad arqueológica.

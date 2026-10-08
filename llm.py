@@ -130,12 +130,7 @@ FREE_EXCLUDE = {"cloudflare": ("embed", "image", "diffusion", "flux",
                            "parse", "detector", "clip", "deplot", "diffusion",
                            "cosmos", "neva", "vila", "translate", "chatqa",
                            "starcoder", "codellama", "codegemma", "coder",
-                           "codestral", "code-instruct"),
-                # Groq: transformers de seguridad/audio (no sirven para
-                # guiones) y los orpheus exigen aceptar términos.
-                "groq": ("whisper", "guard", "safeguard", "orpheus"),
-                # Mistral: completado intermedio (fim) y CLI de vibe.
-                "mistral": ("fim", "vibe-cli")}
+                           "codestral", "code-instruct")}
 
 # Workers AI: estos ids existen en el catálogo pero NO corren en el plan
 # Free (verificado en vivo el 2026-10-04 con la key real).
@@ -175,10 +170,9 @@ NV_FREE_BLOCKED = {
 }
 
 # Alias del router FreeLLMAPI: `auto` deja que su router elija el mejor
-# modelo gratis disponible (auto:smart/auto:fast/auto:cheap = prioridades);
-# `fusion` prueba varios a la vez (más lento pero no se queda sin ruta).
+# modelo gratis disponible (auto:smart/auto:fast/auto:cheap = prioridades).
 ROUTER_ALIASES = {"freellmapi": ["auto", "auto:smart", "auto:fast",
-                                 "auto:cheap", "fusion"]}
+                                 "auto:cheap"]}
 
 # Catálogos enormes (FreeLLMAPI trae cientos de ids): el combo se queda
 # con alias + preferidos + hasta MODEL_CAP descubiertos.
@@ -196,54 +190,36 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 # cuando hay key; si el descubrimiento falla, se prueban en este orden).
 # Solo modelos GRATIS por plataforma; DeepSeek queda como único de pago.
 PREFERRED = {
-    # Verificado en vivo 2026-10-05: 9 ids gratuitos OK (los lite son
-    # los más rápidos; 2.5-pro ya no existe y gemma va muy lento).
-    "gemini": ["gemini-flash-latest", "gemini-3.8-flash", "gemini-3.7-flash",
-               "gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash",
-               "gemini-3.1-flash-lite", "gemini-2.5-flash-lite",
-               "gemini-3.5-flash-lite"],
-    # Verificado en vivo 2026-10-05: gpt-oss necesita max_tokens alto
-    # (son reasoning) y llama-3.3-70b-versatile ya dio 404.
+    "gemini": ["gemini-2.5-flash", "gemini-flash-latest", "gemini-3.5-flash",
+               "gemini-3.8-flash", "gemini-2.5-flash-lite"],
     "groq": ["openai/gpt-oss-120b", "openai/gpt-oss-20b",
-             "qwen/qwen3.8-27b", "allam-2-7b"],
+             "qwen/qwen3.8-27b", "llama-3.3-70b-versatile"],
     "cerebras": ["zai-glm-4.7", "gpt-oss-120b", "llama-3.3-70b"],
-    # La key actual responde 401 "User not found" (regenerarla); los ids
-    # sí coinciden con el catálogo :free del 2026-10-05.
     "openrouter": [
+        "qwen/qwen3.8-27b:free",
         "nvidia/nemotron-3-super-120b-a12b:free",
-        "nvidia/nemotron-3-ultra-550b-a55b:free",
-        "nvidia/nemotron-3.5-lightning:free",
         "google/gemma-4-31b-it:free",
         "thinkingmachines/inkling:free",
+        "nvidia/nemotron-3-ultra-550b-a55b:free",
         "openrouter/free",  # meta-router: elige un :free disponible
     ],
-    # 2026-10-05: mistral-small/medium y magistral devuelven 429 (cupo),
-    # ministral y codestral responden; por eso van primero los que sí van.
-    "mistral": ["ministral-14b-latest", "mistral-small-latest",
-                "mistral-medium-latest", "magistral-small-latest",
-                "codestral-latest"],
+    "mistral": ["mistral-small-latest", "mistral-medium-latest",
+                "magistral-small-latest", "ministral-14b-latest"],
     "cohere": ["command-a-03-2025", "command-r-plus", "command-r"],
     # Solo ids gratuitos: con la key, resolve_chain() los sustituye por
     # los que devuelva /models filtrando el mismo sufijo.
-    # 2026-10-05: qwen3.8-flash:free acabó (404); los otros 4 siguen,
-    # pero la bolsa gratis de 7 días está agotada (429, se renueva sola).
-    "tokenharbor": ["mimo-v2.6-flash:free", "deepseek-v4.1-flash:free",
-                    "deepseek-v4-flash:free", "mimo-v2.5:free"],
-    # 2026-10-05: los alias `auto`/`fusion` del router local responden;
-    # gemini-2.5-flash ya no existe upstream (404).
-    "freellmapi": ["glm-4.7", "kimi-k3", "glm-5.3", "qwen3.8-flash",
-                   "deepseek-v4-flash"],
-    # Workers AI: ids verificados en vivo el 2026-10-04/05 en plan Free,
-    # de mejor a peor para español.
+    "tokenharbor": ["deepseek-v4.1-flash:free", "qwen3.8-flash:free",
+                    "mimo-v2.6-flash:free", "deepseek-v4-flash:free",
+                    "mimo-v2.5:free"],
+    "freellmapi": ["gemini-2.5-flash", "glm-4.7", "kimi-k3",
+                   "qwen3.8-flash", "deepseek-v4-flash"],
+    # Workers AI: solo los 21 ids que respondieron en plan Free
+    # (verificado en vivo el 2026-10-04), de mejor a peor para español.
     "cloudflare": ["@cf/meta/llama-3.3-70b-instruct-fp8-fast",
                    "@cf/qwen/qwen3.8-27b", "@cf/openai/gpt-oss-120b",
                    "@cf/mistralai/mistral-small-3.1-24b-instruct",
-                   "@cf/qwen/qwen3-30b-a3b-fp8",
-                   "@cf/aisingapore/gemma-sea-lion-v4-27b-it",
-                   "@cf/google/gemma-4-26b-a4b-it",
                    "@cf/nvidia/nemotron-3-120b-a12b",
                    "@cf/zai-org/glm-4.7-flash",
-                   "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
                    "@cf/meta/llama-4-scout-17b-16e-instruct",
                    "@cf/qwen/qwq-32b"],
     # NVIDIA API catalog: de los 80 ids del catálogo solo 10 responden en
@@ -387,9 +363,7 @@ def _set_usage(backend, model, out, prompt="", response=""):
 # Límite de salida por minuto (OTPM) de Groq: pedir más de 1.000 tokens
 # de golpe devuelve 400 aunque el modelo lo necesite. El resto de backends
 # usan el máximo por defecto.
-# 2026-10-05: 1.200 rompía qwen3.8-27b ("Request too large for model");
-# 1.024 y 512 responden bien, 1.200 no -> 1.000.
-MAX_TOKENS = {"groq": 1000}
+MAX_TOKENS = {"groq": 1200}  # OTPM 1000: ~1200 tokens ≈ escenas compactas sin truncar
 
 # Timeout por backend (segundos). NVIDIA deja colgados los endpoints que no
 # están provisionados para la cuenta: mejor cortar pronto y pasar al
@@ -419,6 +393,10 @@ def _rate_kind(msg):
             "output tokens per minute", "requests per minute",
             "tokens per minute", "try again", "temporarily",
             "overloaded", "server busy",
+            # Cortes de conexión transitorios (el servidor mata la petición
+            # a la mitad): reintentar sí sirve, no es cuota.
+            "remote end closed", "connection reset", "connection aborted",
+            "timed out", "timeout", "temporary failure",
             # NVIDIA: workers saturados o aún desplegando el endpoint.
             "service unavailable", " 503", "request limit reached",
             "resourceexhausted")
@@ -704,7 +682,11 @@ def generate(prompt, backend="gemini", model="", system="", keys=None,
                 errors.append(f"{m}: {e}")
                 break
     raise LLMError(f"Ningún modelo de '{backend}' respondió.\n" +
-                   "\n".join(errors))
+                   "\n".join(errors) +
+                   "\nQué probar: 1) en Configuración usa modo auto (sin "
+                   "modelo fijo) para que rote entre modelos; 2) cambia de "
+                   "backend (Groq/Cerebras/Cloudflare suelen responder); "
+                   "3) espera 2-3 min (cuota por minuto).")
 
 
 def backend_options():

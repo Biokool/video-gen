@@ -755,28 +755,34 @@ correctamente; 95% pasa.
 
 *Versión del panel: v17 (guiones de 1300+ palabras, cobertura 90%).*
 
-## 29. Cambios v18 (2026-10-07) — revisión en vivo de todos los modelos gratis
+## 29. Cambios v18 (2026-10-07) — storyboard por partes + reintentos de conexión
 
-Sondeo real (chat corto) de **todos los backends con key** para
-refrescar `PREFERRED` y los filtros. Solo se tocaron proveedores ya
-agregados; no se añadió ninguno nuevo.
+Reporte: etapa 5 fallaba con ⛔ STORYBOARD TRUNCADO (961/1799 palabras,
+53%) y "gemini-flash-latest: Remote end closed connection without
+response" tras ~1 min.
 
-| Backend | Estado en vivo | Acción |
-|---|---|---|
-| Gemini | 45 ids; 9 flash OK (2.5-pro ya no existe) | `PREFERRED` ampliado: 3.8/3.7/3.6/3.5 + lites |
-| Groq | `/models` ya responde (11 ids); `llama-3.3-70b-versatile` → 404 | quitado; `allam-2-7b` entra; `FREE_EXCLUDE` (whisper/guard/safeguard/orpheus) |
-| Groq OTPM | 1.200 tokens rompía `qwen3.8-27b` | `MAX_TOKENS["groq"] = 1000` (probado 512/1024 OK, 1200 no) |
-| Token Harbor | 4 `:free`; `qwen3.8-flash:free` terminó (404); bolsa 7 días agotada (429) | quitado de `PREFERRED`; la cuota se renueva sola |
-| FreeLLMAPI | router local OK, 627 ids; `auto` y `fusion` responden | `fusion` añadido a `ROUTER_ALIASES`; `gemini-2.5-flash` (404) fuera |
-| Mistral | 46 ids; solo `ministral-14b-latest` y `codestral-*` responden (small/medium/magistral en 429) | `ministral-14b-latest` pasa al frente; `FREE_EXCLUDE` (fim/vibe-cli) |
-| OpenRouter | descubrimiento OK (17 ids `:free`), **chat 401 «User not found»** | `PREFERRED` alineado al catálogo; **falta regenerar la key** |
-| Cloudflare | 15 ids OK; añadidos `qwen3-30b-a3b-fp8`, `gemma-sea-lion-v4-27b`, `gemma-4-26b`, `deepseek-r1-distill` | `PREFERRED` a 12 |
-| NVIDIA | 10 de 80 OK (§25) | sin cambios |
-| Ollama | 8 locales (1 de embeddings ya excluido) | sin cambios |
-| Cerebras / Cohere | **sin key** | nada que refrescar |
+Causa raíz doble:
+1. Un storyboard completo de ~1800 palabras no cabe en la salida de los
+   modelos gratis (Groq: 1000 tokens duros) y las conexiones largas se
+   caen: el modelo se corta a la mitad (jobs/37: 53%). El botón
+   «Continuar» era reactivo, no preventivo.
+2. Los cortes de conexión no estaban clasificados para reintento:
+   `_rate_kind` devolvía None y el fallo se registraba como duro sin
+   reintentar.
 
-Verificación final: `resolve_chain()` OK en los 9 backends con key y
-`generate()` real OK en gemini (6.5 s), groq (24.6 s), cloudflare (4.6 s)
-y nvidia (4.9 s).
+Fix:
+- `run_storyboard` ahora PARTE guiones de >1000 palabras en trozos de
+  ~650 (sin cortar párrafos) y genera cada parte por separado, con
+  numeración continua (S01...Snn) y `_renumerar_desde` por si el modelo
+  reinicia en S01. La primera parte incluye la bienvenida y la última la
+  despedida. El chequeo de 90% aplica al resultado unido.
+- `_rate_kind`: "remote end closed", "connection reset/aborted",
+  "timed out/timeout", "temporary failure" → "wait" (reintenta hasta 3
+  veces con espera, como la cuota por minuto).
+- Mensaje final "Ningún modelo respondió" ahora sugiere soluciones:
+  modo auto, cambiar de backend, esperar 2-3 min.
 
-*Versión del panel: v18 (cadenas de modelos gratis verificadas en vivo).*
+Verificado: guion de 1799 palabras → 3 partes, 30 escenas S01-S30
+continuas, 1620 palabras VOZ (90%); errores de conexión → wait.
+
+*Versión del panel: v18 (storyboard por partes, reintentos de conexión).*
