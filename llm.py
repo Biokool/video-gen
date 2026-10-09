@@ -124,7 +124,19 @@ FREE_EXCLUDE = {"cloudflare": ("embed", "image", "diffusion", "flux",
                                "transcri", "resnet", "distilbert", "guard",
                                "smart-turn", "clef", "m2m", "indictrans",
                                "detection", "classif", "bge",
-                               "sentence-transformers"),
+                               "sentence-transformers",
+                               # voz/vision: no son chat (2026-10-08)
+                               "deepgram", "llava"),
+                # Gemini: tts, imagen y los pro retirados (404).
+                "gemini": ("tts", "image", "banana", "2.5-pro", "video"),
+                # Groq: audio, clasificadores de seguridad y los orpheus
+                # que exigen aceptar términos. llama-3.3-70b-versatile
+                # ya no existe (404 verificado el 2026-10-08).
+                "groq": ("whisper", "guard", "safeguard", "orpheus",
+                         "llama-3.3-70b-versatile"),
+                # Mistral: completado intermedio (fim), CLI de vibe y
+                # modelos Labs (403: requieren admin).
+                "mistral": ("fim", "vibe-cli", "labs"),
                 # NVIDIA API catalog: 80 ids, muchos no son de chat.
                 "nvidia": ("embed", "vision", "guard", "safety", "reward",
                            "parse", "detector", "clip", "deplot", "diffusion",
@@ -170,9 +182,10 @@ NV_FREE_BLOCKED = {
 }
 
 # Alias del router FreeLLMAPI: `auto` deja que su router elija el mejor
-# modelo gratis disponible (auto:smart/auto:fast/auto:cheap = prioridades).
+# modelo gratis disponible (auto:smart/auto:fast/auto:cheap = prioridades);
+# `fusion` prueba varios a la vez (lento, pero no se queda sin ruta).
 ROUTER_ALIASES = {"freellmapi": ["auto", "auto:smart", "auto:fast",
-                                 "auto:cheap"]}
+                                 "auto:cheap", "fusion"]}
 
 # Catálogos enormes (FreeLLMAPI trae cientos de ids): el combo se queda
 # con alias + preferidos + hasta MODEL_CAP descubiertos.
@@ -190,36 +203,55 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 # cuando hay key; si el descubrimiento falla, se prueban en este orden).
 # Solo modelos GRATIS por plataforma; DeepSeek queda como único de pago.
 PREFERRED = {
-    "gemini": ["gemini-2.5-flash", "gemini-flash-latest", "gemini-3.5-flash",
-               "gemini-3.8-flash", "gemini-2.5-flash-lite"],
+    # 2026-10-08: los flash dan 429 (cuota diaria agotada); los lite y
+    # gemma responden. Orden: lo que responde HOY primero.
+    "gemini": ["gemini-2.5-flash-lite", "gemini-flash-lite-latest",
+               "gemini-3-flash-preview", "gemini-3.5-flash-lite",
+               "gemini-3.1-flash-lite", "gemini-flash-latest",
+               "gemini-3.8-flash", "gemini-3.5-flash", "gemini-2.5-flash",
+               "gemma-4-26b-a4b-it"],
+    # 2026-10-08: llama-3.3-70b-versatile → 404; el resto OK.
     "groq": ["openai/gpt-oss-120b", "openai/gpt-oss-20b",
-             "qwen/qwen3.8-27b", "llama-3.3-70b-versatile"],
+             "qwen/qwen3.8-27b", "allam-2-7b"],
     "cerebras": ["zai-glm-4.7", "gpt-oss-120b", "llama-3.3-70b"],
+    # La key responde 401 «User not found» (regenerarla); ids alineados
+    # con el catálogo :free descubierto el 2026-10-08.
     "openrouter": [
-        "qwen/qwen3.8-27b:free",
         "nvidia/nemotron-3-super-120b-a12b:free",
+        "nvidia/nemotron-3-ultra-550b-a55b:free",
+        "nvidia/nemotron-3.5-lightning:free",
         "google/gemma-4-31b-it:free",
         "thinkingmachines/inkling:free",
-        "nvidia/nemotron-3-ultra-550b-a55b:free",
+        "poolside/laguna-xs-2.1:free",
         "openrouter/free",  # meta-router: elige un :free disponible
     ],
-    "mistral": ["mistral-small-latest", "mistral-medium-latest",
-                "magistral-small-latest", "ministral-14b-latest"],
+    # 2026-10-08: small/medium/magistral en 429; ministral responde.
+    "mistral": ["ministral-14b-latest", "mistral-small-latest",
+                "mistral-medium-latest", "magistral-small-latest",
+                "codestral-latest"],
     "cohere": ["command-a-03-2025", "command-r-plus", "command-r"],
     # Solo ids gratuitos: con la key, resolve_chain() los sustituye por
     # los que devuelva /models filtrando el mismo sufijo.
-    "tokenharbor": ["deepseek-v4.1-flash:free", "qwen3.8-flash:free",
-                    "mimo-v2.6-flash:free", "deepseek-v4-flash:free",
-                    "mimo-v2.5:free"],
-    "freellmapi": ["gemini-2.5-flash", "glm-4.7", "kimi-k3",
-                   "qwen3.8-flash", "deepseek-v4-flash"],
-    # Workers AI: solo los 21 ids que respondieron en plan Free
-    # (verificado en vivo el 2026-10-04), de mejor a peor para español.
+    # 2026-10-08: qwen3.8-flash:free terminó (404); entra claude-haiku
+    # (la bolsa de 7 días está agotada: 429 hasta que se renueve).
+    "tokenharbor": ["mimo-v2.6-flash:free", "deepseek-v4.1-flash:free",
+                    "deepseek-v4-flash:free", "mimo-v2.5:free",
+                    "claude-haiku-5.5:free"],
+    # 2026-10-08: gemini-2.5-flash ya no existe upstream (404);
+    # agnes-2.5-flash y deepseek-v4-flash responden hoy.
+    "freellmapi": ["deepseek-v4-flash", "agnes-2.5-flash", "glm-4.7",
+                   "kimi-k3", "glm-5.3", "qwen3.8-flash"],
+    # Workers AI: ids verificados en vivo el 2026-10-04/08 en plan Free,
+    # de mejor a peor para español (los 12 respondieron).
     "cloudflare": ["@cf/meta/llama-3.3-70b-instruct-fp8-fast",
                    "@cf/qwen/qwen3.8-27b", "@cf/openai/gpt-oss-120b",
                    "@cf/mistralai/mistral-small-3.1-24b-instruct",
+                   "@cf/qwen/qwen3-30b-a3b-fp8",
+                   "@cf/aisingapore/gemma-sea-lion-v4-27b-it",
+                   "@cf/google/gemma-4-26b-a4b-it",
                    "@cf/nvidia/nemotron-3-120b-a12b",
                    "@cf/zai-org/glm-4.7-flash",
+                   "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
                    "@cf/meta/llama-4-scout-17b-16e-instruct",
                    "@cf/qwen/qwq-32b"],
     # NVIDIA API catalog: de los 80 ids del catálogo solo 10 responden en
@@ -575,60 +607,63 @@ def _cohere_chat(api_key, model, prompt, system=""):
 
 
 # ---------- resolución de cadena ----------
+def _descubierto(backend, keys):
+    """Ids que devuelve el catálogo del backend, YA filtrados (solo chat
+    y gratuitos). `[]` si no hay key o el descubrimiento falla."""
+    key = (keys or {}).get(backend, "")
+    if not key:
+        return []
+    try:
+        if backend == "gemini":
+            found = _gemini_models(key)
+        elif backend == "cloudflare":
+            found = _cloudflare_models(key)
+        elif backend == "openrouter":
+            found = _openai_models(OPENROUTER_URL.rsplit("/chat", 1)[0], key)
+        elif backend in OPENAI_BASES:
+            found = _openai_models(_base(backend, keys), key)
+        else:
+            return []
+    except Exception:
+        return []
+    if not found:
+        return []
+    if backend == "cloudflare":
+        bad = FREE_EXCLUDE["cloudflare"]
+        return [m for m in found
+                if m not in CF_FREE_BLOCKED
+                and not any(t in m.lower() for t in bad)]
+    if backend == "nvidia":
+        bad = FREE_EXCLUDE["nvidia"]
+        return [m for m in found
+                if m not in NV_FREE_BLOCKED
+                and not any(t in m.lower() for t in bad)]
+    if backend in FREE_EXCLUDE:  # quitar ids que no son de chat
+        bad = FREE_EXCLUDE[backend]
+        found = [m for m in found
+                 if not any(t in m.lower() for t in bad)]
+    if backend in FREE_ONLY:  # solo ids gratuitos (p.ej. `:free`)
+        suf = FREE_ONLY[backend]
+        keep = FREE_KEEP.get(backend, set())
+        found = [m for m in found if m.endswith(suf) or m in keep]
+    return found
+
+
 def resolve_chain(backend, model, keys):
     """Modelos a intentar, en orden. `model` explícito va primero y solo."""
     if model:
         return [model]
-    key = (keys or {}).get(backend, "")
-    if key and backend == "cloudflare":
-        found = _cloudflare_models(key)
-        if found:
-            bad = FREE_EXCLUDE["cloudflare"]
-            found = [m for m in found
-                     if m not in CF_FREE_BLOCKED
-                     and not any(t in m.lower() for t in bad)]
-        if found:
-            pref = PREFERRED["cloudflare"]
-            ok = [m for m in pref if m in found]
-            return ok + [m for m in found if m not in ok][:3]
-    elif key and backend == "nvidia":
-        found = _openai_models(_base(backend, keys), key)
-        if found:
-            bad = FREE_EXCLUDE["nvidia"]
-            found = [m for m in found
-                     if m not in NV_FREE_BLOCKED
-                     and not any(t in m.lower() for t in bad)]
-        if found:
-            pref = PREFERRED["nvidia"]
-            ok = [m for m in pref if m in found]
-            return ok + [m for m in found if m not in ok][:3]
-    elif key and backend in OPENAI_BASES:
-        found = _openai_models(_base(backend, keys), key)
-        if backend in FREE_EXCLUDE:  # quitar ids que no son de chat
-            bad = FREE_EXCLUDE[backend]
-            found = [m for m in found
-                     if not any(t in m.lower() for t in bad)]
-        if backend in FREE_ONLY:  # solo ids gratuitos (p.ej. `:free`)
-            suf = FREE_ONLY[backend]
-            keep = FREE_KEEP.get(backend, set())
-            found = [m for m in found if m.endswith(suf) or m in keep]
-        if found:
-            pref = PREFERRED[backend]
-            ok = [m for m in pref if m in found]
-            chain = ok + [m for m in found if m not in pref][:2]
-            if backend in MODEL_CAP:  # catálogo enorme: alias + tope
-                alias = list(ROUTER_ALIASES.get(backend, ()))
-                rest = [m for m in found if m not in ok][
-                    :max(0, MODEL_CAP[backend] - len(alias) - len(ok))]
-                chain = alias + ok + rest
-            return chain
-    if key and backend == "gemini":
-        found = _gemini_models(key)
-        if found:
-            pref = PREFERRED["gemini"]
-            return [m for m in pref if m in found] + \
-                   [m for m in found if "flash" in m.lower()][:2]
-    return list(PREFERRED.get(backend, []))
+    found = _descubierto(backend, keys)
+    pref = list(PREFERRED.get(backend, []))
+    if not found:
+        return list(ROUTER_ALIASES.get(backend, [])) + pref
+    ok = [m for m in pref if m in found]
+    rest = [m for m in found if m not in ok]
+    if backend in MODEL_CAP:  # catálogo enorme: alias + tope
+        alias = list(ROUTER_ALIASES.get(backend, ()))
+        rest = rest[:max(0, MODEL_CAP[backend] - len(alias) - len(ok))]
+        return alias + ok + rest
+    return ok + rest[:2]
 
 
 def generate(prompt, backend="gemini", model="", system="", keys=None,
@@ -673,34 +708,47 @@ def generate(prompt, backend="gemini", model="", system="", keys=None,
         return _openai_chat(_base(b, keys), k, m, prompt, system,
                             max_tokens=MAX_TOKENS.get(b, 8192), backend=b)
 
-    chain = resolve_chain(backend, model, keys)
     errors = []
-    bloqueado = False
-    for m in chain:
-        for attempt in range(3):  # 3 intentos si el proveedor pide esperar
-            try:
-                text = _call(backend, m)
-                if not text:
-                    raise LLMError("respuesta vac\u00eda")
-                return text, m
-            except LLMError as e:
-                kind = _rate_kind(str(e))
-                if kind == "blocked":
-                    bloqueado = True
-                    errors.append(f"{m}: bloqueo de red/regi\u00f3n ({e})")
+    estado = {"bloqueado": False}
+
+    def _intentar(chain):
+        """Prueba una cadena entera; devuelve (texto, modelo) o None."""
+        for m in chain:
+            if estado["bloqueado"]:
+                return None
+            for attempt in range(3):  # 3 intentos si pide esperar
+                try:
+                    text = _call(backend, m)
+                    if not text:
+                        raise LLMError("respuesta vac\u00eda")
+                    return text, m
+                except LLMError as e:
+                    kind = _rate_kind(str(e))
+                    if kind == "blocked":
+                        estado["bloqueado"] = True
+                        errors.append(f"{m}: bloqueo de red/regi\u00f3n ({e})")
+                        return None
+                    if kind == "wait" and attempt < 2:
+                        time.sleep(_rate_wait(str(e)))  # se libera sola
+                        continue
+                    if kind == "skip":
+                        errors.append(f"{m}: cuota agotada, salto al siguiente "
+                                      f"modelo ({e})")
+                        break          # no tiene caso reintentar el mismo
+                    errors.append(f"{m}: {e}")
                     break
-                if kind == "wait" and attempt < 2:
-                    wait = _rate_wait(str(e))
-                    time.sleep(wait)   # cuota por minuto: se libera sola
-                    continue
-                if kind == "skip":
-                    errors.append(f"{m}: cuota agotada, salto al siguiente "
-                                  f"modelo ({e})")
-                    break              # no tiene caso reintentar el mismo
-                errors.append(f"{m}: {e}")
-                break
-        if bloqueado:
-            break   # el backend est\u00e1 bloqueado entero: a otro
+        return None
+
+    res = _intentar(resolve_chain(backend, model, keys))
+    if res:
+        return res
+    # Modelo fijo que no respondió: antes de rendirse, prueba el resto
+    # de modelos del MISMO backend (elige otro y sigue funcionando).
+    if model and not estado["bloqueado"]:
+        resto = [m for m in resolve_chain(backend, "", keys) if m != model]
+        res = _intentar(resto)
+        if res:
+            return res
 
     # Rotaci\u00f3n autom\u00e1tica: si el backend elegido no respondi\u00f3,
     # probamos los dem\u00e1s gratuitos con key (nunca DeepSeek, que es de
@@ -731,10 +779,23 @@ def backend_options():
 
 
 def model_options(backend, keys=None):
-    """Opciones para el combo según backend (descubrimiento si hay key)."""
+    """Opciones para el combo: preferidos primero y DESPUÉS todo lo que
+    devuelva el catálogo (ya filtrado), para poder elegir cualquier
+    modelo gratuito. Los preferidos que el catálogo no devuelve también
+    se listan (pueden seguir siendo válidos)."""
     if backend == "ollama":
         # Fuera modelos de embeddings: no sirven para chat/guiones.
         return [m for m in list_ollama_models() if "embed" not in m.lower()]
-    if backend in BACKEND_ORDER:
-        return resolve_chain(backend, "", keys or {})
-    return []
+    if backend not in BACKEND_ORDER:
+        return []
+    keys = keys or {}
+    alias = list(ROUTER_ALIASES.get(backend, []))
+    pref = list(PREFERRED.get(backend, []))
+    found = _descubierto(backend, keys)
+    if not found:
+        return alias + pref
+    ok = [m for m in pref if m in found]
+    rest = [m for m in found if m not in ok]
+    cap = MODEL_CAP.get(backend, 40)
+    coger = max(0, cap - len(alias) - len(ok))
+    return alias + ok + rest[:coger] + [m for m in pref if m not in found]

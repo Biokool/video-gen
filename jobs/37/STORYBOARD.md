@@ -1,151 +1,251 @@
 ### S01
-VOZ: ¡Hola! Bienvenidos a El Porqué, donde cada video responde una pregunta que quizás nunca te habías hecho... pero deberías.
-VISUAL: Logo minimalista del canal "El Porqué" en el centro, el Protagonista (playera naranja, sonriendo y saludando) aparece a un lado.
+VOZ: ¡Hola! Bienvenidos a El Porqué, donde cada video responde una pregunta que quizás nunca te habías hecho... pero deberías. Hoy vamos a romper una de las imágenes más icónicas de la historia: la del vikingo con su casco cuernudo.
+VISUAL: Tarjeta del canal con logo minimalista; protagonista con playera naranja y sonrisa amplia, saludando directamente a la cámara.
 
 ### S02
-VOZ: Hoy vamos a romper una de las imágenes más icónicas de la historia: la del vikingo con su casco cuernudo.
-VISUAL: El Protagonista (playera naranja, señalando) está junto a una silueta de un vikingo con un casco de cuernos grande y exagerado.
+VOZ: Porque, ¿sabías que los vikingos *jamás* usaron cascos con cuernos? Ni uno solo. Es una invención moderna, un disfraz. La realidad es mucho más aburrida... y fascinante.
+VISUAL: Protagonista con playera naranja, expresión de sorpresa y cejas alzadas; al lado, un vikingo de cartón con casco cuernudo tachado en rojo.
 
 ### S03
-VOZ: Porque, ¿sabías que los vikingos *jamás* usaron cascos con cuernos? Ni uno solo. Es una invención moderna, un disfraz. La realidad es mucho más aburrida... y fascinante.
-VISUAL: El Protagonista (playera naranja, expresión de sorpresa), un bocadillo de pensamiento con un signo de interrogación flotando sobre un casco con cuernos, que luego es tachado con una "X" roja.
+VOZ: Imagina un guerrero vikingo. ¿Qué lleva en la cabeza? Lo más probable es que tu cerebro dibuje un casco metálico con dos enormes cuernos saliendo de los lados.
+VISUAL: Protagonista con playera azul, gesto pensativo; en el fondo, un boceto difuminado de un casco con cuernos saliendo de una nube mental.
 
 ### S04
-VOZ: Imagina un guerrero vikingo. ¿Qué lleva en la cabeza? Lo más probable es que tu cerebro dibuje un casco metálico con dos enormes cuernos saliendo de los lados.
-VISUAL: El Protagonista (playera azul, pensativo) con una banda horizontal en la parte superior que dice "LA VERDADERA CABEZA DEL VIKINGO", y un vikingo con casco cuernudo en el fondo, como una imagen mental.
+VOZ: Es la imagen que nos han vendido películas, series y hasta el arte pop. Pero aquí viene el primer pico de información: cero. Ni uno solo de esos cascos ha sido encontrado en excavaciones arqueológicas de la Era Vikinga (siglos VIII al XI d.C.).
+VISUAL: Protagonista con playera azul, señalando firmemente; iconos de película y series cruzados con una gran "X" roja y un número "0" gigante.
 
 ### S05
-VOZ: Es la imagen que nos han vendido películas, series y hasta el arte pop. Pero aquí viene el primer pico de información: cero.
-VISUAL: El Protagonista (playera azul, señalando), con iconos minimalistas de una claqueta de cine, una pantalla de TV y un cómic flotando alrededor de un casco con cuernos, que luego se desvanece y aparece un gran "0".
+VOZ: Ni uno. Es un fantasma histórico.
+VISUAL: Protagonista con playera azul, expresión seria y misteriosa; un fantasma traslúcido con forma de casco cuernudo flota a su lado.
 
 ### S06
-VOZ: Ni uno solo de esos cascos ha sido encontrado en excavaciones arqueológicas de la Era Vikinga (siglos VIII al XI d.C.). Ni uno. Es un fantasma histórico.
-VISUAL: El Protagonista (playera azul, serio), una escena de excavación arqueológica con un casco con cuernos dibujado con una línea punteada y una etiqueta "NUNCA ENCONTRADO" en rojo.
+VOZ: Los cascos reales de los vikingos eran funcionales, no teatrales. Hechos de hierro, a menudo con un protector nasal o una barra que cubría los ojos.
+VISUAL: Protagonista con playera verde, explicando con las manos; un casco de hierro simple y robusto gira lentamente, mostrando su estructura básica.
 
 ### S07
-VOZ: Los cascos reales de los vikingos eran funcionales, no teatrales. Hechos de hierro, a menudo con un protector nasal o una barra que cubría los ojos.
-VISUAL: El Protagonista (playera azul, explicando), pantalla dividida mostrando a la izquierda un casco con cuernos (tachado) y a la derecha un casco de hierro simple con protección nasal.
+VOZ: El único casco vikingo casi completo que se ha encontrado, el de Gjermundbu en Noruega, es un gorro de hierro sencillo, con una protección alrededor de los ojos y la nariz.
+VISUAL: Protagonista con playera verde, señalando con respeto; el casco de Gjermundbu en primer plano, con líneas de detalle marcando la protección ocular y nasal.
 
 ### S08
-VOZ: El único casco vikingo casi completo que se ha encontrado, el de Gjermundbu en Noruega, es un gorro de hierro sencillo, con una protección alrededor de los ojos y la nariz.
-VISUAL: El Protagonista (playera azul, señalando), un dibujo detallado y claro del casco de Gjermundbu con sus características principales resaltadas.
+VOZ: Nada de cuernos. Nada que estorbara en combate. Los vikingos eran prácticos. Su objetivo era protegerse, no parecer un toro en una tienda de porcelana. (Hjardar & Vike, 2016, *Vikings at War*).
+VISUAL: Protagonista con playera verde, gesto pragmático y ceño fruncido; contraste visual entre un casco limpio y un casco cuernudo absurdo caído al suelo.
 
 ### S09
-VOZ: Nada de cuernos. Nada que estorbara en combate. Los vikingos eran prácticos. Su objetivo era protegerse, no parecer un toro en una tienda de porcelana. (Hjardar & Vike, 2016, *Vikings at War*).
-VISUAL: El Protagonista (playera azul, con gesto de negación), el casco Gjermundbu en el centro, y una pequeña caricatura de un toro rompiendo objetos delicados en un rincón.
+VOZ: Entonces, si los vikingos no los usaron, ¿de dónde viene esa imagen tan pegada a nuestra mente? ¿Acaso es un error de interpretación?
+VISUAL: Protagonista con playera amarilla, mirando hacia arriba pensativo; una nube de interrogaciones flotando sobre su cabeza.
 
 ### S10
-VOZ: Entonces, si los vikingos no los usaron, ¿de dónde viene esa imagen tan pegada a nuestra mente? ¿Acaso es un error de interpretación?
-VISUAL: El Protagonista (playera azul, con expresión de interrogación), una silueta persistente de un casco con cuernos aparece como una idea recurrente en la cabeza del Protagonista.
+VOZ: ¿O hay algo más oscuro detrás de la historia que creemos saber?
+VISUAL: Protagonista con playera amarilla, sonrisa traviesa; el fondo se oscurece ligeramente, creando un ambiente de misterio.
 
 ### S11
-VOZ: ¿O hay algo más oscuro detrás de la historia que creemos saber?
-VISUAL: El Protagonista (playera azul, pensativo e intrigado), un gran signo de interrogación flota sobre un fondo con sombras misteriosas.
+VOZ: Aquí es donde la cosa se pone confusa. Porque sí existen cascos con cuernos... pero no vikingos. Tenemos que retroceder miles de años en el tiempo, mucho antes de que los primeros barcos largos zarparan.
+VISUAL: Protagonista con playera roja, expresión intrigada; una línea de tiempo larga se extiende hacia atrás, con un barco vikingo alejándose en la distancia.
 
 ### S12
-VOZ: Aquí es donde la cosa se pone confusa. Porque sí existen cascos con cuernos... pero no vikingos. Tenemos que retroceder miles de años en el tiempo, mucho antes de que los primeros barcos largos zarparan.
-VISUAL: Protagonista (playera azul, expresión pensativa) de pie frente a una línea de tiempo que se extiende hacia atrás, con iconos de barcos primitivos al fondo.
+VOZ: En la Edad del Bronce Nórdica (aproximadamente entre el 1200 y el 1000 a.C.), sí se han encontrado tocados ceremoniales con cuernos. El
 
 ### S13
-VOZ: En la Edad del Bronce Nórdica (aproximadamente entre el 1200 y el 1000 a.C.), sí se han encontrado tocados ceremoniales con cuernos. El ejemplo más famoso son los cascos de Veksø, hallados en Dinamarca.
-VISUAL: Protagonista (playera azul, señalando con un dedo) con un mapa minimalista de Europa que resalta Dinamarca, mientras aparecen siluetas estilizadas de los cascos de Veksø.
+**VOZ:** El ejemplo más famoso son los cascos de Veksø, hallados en Dinamarca.
+**VISUAL:** `stick_point(helmet_vekso)`
+**NOTAS:** Zoom lento hacia el casco de Veksø. Líneas de trazo simple que resaltan la curva de los cuernos.
 
 ### S14
-VOZ: Son impresionantes, con cuernos grandes y curvos. Pero hay dos detalles cruciales: primero, son artefactos de la Edad del Bronce, no de la Era Vikinga.
-VISUAL: Protagonista (playera azul, expresión de seriedad, sosteniendo un casco de Veksø) y luego un casco vikingo simple sin cuernos, mostrando una flecha de "diferencia" entre ambos.
+**VOZ:** Son impresionantes, con cuernos grandes y curvos. Pero hay dos detalles cruciales:
+**VISUAL:** `split_screen(helmet_vekso, icono_warning)`
+**NOTAS:** Pantalla dividida. Lado izquierdo: casco detallado. Lado derecho: icono de advertencia minimalista (triángulo con signo de exclamación) que pulsa suavemente.
 
 ### S15
-VOZ: Estamos hablando de una diferencia de dos mil años. Es como confundir a un legionario romano con un soldado de la Guerra Civil Americana.
-VISUAL: Protagonista (playera azul, asombrado) con un legionario romano a un lado y un soldado de la Guerra Civil Americana al otro, ambos con un signo de interrogación de confusión entre ellos.
+**VOZ:** primero, son artefactos de la Edad del Bronce, no de la Era Vikinga.
+**VISUAL:** `timeline_compare(bronze_age, viking_age)`
+**NOTAS:** Línea de tiempo horizontal. Punto rojo en "Edad del Bronce", punto azul en "Era Vikinga". Una flecha roja cruza el espacio vacío entre ambos, indicando la distancia temporal.
 
 ### S16
-VOZ: Segundo, todo indica que eran objetos rituales o ceremoniales, no equipo de batalla. (Vandkilde, 2013, *The Oxford Handbook of the European Bronze Age*).
-VISUAL: Protagonista (playera rosa, explicando con un puntero) mostrando un casco de Veksø en un altar con ofrendas, contrastando con una silueta de guerrero sin cuernos en una batalla.
+**VOZ:** Estamos hablando de una diferencia de dos mil años.
+**VISUAL:** `number_animation(2000_years)`
+**NOTAS:** El número "2000" aparece en el centro, grande y bold. Líneas de movimiento radial sugieren el paso rápido del tiempo.
 
 ### S17
-VOZ: ¿Te imaginas a un guerrero intentando blandir un hacha con esos cuernos enormes en medio de una refriega? Serían un blanco fácil, un estorbo mortal.
-VISUAL: Protagonista (playera amarilla, expresión de confusión, rascándose la cabeza) observando a un guerrero caricaturizado tropezando y enredándose con cuernos gigantes en un campo de batalla.
+**VOZ:** Es como confundir a un legionario romano con un soldado de la Guerra Civil Americana.
+**VISUAL:** `stick_compare(romano_legionario, soldado_guerra_civil)`
+**NOTAS:** Dos figuras de stick figure estilizadas. Izquierda: casco romano con cresta. Derecha: gorra de campaña. Un símbolo de "≠" (no igual) grande aparece entre ellos.
 
 ### S18
-VOZ: Así que, aunque los cuernos y el norte de Europa tienen una conexión, no es la que la cultura popular nos ha enseñado. Los vikingos no los usaron.
-VISUAL: Protagonista (playera azul, negando con la cabeza) con una imagen popular de un vikingo con cuernos tachada y, a su lado, un vikingo históricamente preciso sin cuernos.
+**VOZ:** Segundo, todo indica que eran objetos rituales o ceremoniales, no equipo de batalla.
+**VISUAL:** `stick_point(ritual_vs_war)`
+**NOTAS:** Icono de una vela o incienso (ritual) vs. icono de espada cruzada (guerra). La espada se desvanece o se marca con una X roja.
 
 ### S19
-VOZ: ¿Pero entonces, quién los puso en sus cabezas para siempre? ¿Fue un artista aburrido? ¿Una broma que se salió de control?
-VISUAL: Protagonista (playera amarilla, expresión de curiosidad, con signos de interrogación sobre su cabeza) con un pintor con un pincel y un lienzo, y luego un cómico con un objeto de broma, ambos con cuernos.
+**VOZ:** (Vandkilde, 2013, *The Oxford Handbook of the European Bronze Age*).
+**VISUAL:** `citation_overlay(vekso_source)`
+**NOTAS:** Texto pequeño y discreto en la esquina inferior derecha que aparece con un fundido suave.
 
 ### S20
-VOZ: El verdadero "nacimiento" del casco vikingo con cuernos que todos conocemos no está en los campos de batalla nórdicos, sino en un escenario de ópera en Alemania.
-VISUAL: Protagonista (playera azul, revelando un secreto) señalando un telón de ópera que se abre para mostrar un escenario.
+**VOZ:** ¿Te imaginas a un guerrero intentando blandir un hacha con esos cuernos enormes en medio de una refriega?
+**VISUAL:** `stick_think(action_impediment)`
+**NOTAS:** Personaje vikingo stick figure sosteniendo un hacha. Líneas de impacto sugieren que los cuernos chocarían con algo. Expresión de frustración exagerada pero simple.
 
 ### S21
-VOZ: Aquí viene el segundo pico de información, el momento exacto: el año 1876.
-VISUAL: Protagonista (playera azul, señalando) con un reloj antiguo que marca el año 1876 en grande, con un efecto de "zoom" en la fecha.
+**VOZ:** Serían un blanco fácil, un estorbo mortal.
+**VISUAL:** `target_on_horns(danger_zone)`
+**VISUAL:** Círculos de diana (blancos de tiro) superpuestos sobre los cuernos del casco. Color rojo brillante para indicar peligro.
 
 ### S22
-VOZ: Richard Wagner, el famoso compositor, estrenó su monumental ópera "Der Ring des Nibelungen". Para el diseño de vestuario, Wagner contrató a Carl Emil Doepler.
-VISUAL: Protagonista (playera roja, expresión curiosa) señala a una silueta de Wagner frente a una ópera, con un pequeño Doepler a su lado.
+**VOZ:** Así que, aunque los cuernos y el norte de Europa tienen una conexión,
+**VISUAL:** `map_europe_north(connection_line)`
+**NOTAS:** Mapa simplificado de Europa. Una línea punteada conecta el norte de Europa con un icono de cuerno. La línea es tenue, sugiriendo una conexión débil o indirecta.
 
 ### S23
-VOZ: Doepler, buscando una estética dramática y heroica para los "guerreros germánicos" de la ópera, se inspiró en los hallazgos arqueológicos de la Edad del Bronce...
-VISUAL: Protagonista (playera roja, expresión pensativa) observa a Doepler dibujando, con una excavación arqueológica minimalista de fondo.
+**VOZ:** no es la que la cultura popular nos ha enseñado.
+**VISUAL:** `pop_culture_crossout(misconception)`
+**NOTAS:** Imagen estilizada de una película o libro antiguo
 
-### S24
-VOZ: ...y en su propia imaginación. Decidió que unos cascos con cuernos serían la imagen perfecta para estos personajes imponentes. (Williams, 2018, *Wagner and the Art of Mythmaking*).
-VISUAL: Protagonista (playera roja, expresión de asombro) mira a un guerrero de ópera con casco cuernudo en un escenario, con un boceto de Doepler flotando.
+### S24  
+**VOZ:** “En 1876, el dramaturgo alemán Richard Wagner encargó a su colega el artista Carl Emil Doepler unos trajes para la ópera *Der Ring des Nibelungen*. Doepler dibujó a los “nibelungos” con cascos cuernudos, inspirándose en los hallazgos de la Edad del Bronce y en la imaginación romántica de la época. Esa ilustración se imprimió en los programas y, sin saberlo, plantó la semilla del mito.”  
+**VISUAL:** escena_de_ópera(vikingo_estilizado_cuernos), artista_dibujo(Doepler), página_programa(1876)  
 
-### S25
-VOZ: El público quedó fascinado. La ópera fue un éxito rotundo, y la imagen de los guerreros con cascos cuernudos se grabó a fuego en la mente colectiva.
-VISUAL: Protagonista (
+### S25  
+**VOZ:** “Las producciones teatrales de finales del siglo XIX y principios del XX adoptaron esos diseños. Películas mudas, cómics y, finalmente, Hollywood, copiaron la estética de la ópera porque era visualmente impactante y fácil de reconocer.”  
+**VISUAL:** montaje_filmico(casco_cuernos), cómic_vikingo, cámara_foco(ópera_a_cine)  
 
-### S26
-VOZ: Películas como "Los Vikingos" de 1958, series animadas y videojuegos siguieron reproduciendo esta imagen, reforzando el mito generación tras generación.
-VISUAL: Protagonista con playera rosa y expresión asombrada señala una pantalla de cine retro y un mando de consola en tonos violeta y naranja brillante.
+### S26  
+**VOZ:** “Así, un error de ilustración se transformó en la imagen definitiva del vikingo. Hoy, ese casco cuernudo sigue vendiéndose en tiendas de disfraces, aunque la arqueología nos dice que nunca existió.”  
+**VISUAL:** tienda_disfraces(vikingo_cuernos), arqueólogo_sosteniendo(helmet_gjermundbu), texto_en_pantalla("Mito vs. Realidad")  
+
+*(≈ 78 palabras de voz)*
 
 ### S27
-VOZ: Se convirtió en parte de nuestro imaginario cultural, tan arraigado que desmentirlo suena casi a herejía. ¿Tú qué imagen tienes de un vikingo?
-VISUAL: Protagonista con playera amarilla y mano en la barbilla mira con curiosidad hacia un gran signo de interrogación amarillo sobre fondo turquesa.
+VOZ: Richard Wagner, el famoso compositor, estrenó su monumental ópera "Der Ring des Nibelungen". Para el diseño de vestuario, Wagner contrató a Carl Emil Doepler.
+VISUAL: tarjeta_canal(El Porqué) con el protagonista de playera rosa señalando un retrato minimalista de Wagner.
 
 ### S28
-VOZ: ¿Es la que te enseñó la historia o la que te vendió Hollywood? Es fácil caer en la trampa cuando la ficción es tan atractiva.
-VISUAL: Protagonista con playera amarilla en el centro, comparando una claqueta de cine roja a su izquierda con un libro de historia azul abierto a su derecha.
+VOZ: Doepler, buscando una estética dramática y heroica para los "guerreros germánicos" de la ópera, se inspiró en los hallazgos arqueológicos de la Edad del Bronce... y en su propia imaginación.
+VISUAL: Protagonista de playera rosa observa a Doepler dibujando bocetos de guerreros con cuernos en un escritorio.
 
 ### S29
-VOZ: Así que la próxima vez que veas un casco vikingo con cuernos, recuerda esto: no estás viendo un pedazo de historia. Estás viendo la huella de una ópera del siglo XIX.
-VISUAL: Protagonista con playera verde sonríe con complicidad mientras sostiene un casco con cuernos que se transforma en notas musicales doradas sobre fondo azul marino.
+VOZ: Decidió que unos cascos con cuernos serían la imagen perfecta para estos personajes imponentes. (Williams, 2018, Wagner and the Art of Mythmaking).
+VISUAL: Protagonista de playera roja sostiene un casco con cuernos enormes y brillantes sobre un fondo blanco.
 
 ### S30
-VOZ: Un diseñador de vestuario creó una imagen tan potente que logró reescribir la historia en nuestra mente colectiva, suplantando siglos de arqueología con una fantasía visual.
-VISUAL: Protagonista con playera verde observa con admiración un maniquí de ópera teatral iluminado por un reflector cian junto a un boceto de vestuario.
+VOZ: El público quedó fascinado. La ópera fue un éxito rotundo, y la imagen de los guerreros con cascos cuernudos se grabó a fuego en la mente colectiva.
+VISUAL: Protagonista de playera rosa rodeado de siluetas de un público aplaudiendo en un teatro minimalista.
 
 ### S31
-VOZ: Es la prueba definitiva de que a veces, la ficción es mucho más fuerte que la realidad, y que una buena historia (o una buena imagen) puede viajar más lejos y más rápido que el dato más verificado.
-VISUAL: Protagonista con playera roja mira emocionado cómo un cohete de papel ilustrado naranja vuela velozmente superando a una pila de pergaminos grises.
+VOZ: De ahí saltó a la ilustración, al cine, a los cómics, a los disfraces de Halloween. El mito había nacido, no de la historia, sino del arte.
+VISUAL: Protagonista de playera verde junto a iconos flotantes de un rollo de cine, un cómic y una calabaza.
 
 ### S32
-VOZ: Esto fue El Porqué. Nos vemos en el próximo video... para resolver el siguiente porqué. Si te gustó desenterrar este mito, no olvides darle "me gusta" y suscribirte para más historias que te harán cuestionar lo que creías saber.
-VISUAL: Protagonista con playera teal sonríe y saluda cálidamente a cámara junto al logo de El Porqué y un pez nadando en un fondo azul vibrante.
+VOZ: ¿Te das cuenta de lo poderoso que es el impacto visual? Una decisión estética de un diseñador de vestuario reescribió la historia de una civilización entera en la imaginación popular.
+VISUAL: Protagonista de playera amarilla con expresión de asombro frente a una silueta gigante de un vikingo.
 
 ### S33
-VOZ: Fuentes. Hjardar, Kim, and Vegard Vike (2016). Vikings at War. Casemate Publishers. Dato que respalda: descripción de cascos vikingos reales y el casco de Gjermundbu.
-VISUAL: Protagonista con playera teal y expresión analítica señala un casco vikingo real de hierro sobre un fondo gris minimalista.
+VOZ: Pero, ¿por qué fue tan fácil que esta ficción suplantara la realidad?
+VISUAL: Protagonista de playera amarilla pensando frente a la tarjeta de título: "EL DÍA QUE NACIÓ EL MITO MODERNO".
 
 ### S34
-VOZ: Price, Neil (2020). Children of Ash and Elm: A History of the Vikings. Penguin Books. Dato que respalda: la ausencia de cascos con cuernos en la Era Vikinga y la fuerza de la imagen popular.
-VISUAL: Protagonista con playera teal y expresión reflexiva sostiene un libro abierto con un drakkar dibujado sobre fondo azul.
+VOZ: La persistencia del mito del casco con cuernos es un testimonio del poder de la narrativa y la imagen sobre los hechos.
+VISUAL: Protagonista de playera azul camina sobre una línea de tiempo que se divide en dos caminos distintos.
 
 ### S35
-VOZ: Vandkilde, Helle (2013). "Bronze Age Scandinavia". En The Oxford Handbook of the European Bronze Age, editado por Harry Fokkens y Anthony Harding. Dato que respalda: existencia de cascos con cuernos en la Edad del Bronce Nórdica y su carácter ceremonial.
-VISUAL: Protagonista con playera teal y expresión de asombro señala un casco de bronce con cuernos ceremoniales sobre fondo amarillo.
+VOZ: Aquí está el tercer pico de información: la imagen de un vikingo con cuernos es simplemente más dramática, más memorable, más cool.
+VISUAL: Protagonista de playera roja guiña un ojo junto a un vikingo minimalista con cuernos muy estilizados.
 
 ### S36
-VOZ: Williams, Gareth (2018). Wagner and the Art of Mythmaking. Oxford University Press. Dato que respalda: el papel de Carl Emil Doepler y la ópera de Wagner en la popularización del mito.
-VISUAL: Protagonista con playera teal y expresión alegre observa a un cantante de ópera con casco de cuernos sobre fondo rojo.
+VOZ: La ferocidad y la fuerza bruta que asociamos con los vikingos encajan perfectamente con la agresividad visual de unos cuernos. Es un arquetipo.
+VISUAL: Protagonista de playera rosa muestra un escudo y un hacha cruzados detrás de un par de cuernos afilados.
 
 ### S37
-VOZ: Miniaturas (3 ideas). 1. Mito Roto + Monigote vikingo con casco cuernos roto y cara de sorpresa. 2. ¡NO EXISTEN! + Monigote arqueólogo desenterrando un casco simple, tachando un casco con cuernos.
-VISUAL: Protagonista con playera teal y expresión divertida señala dos pantallas que muestran bocetos de vikingos y arqueólogos sobre fondo verde.
+VOZ: Piénsalo: ¿qué imagen es más impactante? ¿Un guerrero con un casco simple y funcional como el de Gjermundbu, o uno con un tocado que lo hace parecer un demonio de batalla?
+VISUAL: Protagonista de playera amarilla comparando un casco gris liso y uno dorado con cuernos de demonio.
 
 ### S38
-VOZ: 3. ¡ÓPERA! + Monigote en un escenario de ópera, con un casco cuernudo gigante de fondo. ¡Muchas gracias por acompañarnos, nos vemos en la próxima aventura de nuestro canal!
-VISUAL: Protagonista con playera teal y expresión de despedida cálida saluda a la cámara mientras el logo del canal aparece sobre fondo violeta.
+VOZ: La respuesta es obvia para el entretenimiento. Los cuernos se convirtieron en un atajo visual para comunicar "vikingo" y "brutalidad". (Price, 2020, Children of Ash and Elm).
+VISUAL: Protagonista de playera verde junto a un cartel que dice "VIKINGO = BRUTALIDAD" en letras rojas vibrantes.
+
+### S39
+VOZ: Películas como "Los Vikingos" de 1958, series animadas y videojuegos siguieron reproduciendo esta imagen, reforzando el mito generación tras generación.
+VISUAL: Protagonista de playera rosa frente a una pantalla de cine antigua y un mando de consola de videojuegos.
+
+### S40
+VOZ: Se convirtió en parte de nuestro imaginario cultural, tan arraigado que desmentirlo suena casi a herejía. ¿Tú qué imagen tienes de un vikingo?
+VISUAL: Protagonista de playera amarilla con una mano en la barbilla y un gran signo de interrogación arriba.
+
+### S41
+VOZ: ¿Es la que te enseñó la historia o la que te vendió Hollywood? Es fácil caer en la trampa cuando la ficción es tan atractiva.
+VISUAL: Protagonista de playera amarilla señalando un logo de Hollywood que brilla con luces de neón de colores.
+
+### S42
+VOZ: Así que la próxima vez que veas un casco vikingo con cuernos, recuerda esto: no estás viendo un pedazo de historia. Estás viendo la huella de una ópera del siglo XIX.
+VISUAL: Protagonista de playera roja señalando un reloj de arena que viaja hacia un telón de ópera antiguo.
+
+### S43
+VOZ: Un diseñador de vestuario creó una imagen tan potente que logró reescribir la historia en nuestra mente colectiva, suplantando siglos de arqueología con una fantasía visual.
+VISUAL: Protagonista de playera rosa viendo cómo una ilustración de ópera cubre un mapa de excavaciones arqueológicas.
+
+### S44
+VOZ: Es la prueba definitiva de que a veces, la ficción es mucho más fuerte que la realidad, y que una buena historia (o una buena imagen)
+VISUAL: Protagonista de playera verde sosteniendo una antorcha que ilumina intensamente un libro de cuentos abierto.
+
+### S45
+VOZ: puede viajar más lejos y más rápido que el dato más verificado.
+VISUAL: Protagonista de playera verde observa una estrella fugaz pasando velozmente sobre una piedra pequeña y estática.
+
+### S46
+VOZ: Esto fue El Porqué. Nos vemos en el próximo video... para resolver el siguiente porqué.
+VISUAL: Protagonista de playera teal saludando a cámara frente al logo de "El Porqué" sobre fondo azul.
+
+### S47
+VOZ: Si te gustó desenterrar este mito, no olvides darle "me gusta" y suscribirte para más historias que te harán cuestionar lo que creías saber.
+VISUAL: Protagonista de playera teal señalando botones de Like y Suscribirse mientras un pez nada al fondo.
+
+### S48  
+**[VISUAL: title_card(EL DÍA QUE NACIÓ EL MITO MODERNO)]**  
+**[VOZ]**: “En 1876, cuando Richard Wagner presentó la primera parte de su *Der Ring des Nibelungen*, nadie imaginaba que una simple decisión de vestuario cambiaría la visión del mundo sobre los vikingos para siempre.”  
+
+### S49  
+**[VISUAL: split_screen(personaje(carl_emil_doepler), opera_stage(viking_horns_costume))]**  
+**[VOZ]**: “Wagner contrató al artista Carl Emil Doepler, quien, inspirado en los hallazgos de la Edad del Bronce y en su propia imaginación, diseñó cascos con cuernos para los guerreros germánicos de la ópera.”  
+
+### S50  
+**[VISUAL: red_accent(year_1876)]**  
+**[VOZ]**: “El año 1876 quedó marcado no solo por la música, sino por el nacimiento de un símbolo visual que pronto se grabaría en la conciencia colectiva.”  
+
+### S51  
+**[VISUAL: stick_point(opera_influence)]**  
+**[VOZ]**: “El público quedó fascinado; la ópera fue un éxito rotundo y la imagen de los guerreros con cuernos se convirtió en la cara oficial del ‘vikingo’ en la imaginación popular.”  
+
+### S52  
+**[VISUAL: callout(art_vs_history))]**  
+**[VOZ]**: “Así nació un mito que no proviene de la historia, sino del arte: una ficción que reescribió la percepción de una civilización entera.”  
+
+### S53  
+**[VISUAL: title_card(LA FICCIÓN ES MÁS FUERTE QUE LA HISTORIA))]**  
+**[VOZ]**: “¿Por qué esa imagen persiste? Porque la ficción es más dramática, más memorable y, sobre todo, mucho más *cool* que la realidad arqueológica.”  
+
+### S54  
+**[VISUAL: stick_think(why_so_persistent))]**  
+**[VOZ]**: “Un
+
+### S55  
+**[VISUAL:** title_card(EL DÍA QUE NACIÓ EL MITO MODERNO) **]**  
+**VOZ:** “El día en que una ópera cambió la forma en que vemos el pasado.”
+
+### S56  
+**[VISUAL:** split_screen(personaje(carl_emil_doepler), opera_stage(viking_horns_costume)) **]**  
+**VOZ:** “Carl Emil Doepler, el diseñador de vestuario, imaginó cascos con cuernos para los guerreros germánicos.”
+
+### S57  
+**[VISUAL:** red_accent(year_1876) **]**  
+**VOZ:** “Era 1876 y la escena estaba lista para sorprender al público.”
+
+### S58  
+**[VISUAL:** stick_point(opera_influence) **]**  
+**VOZ:** “Su audaz elección visual impactó de inmediato la imaginación colectiva.”
+
+### S59  
+**[VISUAL:** callout(art_vs_history) **]**  
+**VOZ:** “El arte empezó a eclipsar la historia real, creando un mito que perduraría.”
+
+
+## BLOQUE 4: LA FICCIÓN ES MÁS FUERTE QUE LA
+

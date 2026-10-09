@@ -29,7 +29,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 
-PANEL_VERSION = "v20"  # se muestra en el pie del sidebar; subir en cada release
+PANEL_VERSION = "v21"  # se muestra en el pie del sidebar; subir en cada release
 # Dos layouts soportados:
 #  - anidado: panel/ dentro de zenn-factory/ (jobs/ y thumbnails/ en el padre)
 #  - plano:   todo dentro de video-gen/ (jobs/ y thumbnails/ junto a app.py)
@@ -449,6 +449,24 @@ def _limpiar_parte(text):
     return "\n".join(lineas).strip()
 
 
+def _ultima_voz(text):
+    """Últimas ~15 palabras de la última VOZ: ancla para continuar."""
+    voces = re.findall(r"VOZ:\s*(.+)", text)
+    if not voces:
+        return ""
+    return " ".join(voces[-1].split()[-15:])
+
+
+def _quitar_repetidas(text, desde):
+    """Quita escenas con número < `desde` (el modelo a veces repite la
+    escena ancla al continuar)."""
+    bloques = re.split(r"(?m)^(?=### S\d+)", text)
+    buenos = [b for b in bloques
+              if not re.match(r"### S(\d+)", b)
+              or int(re.match(r"### S(\d+)", b).group(1)) >= desde]
+    return "".join(buenos).strip()
+
+
 def _escenas_validas(text, parte_words):
     """Chequeo de formato por parte: empieza con escena y trae un número
     razonable de escenas para las palabras del trozo."""
@@ -509,47 +527,55 @@ def run_storyboard(generate_fn, p, job):
     textos, model, siguiente = [], "", 1
     for i, parte in enumerate(partes):
         parte_words = len(parte.split())
+        objetivo = int(parte_words * 0.9)
         if len(partes) > 1:
-            prompt = _prompt_parte(i, len(partes), parte, siguiente)
+            prompt_base = _prompt_parte(i, len(partes), parte, siguiente)
         else:
-            prompt = STORYBOARD_PROMPT.format(script=script[:12000])
-        try:
-            text, model = generate_fn(
-                prompt, system="Eres director de animación minimalista.")
-        except Exception as e:
-            return False, (f"Error del modelo en parte {i + 1}/{len(partes)}: "
-                           f"{e}"), [], None
-        # Limpieza: quita preámbulos/separadores/conteos falsos ANTES de
-        # validar (los modelos débiles agregan basura que rompe el conteo).
-        text = _limpiar_parte(text)
-        # Validación POR PARTE (cobertura + formato): si el modelo
-        # resumió/recortó o el formato viene roto, se reintenta una vez con
-        # instrucción explícita.
-        vw = _voz_words(text)
-        formato_ok = _escenas_validas(text, parte_words)
-        if vw < 0.9 * parte_words or not formato_ok:
-            motivo = (f"cubrió solo ~{vw} de {parte_words} palabras: "
-                      f"RESUMISTE" if vw < 0.9 * parte_words
-                      else "el formato viene roto (sin escenas o con "
-                           "preámbulo)")
-            retry_prompt = (
-                f"Tu versión anterior {motivo}. Repite la PARTE {i + 1} "
-                f"copiando el texto literal del guion sin cambiar ni una "
-                f"palabra y sin saltarte ningún párrafo. Empieza "
-                f"DIRECTAMENTE con ### S{siguiente:02d}, sin preámbulos, "
-                f"sin comentarios y sin conteos de palabras. Objetivo: "
-                f"≥{int(parte_words * 0.9)} palabras en VOZ.\n\n" + prompt)
+            prompt_base = STORYBOARD_PROMPT.format(script=script[:12000])
+        # Continuación AUTOMÁTICA por parte: genera, mide, y si falta
+        # cobertura continúa desde la última escena (anclada en su VOZ)
+        # hasta llegar al 90% o agotar 3 intentos. Así el 80% que salió
+        # bien no se regenera: solo se completa lo que faltó.
+        trozos_p, ultimo, vw_p = [], siguiente, 0
+        for intento in range(3):
+            if intento == 0:
+                prompt = prompt_base
+            else:
+                ancla = _ultima_voz("\n\n".join(trozos_p))
+                faltan = max(0, objetivo - vw_p)
+                prompt = (
+                    f"CONTINUACIÓN de la PARTE {i + 1} de {len(partes)}: ya "
+                    f"generaste hasta S{ultimo - 1:02d} (su VOZ terminaba en: "
+                    f"\"...{ancla}\"). Continúa el storyboard desde el punto "
+                    f"del guion donde te quedaste, SIN repetir escenas. "
+                    f"Empieza DIRECTAMENTE con ### S{ultimo:02d}, sin "
+                    f"preámbulos. Te faltan ~{faltan} palabras de VOZ para "
+                    f"llegar al objetivo de {objetivo} (copia literal, sin "
+                    f"resumir).\n\nGuion de esta parte:\n{parte[:6000]}")
             try:
-                text2, model2 = generate_fn(
-                    retry_prompt,
-                    system="Eres director de animación minimalista.")
-                text2 = _limpiar_parte(text2)
-                vw2 = _voz_words(text2)
-                if vw2 > vw and _escenas_validas(text2, parte_words):
-                    text, model, vw = text2, model2, vw2
-            except Exception:
-                pass
-        text = _renumerar_desde(text, siguiente)
+                text, model = generate_fn(
+                    prompt, system="Eres director de animación minimalista.")
+            except Exception as e:
+                if intento == 0 and not trozos_p:
+                    return False, (
+                        f"Error del modelo en parte {i + 1}/{len(partes)}: "
+                        f"{e}"), [], None
+                break  # conserva lo generado hasta ahora
+            text = _limpiar_parte(text)
+            text = _renumerar_desde(text, ultimo)
+            text = _quitar_repetidas(text, ultimo)
+            if not text.strip():
+                break
+            trozos_p.append(text)
+            nums = [int(m.group(1))
+                    for m in re.finditer(r"### S(\d+)", text)]
+            if nums:
+                ultimo = max(nums) + 1
+            vw_p = _voz_words("\n\n".join(trozos_p))
+            if vw_p >= objetivo and _escenas_validas("\n\n".join(trozos_p),
+                                                     parte_words):
+                break
+        text = "\n\n".join(trozos_p)
         textos.append(text)
         nums = [int(m.group(1)) for m in re.finditer(r"### S(\d+)", text)]
         if nums:

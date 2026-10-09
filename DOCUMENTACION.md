@@ -840,3 +840,28 @@ Fix:
   350 palabras; el resto, 650. Cada parte cabe en el límite real.
 
 *Versión del panel: v20 (partes limpias y validadas, chunk por backend).*
+
+## 33. Cambios v21 (2026-10-08) — continuación automática por parte
+
+Reporte: etapa 5 llegó a 1020/1274 palabras (80%), desde S39. Validación
+del proyecto 37: NO está corrupto (38 escenas S01-S38 continuas, sin
+huecos, sin basura, conteo exacto). El modelo simplemente se saltó ~20%
+del contenido a la mitad de cada parte.
+
+Causa raíz: el reintento de v19/v20 repetía TODA la parte (desperdiciando
+lo que salió bien) y con el mismo resultado corto.
+
+Fix: cada parte ahora tiene un loop de hasta 3 intentos que CONTINÚA
+desde donde se quedó en vez de repetir:
+- intento 1: genera la parte normal;
+- intentos 2-3: prompt de CONTINUACIÓN anclado en la última VOZ
+  generada ("tu última escena fue Sxx, su VOZ terminaba en '...'");
+  solo genera las escenas faltantes, que se agregan a las ya logradas.
+- `_quitar_repetidas()` elimina escenas duplicadas si el modelo repite
+  la escena ancla; `_renumerar_desde()` mantiene la numeración continua.
+- Si un intento falla con excepción, se conserva lo generado hasta ahí.
+
+Verificado con mocks: partes al 80% → continuación automática → 56
+escenas S01-S56 sin huecos, cobertura 105%, 5 llamadas en total.
+
+*Versión del panel: v21 (cada parte se completa sola hasta el 90%).*

@@ -132,10 +132,19 @@ else:
 models = llm.model_options(backend, all_keys())
 if backend == "ollama" and not models:
     st.sidebar.warning("Ollama no responde en localhost:11434. Revisa `ollama serve`.")
+# "(auto)" = sin modelo fijo: generate() recorre la cadena del backend
+# (y si hace falta rota a los demás). En Ollama no aplica: hay que elegir
+# un modelo local.
+AUTOMODEL = "(auto) rotar modelos"
+opciones = list(models) if backend == "ollama" else [AUTOMODEL] + models
 default_model = get("default_model_id", "")
-idx = models.index(default_model) if default_model in models else 0
-model_id = st.sidebar.selectbox("Modelo", models or ["(sin modelos)"],
-                                index=idx if models else 0)
+if default_model in models:
+    idx = models.index(default_model) + (0 if backend == "ollama" else 1)
+else:
+    idx = 0
+seleccion = st.sidebar.selectbox("Modelo", opciones or ["(sin modelos)"],
+                                 index=idx if opciones else 0)
+model_id = "" if seleccion in (AUTOMODEL, "(sin modelos)") else seleccion
 if st.sidebar.button("Guardar como predeterminado"):
     db.set_setting(conn, "backend", backend)
     db.set_setting(conn, "default_model_id", model_id)
@@ -263,7 +272,8 @@ elif view == "🎬 Proyectos":
                        ).get(_vvoz, p["voice"])
         st.caption(f"{project_kind_label(p['kind'])} · 🎙️ {_vlabel} · "
                    f"{p['language']} · modelo del sidebar: "
-                   f"{llm.BACKENDS[backend]['label']} / {model_id}")
+                   f"{llm.BACKENDS[backend]['label']} / "
+                   f"{model_id or '(auto)'}")
 
         stages = db.list_stages(conn, pid)
         total = len(stages)
@@ -367,7 +377,8 @@ elif view == "🎬 Proyectos":
                 key=f"vvoz{pid}")
             ck3, ck4 = st.columns(2)
             nl = ck3.text_input("Idioma", p["language"])
-            nm = ck4.text_input("Modelo", p["model_id"])
+            nm = ck4.text_input("Modelo", p["model_id"],
+                                placeholder="(auto) rotar modelos")
             if st.button("Guardar config"):
                 db.update_project(conn, pid, voice=f"{sel_eng}:{sel_voice}",
                                   language=nl, model_id=nm)
