@@ -302,6 +302,50 @@ elif view == "🎬 Proyectos":
 
         st.info(next_step())
 
+        # ---- verificar / reparar elementos ----
+        vc1, vc2 = st.columns(2)
+        with vc1:
+            if st.button("🔍 Verificar elementos", key=f"verif{pid}",
+                         disabled=bool(_running)):
+                rep = pipeline.verificar_elementos(
+                    p, pipeline.job_dir_of(p))
+                st.session_state[f"verif_rep{pid}"] = rep["resumen"]
+                st.session_state[f"verif_ok{pid}"] = rep["ok"]
+                rerun()
+        with vc2:
+            if st.button("🛠 Reparar faltantes", key=f"rep{pid}",
+                         disabled=bool(_running)):
+                job = pipeline.job_dir_of(p)
+                rep = pipeline.verificar_elementos(p, job)["detalle"]
+                msgs = []
+                # 1) vo.json desactualizado -> se sincroniza solo
+                if not rep["vo_json"]["ok"]:
+                    n, origen = pipeline.build_vo_json(p, job)
+                    msgs.append(f"vo.json sincronizado ({n} líneas).")
+                # 2) audios faltantes -> etapa 6 (omite los existentes)
+                if not rep["audios"]["ok"]:
+                    ok, log, arts, _ = pipeline.run_tts_stage(p, job)
+                    db.set_stage(conn, pid, "tts",
+                                 "ok" if ok else "fallo", log, arts)
+                    msgs.append(("audios regenerados: " if ok else
+                                 "TTS falló: ") + log[:200])
+                # 3) videos faltantes -> se informa (etapa 7 es asistida)
+                if not rep["videos"]["ok"]:
+                    fs = ", ".join(i.upper()
+                                   for i in rep["videos"]["faltan"][:10])
+                    msgs.append(f"videos faltantes ({fs}): re-ejecuta la "
+                                "etapa 7 (omite solas las ya hechas).")
+                if not msgs:
+                    msgs.append("Nada que reparar: todo completo. ✅")
+                st.session_state["run_msg"] = ("ok", " ".join(msgs))
+                rerun()
+        if f"verif_rep{pid}" in st.session_state:
+            rep_txt = st.session_state.pop(f"verif_rep{pid}")
+            rep_ok = st.session_state.pop(f"verif_ok{pid}")
+            (st.success if rep_ok else st.warning)(
+                ("✅ Todo completo. " if rep_ok
+                 else "⚠️ Elementos incompletos: ") + rep_txt)
+
         # ---- correr todo ----
         if "run_msg" in st.session_state:
             kind_msg, txt = st.session_state.pop("run_msg")

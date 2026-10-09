@@ -123,6 +123,17 @@ def speak_batch(items, spec, audio_dir, language="es", progress=None):
                              for it in sub}}
 
     total, ok_ids, fails = len(items), [], {}
+    # Reparación: omite los audios que ya existen (no vacíos). Así re-ejecutar
+    # la etapa 6 solo genera los faltantes en vez de narrar todo de nuevo.
+    pendientes, omitidos = [], 0
+    for it in items:
+        f = audio_dir / f"{it['id'].lower()}.mp3"
+        if f.exists() and f.stat().st_size > 0:
+            omitidos += 1
+        else:
+            pendientes.append(it)
+    items = pendientes
+    total = len(items)
     if engine == "kokoro":
         if progress:
             progress("tts", 0, total, "cargando modelo Kokoro…")
@@ -142,6 +153,7 @@ def speak_batch(items, spec, audio_dir, language="es", progress=None):
                          f"{it['id'].upper()} listo" if it["id"] in ok_ids
                          else f"{it['id'].upper()} falló")
     log = (f"TTS motor {engine} · voz {voice}: {len(ok_ids)}/{total} OK"
+           + (f" | omitidos (ya existían): {omitidos}" if omitidos else "")
            + (f" | fallos: {fails}" if fails else "")
            + " · volumen normalizado (loudnorm).")
     return not fails, log

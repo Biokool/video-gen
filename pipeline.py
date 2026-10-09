@@ -29,7 +29,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 
-PANEL_VERSION = "v21"  # se muestra en el pie del sidebar; subir en cada release
+PANEL_VERSION = "v23"  # se muestra en el pie del sidebar; subir en cada release
 # Dos layouts soportados:
 #  - anidado: panel/ dentro de zenn-factory/ (jobs/ y thumbnails/ en el padre)
 #  - plano:   todo dentro de video-gen/ (jobs/ y thumbnails/ junto a app.py)
@@ -425,10 +425,50 @@ def _renumerar_desde(text, desde):
                   lambda m: f"### S{mapa[int(m.group(1))]:02d}", text)
 
 
+def _bloques_escena(text):
+    """Divide el storyboard en bloques por escena (cada uno empieza con
+    ### Snn)."""
+    return [m.group(0) for m in
+            re.finditer(r"(?m)^###\s*S\d+.*?(?=^###\s*S\d+|\Z)", text, re.S)]
+
+
+def _pat_campo(nombre):
+    """Marcadores que los modelos usan: VOZ: / **VOZ:** / **[VOZ]**: /
+    **[VOZ:** / [VOZ]: (igual para VISUAL)."""
+    return (rf"(?m)^\s*(?:\*\*\[{nombre}\]\*\*:|\*\*\[{nombre}:\*\*|"
+            rf"\*\*\[{nombre}:|\*\*{nombre}:\*\*|\[{nombre}\]:|{nombre}:)"
+            rf"\s*(.+?)\s*$")
+
+
+def _limpia_valor(val):
+    """Quita envoltorios **, [], "" de un valor de campo."""
+    val = re.sub(r"^(\*\*|\[)+", "", val.strip()).strip()
+    val = re.sub(r"(\*\*|\])+$", "", val).strip()
+    if len(val) >= 2 and val[0] in "\"“" and val[-1] in "\"”":
+        val = val[1:-1].strip()
+    return val
+
+
+def _campo(bloque, nombre):
+    """Extrae VOZ:/VISUAL: tolerando las variantes de formato de los
+    modelos débiles. Devuelve el texto limpio."""
+    m = re.search(_pat_campo(nombre), bloque)
+    return _limpia_valor(m.group(1)) if m else ""
+
+
+def _normalizar_campos(text):
+    """Reescribe las variantes **[VOZ]**: / **VOZ:** / **[VISUAL:** ... al
+    formato estándar VOZ: / VISUAL: para que el archivo quede limpio."""
+    for nombre in ("VOZ", "VISUAL"):
+        text = re.sub(_pat_campo(nombre),
+                      lambda m: f"{nombre}: {_limpia_valor(m.group(1))}",
+                      text)
+    return text
+
+
 def _voz_words(text):
     """Palabras totales en los campos VOZ: del storyboard."""
-    return sum(len(m.group(1).split())
-               for m in re.finditer(r"VOZ:\s*(.+)", text))
+    return sum(len(_campo(b, "VOZ").split()) for b in _bloques_escena(text))
 
 
 def _limpiar_parte(text):
@@ -451,7 +491,8 @@ def _limpiar_parte(text):
 
 def _ultima_voz(text):
     """Últimas ~15 palabras de la última VOZ: ancla para continuar."""
-    voces = re.findall(r"VOZ:\s*(.+)", text)
+    voces = [_campo(b, "VOZ") for b in _bloques_escena(text)]
+    voces = [v for v in voces if v]
     if not voces:
         return ""
     return " ".join(voces[-1].split()[-15:])
@@ -562,6 +603,7 @@ def run_storyboard(generate_fn, p, job):
                         f"{e}"), [], None
                 break  # conserva lo generado hasta ahora
             text = _limpiar_parte(text)
+            text = _normalizar_campos(text)
             text = _renumerar_desde(text, ultimo)
             text = _quitar_repetidas(text, ultimo)
             if not text.strip():
@@ -587,8 +629,7 @@ def run_storyboard(generate_fn, p, job):
     # Anti-truncado ESTRUCTURAL: si el storyboard no cubre el guion, la etapa
     # FALLA (no avisa y sigue). Un storyboard cortado = video cortado.
     # Umbral 90%: con 70% un guion de 1300 palabras pierde ~400 (casi 3 min).
-    voz_words = sum(len(m.group(1).split())
-                    for m in re.finditer(r"VOZ:\s*(.+)", text))
+    voz_words = _voz_words(text)
     if guion_words > 0 and voz_words < 0.9 * guion_words:
         return False, (
             f"⛔ STORYBOARD TRUNCADO: cubre ~{voz_words} palabras de "
@@ -646,13 +687,13 @@ def run_continuar_storyboard(generate_fn, p, job):
     if not nuevos:
         return False, ("El modelo no devolvió escenas nuevas (S{n + 1:02d}+). "
                        "Reintenta con otro backend."), [str(sb)], None
+    nuevos = [_normalizar_campos(bl) for bl in nuevos]
     with open(sb, "a", encoding="utf-8") as f:
         f.write("\n\n" + "\n\n".join(nuevos) + "\n")
     total = n + len(nuevos)
     # Revalida cobertura
     full = sb.read_text(encoding="utf-8", errors="replace")
-    voz_words = sum(len(m.group(1).split())
-                    for m in re.finditer(r"VOZ:\s*(.+)", full))
+    voz_words = _voz_words(full)
     guion_words = len(re.sub(r"^#.*$", "", script, flags=re.M).split())
     if guion_words > 0 and voz_words < 0.7 * guion_words:
         return False, (
@@ -863,10 +904,9 @@ def build_vo_json(p, job):
     if sb.exists():
         text = sb.read_text(encoding="utf-8", errors="replace")
         for m in re.finditer(r"###\s*(S\d+)(.*?)(?=###\s*S\d+|\Z)", text, re.S):
-            vm = re.search(r"VOZ:\s*(.+)", m.group(2))
-            if vm and vm.group(1).strip():
-                items.append({"id": m.group(1).lower(),
-                              "text": vm.group(1).strip()})
+            voz = _campo(m.group(2), "VOZ")
+            if voz:
+                items.append({"id": m.group(1).lower(), "text": voz})
     if not items:
         sp = find_script(p)
         if sp:
@@ -892,12 +932,25 @@ def build_vo_json(p, job):
 
 def run_tts_stage(p, job, progress=None):
     extra = ""
-    if not (job / "vo.json").exists():
+    # Sincronía vo.json ↔ storyboard: si el storyboard creció después del
+    # TTS (p. ej. "Continuar storyboard" agregó S48), vo.json queda viejo y
+    # la escena nueva nunca recibe audio -> el ensamblado falla con
+    # "Falta el audio de S48". Se reconstruye si los ids no coinciden.
+    sb_ids = [s["id"] for s in _parse_storyboard(job)]
+    vf = job / "vo.json"
+    vo_ids = []
+    if vf.exists():
+        try:
+            vo_ids = [str(it.get("id", "")).lower()
+                      for it in json.loads(vf.read_text(encoding="utf-8"))]
+        except Exception:
+            vo_ids = []
+    if not vf.exists() or (sb_ids and set(sb_ids) != set(vo_ids)):
         n, origen = build_vo_json(p, job)
         if not n:
             return (False, "Sin vo.json ni storyboard/guion para crearlo. "
                            "Genera primero el storyboard (etapa 5).", [], None)
-        extra = f"vo.json creado desde {origen} ({n} líneas). "
+        extra = f"vo.json sincronizado desde {origen} ({n} líneas). "
     ok, log = run_tts(job, p["voice"], p["language"], progress=progress)
     arts = [str(a) for a in (job / "audio").glob("*.mp3")] if ok else []
     full = extra + log
@@ -1453,12 +1506,82 @@ def _parse_storyboard(job):
         return scenes
     text = sb.read_text(encoding="utf-8", errors="replace")
     for m in re.finditer(r"###\s*(S\d+)(.*?)(?=###\s*S\d+|\Z)", text, re.S):
-        vm = re.search(r"VOZ:\s*(.+)", m.group(2))
-        xm = re.search(r"VISUAL:\s*(.+)", m.group(2))
         scenes.append({"id": m.group(1).lower(),
-                       "voz": vm.group(1).strip() if vm else "",
-                       "visual": xm.group(1).strip() if xm else ""})
+                       "voz": _campo(m.group(2), "VOZ"),
+                       "visual": _campo(m.group(2), "VISUAL")})
     return scenes
+
+
+def _ids_con_archivo(ids, carpeta, ext):
+    """De una lista de ids, devuelve (tienen, faltan) según existan archivos
+    no vacíos en la carpeta."""
+    tienen, faltan = [], []
+    for i in ids:
+        f = carpeta / f"{i}{ext}"
+        if f.exists() and f.stat().st_size > 0:
+            tienen.append(i)
+        else:
+            faltan.append(i)
+    return tienen, faltan
+
+
+def verificar_elementos(p, job):
+    """Valida que los artefactos de cada etapa estén completos y
+    consistentes entre sí (el storyboard manda).
+
+    Devuelve {"ok": bool, "detalle": {...}, "resumen": str}. Se usa al
+    inicio de "Correr todo" y en el botón 🔍 Verificar elementos.
+    """
+    job = Path(job)
+    scenes = _parse_storyboard(job)
+    sb_ids = [s["id"] for s in scenes]
+    det = {}
+    cortas = [s["id"].upper() for s in scenes
+              if s["voz"] and len(s["voz"].split()) < 5]
+    det["storyboard"] = {"total": len(sb_ids), "ok": bool(sb_ids),
+                         "faltan": [], "cortas": cortas}
+    # vo.json: debe cubrir las mismas escenas que el storyboard
+    vo_ids = []
+    vf = job / "vo.json"
+    if vf.exists():
+        try:
+            vo_ids = [str(it.get("id", "")).lower()
+                      for it in json.loads(vf.read_text(encoding="utf-8"))]
+        except Exception:
+            vo_ids = []
+    faltan_vo = [i for i in sb_ids if i not in vo_ids]
+    det["vo_json"] = {"total": len(vo_ids), "faltan": faltan_vo,
+                      "ok": bool(sb_ids) and not faltan_vo}
+    # audios (etapa 6)
+    _, faltan_au = _ids_con_archivo(sb_ids, job / "audio", ".mp3")
+    det["audios"] = {"total": len(sb_ids),
+                     "tienen": len(sb_ids) - len(faltan_au),
+                     "faltan": faltan_au, "ok": bool(sb_ids) and not faltan_au}
+    # videos (etapa 7)
+    _, faltan_vi = _ids_con_archivo(sb_ids, job / "video" / "scenes", ".mp4")
+    det["videos"] = {"total": len(sb_ids),
+                     "tienen": len(sb_ids) - len(faltan_vi),
+                     "faltan": faltan_vi, "ok": bool(sb_ids) and not faltan_vi}
+    # ensamblado (etapa 8)
+    final = job / "video" / "final.mp4"
+    det["ensamblado"] = {"ok": final.exists() and final.stat().st_size > 0,
+                         "faltan": []}
+    ok = all(v["ok"] for v in det.values())
+    partes = []
+    for clave, nombre in (("storyboard", "Storyboard"),
+                          ("vo_json", "vo.json"), ("audios", "Audios"),
+                          ("videos", "Videos"), ("ensamblado", "Ensamblado")):
+        v = det[clave]
+        marca = "✅" if v["ok"] else "❌"
+        extra = ""
+        if v["faltan"]:
+            fs = ", ".join(i.upper() for i in v["faltan"][:8])
+            extra = f" (faltan: {fs}{'...' if len(v['faltan']) > 8 else ''})"
+        if clave == "storyboard" and det["storyboard"]["cortas"]:
+            cs = ", ".join(det["storyboard"]["cortas"][:8])
+            extra += f" [VOZ muy corta: {cs}]"
+        partes.append(f"{marca} {nombre}{extra}")
+    return {"ok": ok, "detalle": det, "resumen": " · ".join(partes)}
 
 
 def _es_fallo_quota(err):
@@ -1812,7 +1935,10 @@ def run_ensamblado(p, job, progress=None):
         au = job / "audio" / f"{sid}.mp3"
         if not au.exists():
             return (False, f"Falta el audio de {sid.upper()} "
-                           "(etapa 6 · TTS).", [], None)
+                           "(etapa 6 · TTS). Re-ejecuta la etapa 6 "
+                           "(solo genera los audios faltantes) o pulsa "
+                           "«🛠 Reparar faltantes», y luego repite esta "
+                           "etapa.", [], None)
         adur = _probe_duration(au)
         if adur <= 0:
             return False, f"No pude leer la duración de {au.name}.", [], None
@@ -2203,6 +2329,20 @@ def run_all(conn, p, generate_fn, on_step=None, on_progress=None):
     """
     import db as _db
     pid = p["id"]
+    # Validación ANTES de correr: si una etapa está marcada "ok" pero le
+    # faltan artefactos (p. ej. el storyboard creció después del TTS y S48
+    # no tiene audio), se reabre para que se repare sola en vez de fallar
+    # más adelante. El TTS omite los audios ya existentes: solo genera los
+    # faltantes.
+    try:
+        job = job_dir_of(p)
+        rep = verificar_elementos(p, job)["detalle"]
+        if not rep["audios"]["ok"] or not rep["vo_json"]["ok"]:
+            _db.set_stage(conn, pid, "tts", "pendiente",
+                          "Verificación automática: faltan audios o vo.json "
+                          "desactualizado; se regeneran solo los faltantes.")
+    except Exception:
+        pass
     for s in _db.list_stages(conn, pid):
         name, stt = s["stage"], s["status"]
         if stt in ("ok", "manual", "omitido"):

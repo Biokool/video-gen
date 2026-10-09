@@ -865,3 +865,56 @@ Verificado con mocks: partes al 80% → continuación automática → 56
 escenas S01-S56 sin huecos, cobertura 105%, 5 llamadas en total.
 
 *Versión del panel: v21 (cada parte se completa sola hasta el 90%).*
+
+## 34. Cambios v22 (2026-10-09) — verificación y reparación de elementos
+
+Reporte: ensamblado falló con "Falta el audio de S48 (etapa 6 · TTS)".
+
+Causa raíz: el storyboard creció DESPUÉS del TTS ("Continuar storyboard"
+agregó escenas) y vo.json quedó desactualizado: la escena nueva nunca
+recibió audio. Además el TTS regeneraba todo siempre y "Correr todo"
+saltaba la etapa 6 por estar marcada "ok".
+
+Fix:
+- `verificar_elementos(p, job)`: valida que storyboard, vo.json, audios,
+  videos y ensamblado estén completos y consistentes (el storyboard manda).
+  Devuelve reporte por rubro con la lista de faltantes.
+- `run_tts_stage`: si los ids de vo.json no coinciden con el storyboard,
+  lo reconstruye automáticamente antes de narrar.
+- `tts_engine.speak_batch`: omite los audios que ya existen (no vacíos);
+  re-ejecutar la etapa 6 solo genera los faltantes. El log lo reporta.
+- `run_all`: al inicio verifica los artefactos; si la etapa 6 está "ok"
+  pero faltan audios (o vo.json desactualizado), la reabre para que se
+  repare sola.
+- Panel: botones "🔍 Verificar elementos" (muestra el reporte) y
+  "🛠 Reparar faltantes" (sincroniza vo.json, regenera audios faltantes,
+  informa videos faltantes).
+- El error del ensamblado ahora sugiere la reparación en vez de solo
+  fallar.
+
+*Versión del panel: v22 (verificación + reparación de elementos).*
+
+## 35. Cambios v23 (2026-10-09) — parsing tolerante de VOZ/VISUAL
+
+Reporte: "Reparar faltantes" sincronizó vo.json con 52 líneas en vez de 59
+y el TTS omitió todo (0/0): el error "Falta el audio de S48" persistía.
+
+Causa raíz: las escenas S48-S54 usan OTRO formato (`**[VOZ]**: "..."` en
+vez de `VOZ:`). El parser solo entendía el formato estándar, así que esas
+7 escenas eran invisibles para vo.json/TTS/verificación. En el storyboard
+hay 4 variantes: `VOZ:`, `**VOZ:**`, `**[VOZ]**: "..."`, `**[VISUAL:** ...`.
+
+Fix:
+- `_campo(bloque, nombre)`: extrae VOZ:/VISUAL: tolerando las 4 variantes
+  y limpiando envoltorios (**, [], "").
+- Se usa en TODOS los lectores: `_parse_storyboard`, `build_vo_json`,
+  `_voz_words`, `_ultima_voz` y los chequeos de cobertura.
+- `_normalizar_campos()`: al guardar (etapa 5 y "Continuar"), reescribe
+  las variantes al formato estándar para que el archivo quede limpio.
+- `verificar_elementos` avisa de escenas con VOZ sospechosamente corta
+  (<5 palabras, p. ej. S54 quedó truncada a media frase).
+
+Verificado con el STORYBOARD.md real del proyecto 37: vo.json pasa de 52
+a 59 líneas; las 4 variantes parsean y normalizan bien.
+
+*Versión del panel: v23 (VOZ/VISUAL se leen en cualquier formato).*
