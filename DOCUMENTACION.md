@@ -815,35 +815,28 @@ reintento literal → 60 escenas S01-S60 continuas, cobertura 107%.
 
 *Versión del panel: v19 (cobertura validada por parte, no solo global).*
 
-## 31. Cambios v19.1 (2026-10-08) — bloqueo de red y rotación entre backends
+## 32. Cambios v20 (2026-10-08) — limpieza de partes + chunk adaptativo
 
-Reporte: etapa 5 (storyboard) falló en 2s con
-`Ningún modelo de 'groq' respondió / HTTP 403: Access denied. Please
-check your network settings.`
+Reporte: etapa 5 falló en 11m16s con TRUNCADO 299/1274 (23%), desde S12.
 
-Causa: **Groq estaba bloqueando la IP** (venía de una VPN): el 403 salía
-en `/models` y en los 4 modelos, así que reintentar o rotar dentro de
-Groq no servía de nada. Al quitar la VPN volvió a responder
-(`/models` 200, 11 ids).
+Causa raíz triple (medida en jobs/37):
+1. Red: Groq bloqueaba la IP por la VPN → la rotación v19.1 quemó
+   minutos ciclando backends hasta caer en un modelo débil.
+2. Regresión: v19.1 devolvió `MAX_TOKENS` de Groq a 1200 (rompe
+   qwen3.8-27b con 400, según lo verificado en v18.1). Restaurado a 1000.
+3. El modelo débil no solo truncó: escribió preámbulo
+   ("¡Excelente! Me encanta..."), separadores "---" y un conteo FALSO
+   ("590 palabras... objetivo alcanzado" cuando eran 299).
 
-Fix en `llm.py`:
+Fix:
+- `_limpiar_parte()`: corta todo lo anterior a la primera escena,
+  elimina líneas "---" y falsos "Recuento de palabras" ANTES de validar.
+- Validación de FORMATO por parte (`_escenas_validas`): número mínimo de
+  escenas según las palabras del trozo; si viene roto, el reintento ordena
+  "empieza DIRECTAMENTE con ### Sxx, sin preámbulos".
+- Prompt base de cada parte: "empieza DIRECTAMENTE con ### Sxx, sin
+  preámbulos ni comentarios".
+- Chunk adaptativo al backend: Groq (1000 tokens de salida) usa trozos de
+  350 palabras; el resto, 650. Cada parte cabe en el límite real.
 
-- `_rate_kind` añade `'blocked'`: "access denied" / "check your network"
-  / "not available in your region" → no se reintenta y se corta esa
-  cadena entera (antes caía como error duro y seguía perdiendo el tiempo
-  con el mismo backend). Un 403 genérico de un modelo concreto pasa a
-  `'skip'` (salta al siguiente modelo, no aborta el backend).
-- **Rotación automática de backend**: si el backend elegido no respondió
-  (bloqueo, cuota, 404…), `generate()` prueba los demás backends
-  gratuitos con key (orden `BACKEND_ORDER`, 3 modelos por backend,
-  excluidos `deepseek` —de pago— y `ollama` —necesita su modelo—) y
-  devuelve `"<modelo> · <backend>"` cuando uno responde. El mensaje de
-  error final ya no recomienda un "modo auto" que no existe: sugiere
-  esperar, cambiar de backend en el panel y revisar la key.
-
-Verificado: `rate_kind("HTTP 403: Access denied…") = blocked`;
-`generate(backend="groq", model="openai/gpt-oss-120b")` → OK 0.7s;
-con la key de OpenRouter corrupta → rotó solo a `gemini-2.5-flash · gemini`
-(8.1s); sin alternativas → mensaje claro. Panel reiniciado (health ok).
-
-*Versión del panel: v19.1 (rotación automática entre backends).*
+*Versión del panel: v20 (partes limpias y validadas, chunk por backend).*

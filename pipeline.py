@@ -29,7 +29,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 
-PANEL_VERSION = "v19"  # se muestra en el pie del sidebar; subir en cada release
+PANEL_VERSION = "v20"  # se muestra en el pie del sidebar; subir en cada release
 # Dos layouts soportados:
 #  - anidado: panel/ dentro de zenn-factory/ (jobs/ y thumbnails/ en el padre)
 #  - plano:   todo dentro de video-gen/ (jobs/ y thumbnails/ junto a app.py)
@@ -431,6 +431,34 @@ def _voz_words(text):
                for m in re.finditer(r"VOZ:\s*(.+)", text))
 
 
+def _limpiar_parte(text):
+    """Quita la basura que los modelos débiles agregan: preámbulos
+    ("¡Excelente!..."), separadores "---" y falsos conteos de palabras.
+    Devuelve el texto desde la primera escena; si no hay escenas, "".
+    """
+    m = re.search(r"(?m)^### S\d+", text)
+    if not m:
+        return ""
+    text = text[m.start():]
+    lineas = []
+    for ln in text.split("\n"):
+        s = ln.strip()
+        if s == "---" or s.startswith("**Recuento de palabras"):
+            continue
+        lineas.append(ln)
+    return "\n".join(lineas).strip()
+
+
+def _escenas_validas(text, parte_words):
+    """Chequeo de formato por parte: empieza con escena y trae un número
+    razonable de escenas para las palabras del trozo."""
+    if not text:
+        return False
+    n = len(re.findall(r"(?m)^### S\d+", text))
+    esperado = max(5, int(parte_words / 40))
+    return n >= esperado
+
+
 def _prompt_parte(i, n_partes, parte, siguiente):
     """Prompt del storyboard para una parte, con objetivo de cobertura."""
     pw = len(parte.split())
@@ -449,7 +477,8 @@ def _prompt_parte(i, n_partes, parte, siguiente):
         f"(continúa la numeración, NO reinicies en S01).\n"
         f"OBJETIVO MEDIBLE: los campos VOZ sumados deben tener al menos "
         f"{objetivo} palabras (90% de esta parte). Cuéntalas antes de "
-        f"responder.\n\n" +
+        f"responder. Empieza DIRECTAMENTE con ### S{siguiente:02d}, sin "
+        f"preámbulos ni comentarios.\n\n" +
         STORYBOARD_PROMPT.format(script=parte[:6000]))
 
 
@@ -462,11 +491,21 @@ def run_storyboard(generate_fn, p, job):
         return False, "Sin guion: primero genera el borrador (etapa guion).", [], None
     script = Path(sp).read_text(encoding="utf-8", errors="replace")
     guion_words = len(re.sub(r"^#.*$", "", script, flags=re.M).split())
-    # Anti-truncado ESTRUCTURAL (2 capas): además del chequeo de cobertura,
+    # Anti-truncado ESTRUCTURAL (3 capas): además del chequeo de cobertura,
     # los guiones largos se generan POR PARTES. Un storyboard completo de
     # ~1800 palabras no cabe en la salida de los modelos gratis y el modelo
     # se corta a la mitad (jobs/37: 53%). Por partes sí cabe.
-    partes = (_partir_guion(script) if guion_words > 1000 else [script])
+    # El tamaño del trozo se adapta al backend: con límite de salida bajo
+    # (Groq: 1000 tokens) los trozos son más chicos para que cada parte quepa.
+    backend = getattr(generate_fn, "backend", "") or ""
+    try:
+        import llm as _llm
+        mt = _llm.MAX_TOKENS.get(backend, 8192)
+    except Exception:
+        mt = 8192
+    trozo = 350 if mt <= 1000 else 650
+    partes = (_partir_guion(script, trozo) if guion_words > 1000
+              else [script])
     textos, model, siguiente = [], "", 1
     for i, parte in enumerate(partes):
         parte_words = len(parte.split())
@@ -480,23 +519,34 @@ def run_storyboard(generate_fn, p, job):
         except Exception as e:
             return False, (f"Error del modelo en parte {i + 1}/{len(partes)}: "
                            f"{e}"), [], None
-        # Validación POR PARTE: si el modelo resumió/recortó, se reintenta
-        # una vez con instrucción explícita (jobs/37: las partes salían al
-        # 64-87% por compresión, no por corte de tokens).
+        # Limpieza: quita preámbulos/separadores/conteos falsos ANTES de
+        # validar (los modelos débiles agregan basura que rompe el conteo).
+        text = _limpiar_parte(text)
+        # Validación POR PARTE (cobertura + formato): si el modelo
+        # resumió/recortó o el formato viene roto, se reintenta una vez con
+        # instrucción explícita.
         vw = _voz_words(text)
-        if vw < 0.9 * parte_words:
+        formato_ok = _escenas_validas(text, parte_words)
+        if vw < 0.9 * parte_words or not formato_ok:
+            motivo = (f"cubrió solo ~{vw} de {parte_words} palabras: "
+                      f"RESUMISTE" if vw < 0.9 * parte_words
+                      else "el formato viene roto (sin escenas o con "
+                           "preámbulo)")
             retry_prompt = (
-                f"Tu versión anterior cubrió solo ~{vw} de {parte_words} "
-                f"palabras: RESUMISTE. Repite la PARTE {i + 1} copiando el "
-                f"texto literal del guion sin cambiar ni una palabra y sin "
-                f"saltarte ningún párrafo. Objetivo: ≥{int(parte_words * 0.9)} "
-                f"palabras en VOZ.\n\n" + prompt)
+                f"Tu versión anterior {motivo}. Repite la PARTE {i + 1} "
+                f"copiando el texto literal del guion sin cambiar ni una "
+                f"palabra y sin saltarte ningún párrafo. Empieza "
+                f"DIRECTAMENTE con ### S{siguiente:02d}, sin preámbulos, "
+                f"sin comentarios y sin conteos de palabras. Objetivo: "
+                f"≥{int(parte_words * 0.9)} palabras en VOZ.\n\n" + prompt)
             try:
                 text2, model2 = generate_fn(
                     retry_prompt,
                     system="Eres director de animación minimalista.")
-                if _voz_words(text2) > vw:
-                    text, model, vw = text2, model2, _voz_words(text2)
+                text2 = _limpiar_parte(text2)
+                vw2 = _voz_words(text2)
+                if vw2 > vw and _escenas_validas(text2, parte_words):
+                    text, model, vw = text2, model2, vw2
             except Exception:
                 pass
         text = _renumerar_desde(text, siguiente)

@@ -363,7 +363,7 @@ def _set_usage(backend, model, out, prompt="", response=""):
 # Límite de salida por minuto (OTPM) de Groq: pedir más de 1.000 tokens
 # de golpe devuelve 400 aunque el modelo lo necesite. El resto de backends
 # usan el máximo por defecto.
-MAX_TOKENS = {"groq": 1200}  # OTPM 1000: ~1200 tokens ≈ escenas compactas sin truncar
+MAX_TOKENS = {"groq": 1000}  # OTPM 1000: 1200 rompe qwen3.8-27b (400); 1024 y 512 van bien
 
 # Timeout por backend (segundos). NVIDIA deja colgados los endpoints que no
 # están provisionados para la cuenta: mejor cortar pronto y pasar al
