@@ -29,7 +29,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 
-PANEL_VERSION = "v23"  # se muestra en el pie del sidebar; subir en cada release
+PANEL_VERSION = "v24"  # se muestra en el pie del sidebar; subir en cada release
 # Dos layouts soportados:
 #  - anidado: panel/ dentro de zenn-factory/ (jobs/ y thumbnails/ en el padre)
 #  - plano:   todo dentro de video-gen/ (jobs/ y thumbnails/ junto a app.py)
@@ -584,11 +584,15 @@ def run_storyboard(generate_fn, p, job):
             else:
                 ancla = _ultima_voz("\n\n".join(trozos_p))
                 faltan = max(0, objetivo - vw_p)
+                temas_p = _temas_cubiertos("\n\n".join(textos) + "\n\n" +
+                                           "\n\n".join(trozos_p), tope=8)
+                no_rep = (f" Ya cubriste estos temas, NO los repitas: "
+                          f"{', '.join(temas_p)}." if temas_p else "")
                 prompt = (
                     f"CONTINUACIÓN de la PARTE {i + 1} de {len(partes)}: ya "
                     f"generaste hasta S{ultimo - 1:02d} (su VOZ terminaba en: "
                     f"\"...{ancla}\"). Continúa el storyboard desde el punto "
-                    f"del guion donde te quedaste, SIN repetir escenas. "
+                    f"del guion donde te quedaste, SIN repetir escenas.{no_rep} "
                     f"Empieza DIRECTAMENTE con ### S{ultimo:02d}, sin "
                     f"preámbulos. Te faltan ~{faltan} palabras de VOZ para "
                     f"llegar al objetivo de {objetivo} (copia literal, sin "
@@ -662,6 +666,11 @@ def run_continuar_storyboard(generate_fn, p, job):
     n = max(nums)
     sp = find_script(p)
     script = Path(sp).read_text(encoding="utf-8", errors="replace") if sp else ""
+    # Anti-repetición: el modelo tiende a re-contar la parte más narrable
+    # (proyecto 37: Wagner 4 veces). Se le prohíben los temas ya cubiertos.
+    temas = _temas_cubiertos(text)
+    no_repetir = (f"\nTEMAS YA CUBIERTOS (PROHIBIDO repetirlos o re-contarlos "
+                  f"desde cero): {', '.join(temas)}.\n" if temas else "")
     prompt = (
         f"Este storyboard quedó TRUNCADO en S{n:02d}. Continúa desde "
         f"S{n + 1:02d} cubriendo ÚNICAMENTE las partes del guion que aún no "
@@ -669,7 +678,7 @@ def run_continuar_storyboard(generate_fn, p, job):
         f"cierre del canal). Mismo formato exacto por escena:\n"
         f"### SXX\nVOZ: <texto literal del guion>\nVISUAL: <descripción>\n\n"
         f"REGLAS: escenas de 8-12s (~25-35 palabras de VOZ); PROTAGONISTA en "
-        f"todas; NO repitas escenas ya existentes.\n\n"
+        f"todas; NO repitas escenas ya existentes.{no_repetir}\n"
         f"STORYBOARD EXISTENTE (referencia, no lo repitas):\n{text[-6000:]}\n\n"
         f"GUION COMPLETO:\n{script[:12000]}")
     try:
@@ -733,7 +742,7 @@ FUENTES:
 <las fuentes reales citadas en el guion/investigación, una por línea, formato "Autor (año). Título.">
 
 CTA:
-<1 línea invitando a suscribirse, p. ej: "🔔 Suscríbete a El Porqué para resolver el siguiente porqué cada semana.">
+<1 línea invitando a suscribirse, p. ej: "🔔 Suscríbete a Indaga para la siguiente indagación, cada semana.">
 
 PREGUNTA:
 <1 pregunta abierta para los comentarios, sin repetir el título, terminada en "👇">
@@ -1540,6 +1549,13 @@ def verificar_elementos(p, job):
               if s["voz"] and len(s["voz"].split()) < 5]
     det["storyboard"] = {"total": len(sb_ids), "ok": bool(sb_ids),
                          "faltan": [], "cortas": cortas}
+    # Calidad narrativa: repeticiones, doble final y citas sueltas.
+    det["storyboard"]["repeticiones"] = _repeticiones(
+        (job / "STORYBOARD.md").read_text(encoding="utf-8", errors="replace")
+        if (job / "STORYBOARD.md").exists() else "")
+    desp_id, desp_n = _doble_final(scenes)
+    det["storyboard"]["doble_final"] = (desp_id, desp_n)
+    det["storyboard"]["citas_sueltas"] = _citas_sueltas(scenes)
     # vo.json: debe cubrir las mismas escenas que el storyboard
     vo_ids = []
     vf = job / "vo.json"
@@ -1577,11 +1593,115 @@ def verificar_elementos(p, job):
         if v["faltan"]:
             fs = ", ".join(i.upper() for i in v["faltan"][:8])
             extra = f" (faltan: {fs}{'...' if len(v['faltan']) > 8 else ''})"
-        if clave == "storyboard" and det["storyboard"]["cortas"]:
-            cs = ", ".join(det["storyboard"]["cortas"][:8])
-            extra += f" [VOZ muy corta: {cs}]"
+        if clave == "storyboard":
+            sbd = det["storyboard"]
+            if sbd["cortas"]:
+                cs = ", ".join(sbd["cortas"][:8])
+                extra += f" [VOZ muy corta: {cs}]"
+            if sbd["repeticiones"]:
+                rp = "; ".join(f"{t} ({', '.join(e)})"
+                               for t, e in sbd["repeticiones"][:3])
+                extra += f" [⚠️ posible repetición: {rp}]"
+            desp_id, desp_n = sbd["doble_final"]
+            if desp_n:
+                extra += (f" [⚠️ doble final: despedida en {desp_id} y "
+                          f"{desp_n} escenas después]")
+            if sbd["citas_sueltas"]:
+                extra += (f" [cita suelta: "
+                          f"{', '.join(sbd['citas_sueltas'][:5])}]")
         partes.append(f"{marca} {nombre}{extra}")
     return {"ok": ok, "detalle": det, "resumen": " · ".join(partes)}
+
+
+def _temas_cubiertos(text, tope=10):
+    """Nombres propios y title_cards ya usados en el storyboard.
+    Se pasan al prompt de continuación para PROHIBIR que el modelo los
+    repita (proyecto 37: Wagner/Doepler se contó 4 veces)."""
+    temas = []
+    for m in re.finditer(r"title_card\(([^)]+)\)", text):
+        t = m.group(1).strip().strip("\"'")
+        if t and t.lower() not in [x.lower() for x in temas]:
+            temas.append(t)
+    from collections import Counter
+    palabras = re.findall(r"[A-ZÁÉÍÓÚÑ][a-záéíóúñ]{3,}", text)
+    comunes = {"Pero", "Porque", "Cuando", "Como", "Este", "Esta", "Para",
+               "Entre", "Sobre", "Desde", "Hasta", "Porque", "Aunque",
+               "Entonces", "Así", "Piénsalo", "Imagina"}
+    for pal, cnt in Counter(palabras).most_common(tope * 2):
+        if cnt >= 3 and pal not in comunes and \
+                pal.lower() not in [x.lower() for x in temas]:
+            temas.append(pal)
+        if len(temas) >= tope:
+            break
+    return temas
+
+
+def _repeticiones(text):
+    """Detecta posible repetición de temas: title_cards duplicados o nombres
+    propios que aparecen en 2+ bloques de escenas separados (>10 escenas).
+    Devuelve lista de (tema, [escenas])."""
+    reps = []
+    cards = {}
+    for b in _bloques_escena(text):
+        mh = re.match(r"###\s*(S\d+)", b)
+        if not mh:
+            continue
+        for m in re.finditer(r"title_card\(([^)]+)\)", b):
+            t = m.group(1).strip().strip("\"'").lower()
+            if t:
+                cards.setdefault(t, []).append(mh.group(1).upper())
+    for t, escenas in cards.items():
+        if len(escenas) > 1:
+            reps.append((f"title_card({t})", escenas))
+    bloques = _bloques_escena(text)
+    esc_por_pal = {}
+    for i, b in enumerate(bloques):
+        for pal in set(re.findall(r"[A-ZÁÉÍÓÚÑ][a-záéíóúñ]{3,}", b)):
+            esc_por_pal.setdefault(pal, []).append(i + 1)
+    comunes = {"Pero", "Porque", "Cuando", "Como", "Este", "Esta", "Para",
+               "Entre", "Sobre", "Desde", "Hasta", "Aunque", "Entonces",
+               "Así", "Vikingo", "Vikingos", "Vikinga", "Protagonista"}
+    for pal, escenas in esc_por_pal.items():
+        if pal in comunes or len(escenas) < 3:
+            continue
+        # agrupa en clusters (hueco >5 = otro bloque)
+        clusters, actual = [], [escenas[0]]
+        for e in escenas[1:]:
+            if e - actual[-1] > 5:
+                clusters.append(actual)
+                actual = [e]
+            else:
+                actual.append(e)
+        clusters.append(actual)
+        clusters = [c for c in clusters if len(c) >= 2]
+        if len(clusters) >= 2:
+            reps.append((pal, [f"S{c[0]:02d}-S{c[-1]:02d}" for c in clusters]))
+    return reps
+
+
+_DESPEDIDA_PAT = re.compile(
+    r"esto fue el porqu[eé]|esto fue indaga|nos vemos en el pr[oó]ximo|"
+    r"para resolver el siguiente porqu[eé]|para la siguiente indagaci[oó]n|"
+    r"seguimos indagando|no olvides.*suscri|"
+    r"dale.{0,20}me gusta.{0,20}suscr", re.I)
+
+
+def _doble_final(scenes):
+    """Si hay despedida/CTA y después más escenas, el video 'termina dos
+    veces'. Devuelve (escena_despedida, n_posteriores)."""
+    idx = None
+    for i, s in enumerate(scenes):
+        if _DESPEDIDA_PAT.search(s["voz"]):
+            idx = i
+    if idx is not None and idx < len(scenes) - 1:
+        return scenes[idx]["id"].upper(), len(scenes) - idx - 1
+    return None, 0
+
+
+def _citas_sueltas(scenes):
+    """Escenas cuya VOZ es solo una cita bibliográfica (suenan rotas en TTS)."""
+    return [s["id"].upper() for s in scenes
+            if re.match(r"^\(.*\d{4}.*\)\.?$", s["voz"].strip())]
 
 
 def _es_fallo_quota(err):
@@ -1902,8 +2022,8 @@ def run_ensamblado(p, job, progress=None):
         return (False, "Falta ffmpeg/ffprobe en el PATH: instálalo para "
                        "poder ensamblar.", [], None)
     vdir = job / "video" / "scenes"
-    scenes = sorted(vdir.glob("*.mp4")) if vdir.exists() else []
-    if not scenes:
+    archivos = sorted(vdir.glob("*.mp4")) if vdir.exists() else []
+    if not archivos:
         return (False, "Sin videos de escenas: ejecuta antes la etapa 7 "
                        "(Animación).", [], None)
     # Garantía de duración: el video final debe cubrir TODAS las escenas del
@@ -1911,7 +2031,7 @@ def run_ensamblado(p, job, progress=None):
     # fallamos con la lista para que se re-animen solo esas.
     sb_ids = [s["id"] for s in _parse_storyboard(job)]
     if sb_ids:
-        have = {sc.stem.lower() for sc in scenes if sc.stat().st_size > 0}
+        have = {sc.stem.lower() for sc in archivos if sc.stat().st_size > 0}
         faltan = [i.upper() for i in sb_ids if i not in have]
         if faltan:
             return (False,
@@ -1921,6 +2041,13 @@ def run_ensamblado(p, job, progress=None):
                     "(Animación: omite solas las ya hechas) o usa "
                     "«Re-animar escena» para cada una, y luego repite esta "
                     "etapa.", [], None)
+    # El storyboard manda: solo se ensamblan sus escenas, en su orden.
+    # Los videos huérfanos (escenas borradas del storyboard) se ignoran con
+    # aviso en vez de colarse al video final.
+    scenes = ([vdir / f"{sid}.mp4" for sid in sb_ids
+               if (vdir / f"{sid}.mp4").exists()] if sb_ids else archivos)
+    huerfanos = [sc.stem.upper() for sc in archivos
+                 if sc.stem.lower() not in sb_ids] if sb_ids else []
     prog = Progreso("ensamblado", progress)
     prog.start(len(scenes) + 2, "leyendo escenas")
     vo_file = job / "vo.json"
@@ -1993,6 +2120,9 @@ def run_ensamblado(p, job, progress=None):
     prog.item(len(segs) + 2, len(segs) + 2, "video final listo")
     log = (f"Ensamblado OK: {len(segs)} escenas, {total:.0f}s totales "
            f"({total / 60:.1f} min).\n" + " · ".join(logs) +
+           (f"\n⚠️ Videos huérfanos ignorados (no están en el storyboard): "
+            f"{', '.join(huerfanos)}. Bórralos de video/scenes si ya no los "
+            f"necesitas." if huerfanos else "") +
            ("\nVersión con subtítulos quemados generada."
             if r.returncode == 0 else
             "\nAVISO: no se pudo quemar subtítulos (revisa final.srt)."))
@@ -2390,7 +2520,7 @@ def run_all(conn, p, generate_fn, on_step=None, on_progress=None):
 
 
 # ---------- propuestas de temas (asistida por LLM) ----------
-TOPIC_PROMPT = """Propón 8 temas para videos de curiosidad del canal "El Porqué"
+TOPIC_PROMPT = """Propón 8 temas para videos de curiosidad del canal "Indaga"
 (español neutro): una sola pregunta por video, 8-12 minutos, animación de
 dibujos simples con personaje cabezón de playera naranja. Público:
 hispanohablantes curiosos. El formato "curiosidad animada" en español está

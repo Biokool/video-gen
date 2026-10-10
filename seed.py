@@ -21,7 +21,7 @@ tid = db.add_topic(
     "La percepción del tiempo se acelera con la edad",
     source="manual",
     signals="Pregunta universal, alto potencial de retención",
-    notes="Video piloto del canal El Porqué",
+    notes="Video piloto del canal Indaga",
 )
 db.set_topic_status(conn, tid, "aprobado")
 

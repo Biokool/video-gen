@@ -1,6 +1,6 @@
 # Panel Zenn Factory
 
-Tablero visual local para operar el canal **El Porqué**: bandeja de temas,
+Tablero visual local para operar el canal **Indaga**: bandeja de temas,
 pipeline por proyecto con 3 puertas de aprobación, configuración por video
 (largo / corto-recorte / corto-standalone) y combo multi-backend
 (Gemini, Groq, Cerebras, OpenRouter gratis, Mistral, Cohere ↔ Ollama local).

@@ -19,13 +19,14 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import db
 import llm
+import marca
 import pipeline
 from pipeline import (BASE, stages_for, count_words, estimate_minutes,
                       propose_topics, draft_script, critic_review,
                       cut_vertical, execute_stage, run_all, stage_label,
                       STAGE_HINTS)
 
-st.set_page_config(page_title="Zenn Factory · El Porqué", layout="wide")
+st.set_page_config(page_title=f"Zenn Factory · {marca.NOMBRE_CANAL}", layout="wide")
 
 conn = db.connect()
 db.init_db()
@@ -688,11 +689,11 @@ elif view == "🎬 Proyectos":
                     st.error("⚠️ **Falta el paquete de publicación**: no hay "
                              "`PAQUETE.md` en este proyecto. Corre la etapa "
                              "**10 (Paquete de publicación)** primero — sin "
-                             "él, el título saldría como \"El Porqué\" y la "
+                             f"él, el título saldría como \"{marca.NOMBRE_CANAL}\" y la "
                              "descripción vacía.")
                 else:
                     paq = yt.parse_paquete(paq_path)
-                    if (not paq["titulo"] or paq["titulo"] == "El Porqué"
+                    if (not paq["titulo"] or paq["titulo"] == marca.NOMBRE_CANAL
                             or len(paq["descripcion"]) < 50):
                         st.warning("⚠️ El paquete parece incompleto (título o "
                                    "descripción vacíos). Revísalo antes de "

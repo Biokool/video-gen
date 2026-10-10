@@ -20,6 +20,8 @@ token.json y client_secret.json son SECRETOS: nunca van al ZIP ni a git.
 import json
 from pathlib import Path
 
+import marca
+
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 
 # Etiquetas de la UI -> valores que acepta resource.status.privacyStatus.
@@ -205,8 +207,7 @@ _PAQ_HEADERS = ["TITULOS:", "DESCRIPCION:", "LO QUE VERAS:", "CAPITULOS:",
                 "COMENTARIO FIJADO:", "POST COMUNIDAD:", "SHORT SUGERIDO:",
                 "PANTALLA FINAL:"]
 
-_CTA_DEFAULT = ("🔔 Suscríbete a El Porqué para resolver el siguiente "
-                "porqué cada semana.")
+_CTA_DEFAULT = marca.CTA_YOUTUBE
 
 
 def _limpiar_md(t):
@@ -281,7 +282,7 @@ def parse_paquete(paquete_md):
         titulo = _limpiar_md(m.group(1).strip())
     if not titulo:
         m = re.search(r"^1\.\s*(.+)", txt, re.M)
-        titulo = _limpiar_md(m.group(1).strip()) if m else "El Porqué"
+        titulo = _limpiar_md(m.group(1).strip()) if m else marca.NOMBRE_CANAL
 
     desc = _limpiar_md(sec.get("DESCRIPCION:", ""))
     veras = _limpiar_md(sec.get("LO QUE VERAS:", ""))

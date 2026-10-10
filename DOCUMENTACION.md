@@ -1,4 +1,4 @@
-# Zenn Factory — Panel «El Porqué» · Documentación completa
+# Zenn Factory — Panel «Indaga» · Documentación completa
 
 **Qué es:** una fábrica local de videos de divulgación científica estilo
 Zenn (una pregunta por video, 8–12 minutos, monigotes animados, fuentes
@@ -217,21 +217,23 @@ Si uno de los tres promete otra cosa, la retención se cae.
 7. Métricas que mandan: **CTR** (miniatura+título) y **retención**
    (gancho de los primeros 30 s y ritmo visual).
 
-## 8. Nombres para el canal (5 alternativas a «El Porqué»)
+## 8. Nombre del canal (decisión v25)
 
-| Nombre | Por qué funciona | Riesgo |
-|--------|------------------|--------|
-| **¿Y Eso Por Qué?** | Es la frase exacta que la audiencia dice y busca; formato pregunta = clic | Handle largo (@YEsoPorque) |
-| **Mente Preguntona** | Marca propia, memorable, tono familiar amplio | Menos “buscable” al inicio |
-| **Por Qué Será** | Coloquial mexicano, muy pegajoso, corto | Puede sonar a cumbia/chisme |
-| **Duda Científica** | Describe el nicho; “científica” posiciona en búsquedas de ciencia | Suena a tarea escolar |
-| **La Pregunta del Día** | Promete hábito diario; formato claro | Genérico; competencia de medios |
+El canal se llama **Indaga** desde v25 (2026-10-09). Nombres anteriores
+descartados: «El Porqué» (no disponible como nombre de canal) y
+«Sabia Duda» (frase genérica, imposible de apropiar en búsqueda, tono de
+filosofía desalineado con ciencia-curiosidad).
 
-**Mi recomendación:** si el objetivo nº 1 es que el algoritmo y las
-búsquedas te encuentren, **«¿Y Eso Por Qué?»** gana (la pregunta ES la
-búsqueda). Si prefieres marca a largo plazo, quédate con **«El
-Porqué»** y compensa con títulos siempre en forma de pregunta. Verifica
-handle y que no exista un canal grande con el nombre antes de cambiar.
+- Marca centralizada en `panel/marca.py`: nombre, eslogan, saludo, despedida,
+  CTA de YouTube, hashtags y colores. Si el nombre vuelve a cambiar, se cambia
+  ahí y en `PROMPT_MAESTRO.md`.
+- Voz fija: saludo «¡Hola! Bienvenidos a Indaga, donde cada pregunta se
+  investiga a fondo.»; despedida «Esto fue Indaga. Nos vemos en el próximo
+  video... para la siguiente indagación.»
+- Hashtags: `#ciencia #curiosidades #sabiasque`.
+- Paleta: noche `#011348`, ámbar `#FFB300`, blanco `#FFFFFF`. Emblema del canal
+  en `panel/marca/indaga-emblema.png` (también disponible para futuros
+  intro/watermark).
 
 ## 9. Solución de problemas
 
@@ -306,7 +308,7 @@ video-gen/
 - **Guion con retención:** PROMPT_MAESTRO v2 — saludo fijo de apertura +
   hook en 15 s, 3–4 picos de información, open loops por bloque, matices
   de narración, mezcla ciencia + cultura alternativa, despedida fija
-  ("...para resolver el siguiente porqué"). El storyboard usa la primera
+  («...para la siguiente indagación»). El storyboard usa la primera
   escena para la bienvenida y la última para la despedida; la crítica
   revisa apertura, picos, cierre y **ortografía** (tildes).
 - **Aviso ortográfico automático:** la verificación lista palabras con
@@ -617,7 +619,7 @@ proyecto largo, la puerta muestra advertencia (objetivo 8–12 min ≈
 ### 🚫 Publicar exige PAQUETE.md (nuevo gate)
 
 Si no existe `PAQUETE.md`, la sección Publicar muestra error bloqueante
-("corre la etapa 10 primero") en vez de rellenar título="El Porqué" y
+("corre la etapa 10 primero") en vez de rellenar título="Indaga" y
 descripción vacía en silencio. Si el paquete parece incompleto, avisa
 antes de subir.
 
@@ -918,3 +920,31 @@ Verificado con el STORYBOARD.md real del proyecto 37: vo.json pasa de 52
 a 59 líneas; las 4 variantes parsean y normalizan bien.
 
 *Versión del panel: v23 (VOZ/VISUAL se leen en cualquier formato).*
+
+## 36. Cambios v24 (2026-10-09) — anti-repetición y plan de mejora continua
+
+Reporte: el video publicado (8:51) cuenta el origen Wagner/Doepler 4
+veces (~3 min, 35%) y "termina dos veces" (despedida en 7:05 + recap
+7:22-8:46). La repetición la introdujeron las continuaciones del
+storyboard, no el guion (el guion lo cuenta una vez).
+
+Fix técnico:
+- `_temas_cubiertos()`: nombres propios + title_cards ya usados; se
+  prohíben en el prompt de "Continuar storyboard" y en la continuación
+  automática por parte ("PROHIBIDO repetirlos").
+- `_repeticiones()`: detecta title_cards duplicados y nombres en 2+
+  bloques separados → aviso en 🔍 Verificar elementos.
+- `_doble_final()`: despedida/CTA + escenas después → aviso.
+- `_citas_sueltas()`: VOZ que es solo `(Autor, año)` → aviso.
+- `run_ensamblado`: el storyboard manda — solo se ensamblan sus escenas
+  en su orden; videos huérfanos se ignoran con aviso (antes se colaban).
+- PROMPT_MAESTRO: regla "UN TEMA = UN BLOQUE" + densidad competitiva
+  (giro/dato cada ~60s) + loop de mejora.
+- Nuevo `MEJORA_CONTINUA.md`: chequeos automáticos, loop publicar →
+  medir → ajustar (un cambio por video), scorecard y benchmark mensual
+  (Memorias de Pez, Quantum Fracture, CdeCiencia, La Hiperactina).
+
+Acción inmediata (proyecto 37): propuesta `STORYBOARD_LIMPIO_37.md`
+(41 escenas: fuera S27-S31 y S48-S59, S19 fusionada en S18, renumeradas).
+
+*Versión del panel: v24 (anti-repetición + mejora continua).*

@@ -17,8 +17,8 @@ PÚBLICO: adultos curiosos, sin formación científica. Español neutro latinoam
 DURACIÓN OBJETIVO: [8–12] minutos → 1,300–1,900 palabras a 150–160 palabras/minuto.
 
 APERTURA OBLIGATORIA (primeros 20 segundos, ~50 palabras):
-1. Saludo fijo del canal: "¡Hola! Bienvenidos a El Porqué, donde cada video
-   responde una pregunta que quizás nunca te habías hecho... pero deberías."
+1. Saludo fijo del canal: "¡Hola! Bienvenidos a Indaga, donde cada pregunta
+   se investiga a fondo."
 2. HOOK inmediato (sin rodeos): la pregunta del video + UN dato brutal o una
    escena en segunda persona que el espectador haya vivido. PROHIBIDO empezar
    con definiciones, contexto histórico o "en este video vamos a ver".
@@ -44,8 +44,8 @@ ESTRUCTURA (con tiempos):
    Cada bloque abre con tarjeta de título (mayúsculas, ej: "TU CEREBRO MIENTE").
 3. PAYOFF FINAL (últimos 60 segundos, ~80 palabras): el dato máximo del video,
    el que la gente va a citar en comentarios. Una sola idea, demoledora.
-4. CIERRE OBLIGATORIO (2 líneas): despedida fija del canal: "Esto fue El Porqué.
-   Nos vemos en el próximo video... para resolver el siguiente porqué." +
+4. CIERRE OBLIGATORIO (2 líneas): despedida fija del canal: "Esto fue Indaga.
+   Nos vemos en el próximo video... para la siguiente indagación." +
    invitación suave a suscribirse.
 
 REGLAS DE ESTILO:
@@ -108,3 +108,14 @@ FORMATO DE SALIDA:
 4. **Duración:** contar palabras del borrador (sin contar [VISUAL] ni FUENTES).
    Ajustar bloques hasta caer en 1,300–1,900.
 5. **Idioma:** español neutro. Evitar modismos regionales ("vale", "che", "güey").
+6. **Disciplina narrativa (anti-repetición):** UN TEMA = UN BLOQUE. Si un
+   nombre propio (persona, obra, año) ya tiene su bloque, no vuelve a
+   aparecer como bloque separado: las menciones posteriores son de UNA
+   frase como recordatorio ("como viste con Wagner..."), nunca otro bloque.
+   La despedida + CTA es LO ÚLTIMO del guion: nada de contenido nuevo
+   después (el panel lo detecta como "doble final").
+7. **Densidad competitiva:** un giro, dato nuevo, pregunta retórica o chiste
+   cada ~60 segundos (Memorias de Pez / CdeCiencia no dejan tramos planos).
+   Si un párrafo no agrega dato nuevo ni giro, se borra.
+8. **Mejora continua:** ver MEJORA_CONTINUA.md — después de cada video se
+   mide (CTR, retención 30s, comentarios) y se hace UN ajuste por video.
