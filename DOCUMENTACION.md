@@ -948,3 +948,88 @@ Acción inmediata (proyecto 37): propuesta `STORYBOARD_LIMPIO_37.md`
 (41 escenas: fuera S27-S31 y S48-S59, S19 fusionada en S18, renumeradas).
 
 *Versión del panel: v24 (anti-repetición + mejora continua).*
+
+## 36. Cambios v26 (2026-10-09) — audios: verificación estructural + diagnóstico forense
+
+Reporte: tras aplicar v25, el ensamblado volvió a fallar en el mismo lugar:
+"Falta el audio de S34 (etapa 6 · TTS)", A PESAR de que "🛠 Reparar faltantes"
+había sincronizado vo.json (82 líneas) y el TTS reportó "0/0 OK | omitidos
+(ya existían): 82". Contradicción: el TTS veía los 82 audios y el ensamblado
+no encontraba s34.mp3.
+
+Revisión a detalle: las 5+ construcciones de rutas `job/"audio"/f"{id}.mp3`
+(TTS-skip, `_ids_con_archivo`, reparación, ensamblado, probes) normalizaban
+igual (minúsculas) y `job_dir_of()` es determinista, así que el código no
+podía discrepar consigo mismo: el estado del archivo cambió entre los dos
+chequeos, o el archivo quedó inválido. Casos validados en los que esto sucede:
+
+1. **Audio corrupto/truncado que pasa el filtro de existencia.** El TTS omite
+   si el archivo existe y no está vacío; un mp3 truncado (corte de energía,
+   runner muerto a la mitad, escritura parcial) tiene tamaño > 0 pero es
+   ilegible. El TTS lo omite como "ya existía" y el ensamblado lo reporta
+   como faltante o falla al leer su duración.
+2. **Archivo eliminado/movido ENTRE la verificación y el ensamblado.**
+   Antivirus en cuarentena, carpeta bajo sincronización en la nube
+   (OneDrive/Dropbox) que mueve o bloquea el archivo, limpieza de disco o
+   borrado manual accidental.
+3. **Storyboard editado después del TTS** (continuar, renumerar, borrar
+   escenas): vo.json y los audios ya no corresponden a los ids actuales.
+4. **Bloqueo de archivo en Windows**: otro proceso (reproductor, vista previa
+   del explorador) bloquea el mp3 y `exists()`/lectura falla intermitente.
+
+Fix estructural (el fallo ya no puede ser silencioso ni críptico):
+- `_audio_path(job, sid)`: ÚNICA función que construye la ruta de un audio;
+  TTS-skip, verificación, reparación, ensamblado y probes la usan. Cero
+  deriva de normalización.
+- `run_tts_stage`: verificación posterior — la etapa NO puede terminar en ok
+  si alguna escena de vo.json quedó sin audio válido (existe + no vacío +
+  duración legible por ffprobe). Falla fuerte listando las escenas.
+- `run_ensamblado`: pre-flight vo.json ↔ storyboard; si el storyboard cambió
+  después del TTS, falla con la diferencia exacta en vez de "Falta el audio".
+- Error "Falta el audio" enriquecido: ruta completa esperada, cuántos mp3s
+  hay en audio/, nombres parecidos (difflib) y causas probables con acción.
+- `verificar_elementos`: además de existencia, prueba legibilidad con ffprobe
+  (si está instalado); los ilegibles se reportan como faltantes.
+- "🛠 Reparar faltantes": nuevo campo "Forzar regeneración de audios
+  (ej: s34)" que borra esos mp3 antes de reparar (cubre el caso 1); y
+  RE-VERIFICA después de reparar: si sigue incompleto lo dice en vez de
+  declarar éxito (cubre el caso S34 original).
+
+*Versión del panel: v26 (audios a prueba de contradicciones).*
+
+## 37. Cambios v27 (2026-10-10) — causa raíz del loop S34: escenas sin VOZ descartadas en silencio
+
+Reporte: con v26, "🛠 Reparar faltantes" mostraba "vo.json sincronizado
+(82 líneas) · TTS 0/0 OK | omitidos: 82 · ⚠️ SIGUE INCOMPLETO tras reparar:
+vo_json: S34-S39; audios: S34-S39" y el ensamblado: "El storyboard cambió
+después del TTS: en storyboard pero no en vo.json: S34, S35, ... S53...".
+La etapa 5 reportaba 111 escenas pero vo.json siempre quedaba en 82.
+
+Causa raíz (esta sí): `build_vo_json()` descartaba EN SILENCIO las escenas
+cuyo VOZ no podía parsear (`if voz:`). 29 de las 111 escenas usan un formato
+de marcador que `_campo()` no reconoce (5ª variante, posterior a las 4 de
+v23 — probablemente de la continuación con gemini-2.5-flash-lite). El loop
+infinito: verificar detecta faltantes → reparación reconstruye vo.json →
+vuelve a descartar las mismas 29 → TTS omite las 82 existentes → verificar
+vuelve a detectar faltantes. Ningún botón podía arreglarlo porque el
+problema está en el STORYBOARD (etapa 5), no en el TTS.
+
+Fix:
+- `build_vo_json()` devuelve `(n, origen, sin_voz)`: las escenas sin VOZ
+  legible se REPORTAN, nunca se descartan en silencio.
+- `run_tts_stage`: si hay `sin_voz`, falla FUERTE con la lista exacta de
+  escenas + muestra del markdown crudo de la primera (para ver el formato
+  real que usó el modelo) + instrucción (editar STORYBOARD.md con formato
+  'VOZ: ...' o re-ejecutar etapa 5).
+- `verificar_elementos`: la sección storyboard incluye `sin_voz` y marca
+  ❌ ("ningún botón las arregla: edita STORYBOARD.md o etapa 5").
+- "🛠 Reparar faltantes": informa las escenas sin VOZ en su mensaje y el
+  campo "Forzar" ahora solo acepta ids de escena (`s\d+`; ignora texto
+  pegado por accidente).
+- Nuevo `_bloque_crudo(job, sid)`: devuelve el markdown crudo de una escena
+  para diagnóstico de formato.
+
+Nota: si el usuario pega la muestra del formato no reconocido, se agrega la
+variante a `_pat_campo()` (como se hizo en v23 con las 4 anteriores).
+
+*Versión del panel: v27 (sin descarte silencioso de escenas).*

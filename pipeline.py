@@ -770,7 +770,7 @@ def _scene_marks(job):
     items = json.loads(vo.read_text(encoding="utf-8"))
     lines, t = [], 0.0
     for it in items:
-        au = job / "audio" / f"{it['id'].lower()}.mp3"
+        au = _audio_path(job, it["id"])
         dur = _probe_duration(au) if au.exists() else 0.0
         m, s = divmod(int(t), 60)
         lines.append(f"{m}:{s:02d} {it['id'].upper()} — "
@@ -807,7 +807,7 @@ def run_paquete(generate_fn, p, job):
         try:
             for it in json.loads((job / "vo.json").read_text(
                     encoding="utf-8")):
-                au = job / "audio" / f"{it['id'].lower()}.mp3"
+                au = _audio_path(job, it["id"])
                 if au.exists():
                     t += _probe_duration(au) or 0.0
         except Exception:
@@ -903,19 +903,39 @@ class Progreso:
             pass
 
 
+def _bloque_crudo(job, sid):
+    """Devuelve el markdown crudo del bloque de una escena (para diagnóstico).
+    v27: cuando una escena no tiene VOZ legible, el error muestra este texto
+    para ver el formato real que usó el modelo."""
+    sb = Path(job) / "STORYBOARD.md"
+    if not sb.exists():
+        return ""
+    text = sb.read_text(encoding="utf-8", errors="replace")
+    sid_u = str(sid).upper()
+    m = re.search(rf"(?ms)^###\s*{sid_u}\b(.*?)(?=^###\s*S\d+|\Z)", text)
+    return m.group(0).strip()[:600] if m else ""
+
+
 def build_vo_json(p, job):
     """Crea vo.json ([{id, text}]) desde STORYBOARD.md; si no hay, del guion.
 
-    Devuelve (n_items, origen) o (0, "") si no hay material.
+    Devuelve (n_items, origen, sin_voz). v27: las escenas SIN VOZ legible ya
+    NO se descartan en silencio (eso causaba un loop infinito: la reparación
+    sincronizaba vo.json una y otra vez con menos líneas, el TTS omitía todo
+    y el ensamblado seguía fallando). Ahora se reportan en sin_voz para que
+    la etapa falle fuerte con la lista exacta.
     """
-    items = []
+    items, sin_voz = [], []
     sb = job / "STORYBOARD.md"
     if sb.exists():
         text = sb.read_text(encoding="utf-8", errors="replace")
         for m in re.finditer(r"###\s*(S\d+)(.*?)(?=###\s*S\d+|\Z)", text, re.S):
             voz = _campo(m.group(2), "VOZ")
+            sid = m.group(1).lower()
             if voz:
-                items.append({"id": m.group(1).lower(), "text": voz})
+                items.append({"id": sid, "text": voz})
+            else:
+                sin_voz.append(sid)
     if not items:
         sp = find_script(p)
         if sp:
@@ -935,8 +955,8 @@ def build_vo_json(p, job):
     if items:
         (job / "vo.json").write_text(
             json.dumps(items, ensure_ascii=False, indent=1), encoding="utf-8")
-        return len(items), ("storyboard" if sb.exists() else "guion")
-    return 0, ""
+        return len(items), ("storyboard" if sb.exists() else "guion"), sin_voz
+    return 0, "", sin_voz
 
 
 def run_tts_stage(p, job, progress=None):
@@ -955,12 +975,55 @@ def run_tts_stage(p, job, progress=None):
         except Exception:
             vo_ids = []
     if not vf.exists() or (sb_ids and set(sb_ids) != set(vo_ids)):
-        n, origen = build_vo_json(p, job)
+        n, origen, sin_voz = build_vo_json(p, job)
         if not n:
             return (False, "Sin vo.json ni storyboard/guion para crearlo. "
                            "Genera primero el storyboard (etapa 5).", [], None)
+        # v27: si hay escenas sin VOZ legible, fallar FUERTE aquí con la lista
+        # y una muestra del formato real — antes se descartaban en silencio y
+        # la reparación entraba en loop infinito (vo.json siempre con menos
+        # líneas, TTS omitiendo todo, ensamblado fallando).
+        if sin_voz:
+            muestra = _bloque_crudo(job, sin_voz[0])
+            lista = ", ".join(s.upper() for s in sin_voz[:12])
+            if len(sin_voz) > 12:
+                lista += f" (+{len(sin_voz) - 12} más)"
+            return (False,
+                    f"El storyboard tiene {len(sin_voz)} escenas sin VOZ "
+                    f"legible: {lista}.\n"
+                    "El modelo las escribió con un formato que no reconozco "
+                    "(cada escena necesita una línea 'VOZ: ...'). Muestra de "
+                    f"la primera ({sin_voz[0].upper()}):\n---\n{muestra}\n---\n"
+                    "Edita STORYBOARD.md y dales formato 'VOZ: ...' / "
+                    "'VISUAL: ...', o re-ejecuta la etapa 5 (Storyboard). "
+                    "Cuando las arregles, re-ejecuta esta etapa.",
+                    [], None)
         extra = f"vo.json sincronizado desde {origen} ({n} líneas). "
     ok, log = run_tts(job, p["voice"], p["language"], progress=progress)
+    # v26 — verificación posterior ESTRUCTURAL: el TTS omite los audios que
+    # "ya existen", pero si un archivo se corrompió o se borró entre el
+    # chequeo y el ensamblado, la etapa 8 fallaba con "Falta el audio de Sxx"
+    # aunque la 6 había reportado ok. Ahora la etapa 6 no puede terminar en ok
+    # sin que cada escena de vo.json tenga un audio válido (existe, no vacío
+    # y con duración legible). Si algo falla, se dice exactamente qué.
+    mal = []
+    try:
+        vitems = json.loads(vf.read_text(encoding="utf-8")) if vf.exists() else []
+    except Exception:
+        vitems = []
+    for it in vitems:
+        sid = str(it.get("id", "")).lower()
+        au = _audio_path(job, sid)
+        if not au.exists() or au.stat().st_size == 0:
+            mal.append(f"{sid.upper()} (sin archivo)")
+        elif _probe_duration(au) <= 0:
+            mal.append(f"{sid.upper()} (ilegible/corrupto)")
+    if mal:
+        return (False,
+                "TTS terminó pero estos audios quedaron inválidos: "
+                + ", ".join(mal) + ". Bórralos de audio/ (o usa «Forzar» en "
+                  "«🛠 Reparar faltantes») y re-ejecuta la etapa 6.",
+                [], None)
     arts = [str(a) for a in (job / "audio").glob("*.mp3")] if ok else []
     full = extra + log
     logf = _guardar_log(job, "tts", [full])
@@ -1521,12 +1584,24 @@ def _parse_storyboard(job):
     return scenes
 
 
+def _audio_path(job, sid):
+    """ÚNICA forma válida de construir la ruta de un audio.
+
+    v26: antes había 5+ construcciones inline de job/"audio"/f"{id}.mp3"
+    repartidas entre TTS, verificación, reparación y ensamblado. Si alguna
+    normalizaba distinto, el TTS podía "omitir por existente" un archivo que
+    el ensamblado no encontraba. Ahora todos usan esta función.
+    """
+    return Path(job) / "audio" / f"{str(sid).lower()}.mp3"
+
+
 def _ids_con_archivo(ids, carpeta, ext):
     """De una lista de ids, devuelve (tienen, faltan) según existan archivos
-    no vacíos en la carpeta."""
+    no vacíos en la carpeta. Los ids se normalizan a minúsculas igual que
+    _audio_path (en Windows da igual, pero el log queda consistente)."""
     tienen, faltan = [], []
     for i in ids:
-        f = carpeta / f"{i}{ext}"
+        f = carpeta / f"{str(i).lower()}{ext}"
         if f.exists() and f.stat().st_size > 0:
             tienen.append(i)
         else:
@@ -1547,8 +1622,12 @@ def verificar_elementos(p, job):
     det = {}
     cortas = [s["id"].upper() for s in scenes
               if s["voz"] and len(s["voz"].split()) < 5]
-    det["storyboard"] = {"total": len(sb_ids), "ok": bool(sb_ids),
-                         "faltan": [], "cortas": cortas}
+    # v27: escenas sin VOZ legible (formato no reconocido) — antes se
+    # descartaban en silencio en build_vo_json y la reparación entraba en loop
+    sin_voz = [s["id"].upper() for s in scenes if not s["voz"]]
+    det["storyboard"] = {"total": len(sb_ids),
+                         "ok": bool(sb_ids) and not sin_voz,
+                         "faltan": [], "cortas": cortas, "sin_voz": sin_voz}
     # Calidad narrativa: repeticiones, doble final y citas sueltas.
     det["storyboard"]["repeticiones"] = _repeticiones(
         (job / "STORYBOARD.md").read_text(encoding="utf-8", errors="replace")
@@ -1568,11 +1647,20 @@ def verificar_elementos(p, job):
     faltan_vo = [i for i in sb_ids if i not in vo_ids]
     det["vo_json"] = {"total": len(vo_ids), "faltan": faltan_vo,
                       "ok": bool(sb_ids) and not faltan_vo}
-    # audios (etapa 6)
-    _, faltan_au = _ids_con_archivo(sb_ids, job / "audio", ".mp3")
+    # audios (etapa 6) — v26: no basta que el archivo exista y no esté vacío;
+    # un mp3 truncado (corte de luz, runner muerto a la mitad) pasa el filtro
+    # de existencia pero es ilegible. Se prueban con ffprobe (si está).
+    import shutil as _sh
+    _tienen_au, _faltan_au = _ids_con_archivo(sb_ids, job / "audio", ".mp3")
+    _ilegibles = []
+    if _tienen_au and _sh.which("ffprobe"):
+        _ilegibles = [i for i in _tienen_au
+                      if _probe_duration(_audio_path(job, i)) <= 0]
+    faltan_au = _faltan_au + _ilegibles
     det["audios"] = {"total": len(sb_ids),
                      "tienen": len(sb_ids) - len(faltan_au),
-                     "faltan": faltan_au, "ok": bool(sb_ids) and not faltan_au}
+                     "faltan": faltan_au, "ok": bool(sb_ids) and not faltan_au,
+                     "ilegibles": _ilegibles}
     # videos (etapa 7)
     _, faltan_vi = _ids_con_archivo(sb_ids, job / "video" / "scenes", ".mp4")
     det["videos"] = {"total": len(sb_ids),
@@ -1609,6 +1697,11 @@ def verificar_elementos(p, job):
             if sbd["citas_sueltas"]:
                 extra += (f" [cita suelta: "
                           f"{', '.join(sbd['citas_sueltas'][:5])}]")
+            if sbd.get("sin_voz"):
+                sv = sbd["sin_voz"]
+                extra += (f" [SIN VOZ legible: {', '.join(sv[:8])}"
+                          f"{'...' if len(sv) > 8 else ''} — ningún botón "
+                          f"las arregla: edita STORYBOARD.md o etapa 5]")
         partes.append(f"{marca} {nombre}{extra}")
     return {"ok": ok, "detalle": det, "resumen": " · ".join(partes)}
 
@@ -1721,7 +1814,7 @@ def _generar_y_renderizar_escena(generate_fn, sdir, media, vdir, job, sc,
     sid, cls = sc["id"], sc["id"].upper()
     out = vdir / f"{sid}.mp4"
     f = sdir / f"{sid}.py"
-    adur = _probe_duration(job / "audio" / f"{sid}.mp3")
+    adur = _probe_duration(_audio_path(job, sid))
     secs = round(adur) if adur else max(4, len(sc["voz"].split()) // 3)
     code, err = None, ""
     intentos = 1 if solo_render else 3
@@ -2030,6 +2123,28 @@ def run_ensamblado(p, job, progress=None):
     # storyboard. Si falta alguna, NO construimos un video corto en silencio:
     # fallamos con la lista para que se re-animen solo esas.
     sb_ids = [s["id"] for s in _parse_storyboard(job)]
+    # v26 — pre-flight: si el storyboard cambió DESPUÉS del TTS (edición,
+    # continuación, renumerado), vo.json y los audios ya no corresponden.
+    # Fallar aquí con mensaje claro en vez del críptico "Falta el audio de Sxx".
+    _vf = job / "vo.json"
+    try:
+        _vo_ids = {str(it.get("id", "")).lower()
+                   for it in json.loads(_vf.read_text(encoding="utf-8"))} \
+            if _vf.exists() else set()
+    except Exception:
+        _vo_ids = set()
+    if sb_ids and set(sb_ids) != _vo_ids:
+        _solo_sb = sorted(set(sb_ids) - _vo_ids)
+        _solo_vo = sorted(_vo_ids - set(sb_ids))
+        return (False,
+                "El storyboard cambió después del TTS: vo.json ya no lo cubre. "
+                + (f"En storyboard pero no en vo.json: "
+                   f"{', '.join(s.upper() for s in _solo_sb)}. " if _solo_sb else "")
+                + (f"En vo.json pero no en storyboard: "
+                   f"{', '.join(s.upper() for s in _solo_vo)}. " if _solo_vo else "")
+                + "Re-ejecuta la etapa 6 (sincroniza vo.json y genera "
+                  "faltantes) y luego esta etapa.",
+                [], None)
     if sb_ids:
         have = {sc.stem.lower() for sc in archivos if sc.stat().st_size > 0}
         faltan = [i.upper() for i in sb_ids if i not in have]
@@ -2059,13 +2174,31 @@ def run_ensamblado(p, job, progress=None):
     segs, srt_items, srt_durs, logs = [], [], [], []
     for sc in scenes:
         sid = sc.stem.lower()
-        au = job / "audio" / f"{sid}.mp3"
+        au = _audio_path(job, sid)
         if not au.exists():
-            return (False, f"Falta el audio de {sid.upper()} "
-                           "(etapa 6 · TTS). Re-ejecuta la etapa 6 "
-                           "(solo genera los audios faltantes) o pulsa "
-                           "«🛠 Reparar faltantes», y luego repite esta "
-                           "etapa.", [], None)
+            # v26 — diagnóstico forense: si esto vuelve a pasar, el mensaje
+            # debe decir EXACTAMENTE qué se buscó y qué hay en audio/.
+            import difflib
+            adir = job / "audio"
+            presentes = sorted(p.name for p in adir.glob("*.mp3")) \
+                if adir.exists() else []
+            cerca = difflib.get_close_matches(au.name, presentes, n=3,
+                                              cutoff=0.6)
+            return (False,
+                    f"Falta el audio de {sid.upper()} (etapa 6 · TTS).\n"
+                    f"Ruta esperada: {au}\n"
+                    f"La carpeta audio/ {'no existe' if not adir.exists() else f'existe y tiene {len(presentes)} mp3s'}."
+                    + (f" Nombres parecidos: {', '.join(cerca)}." if cerca else
+                       " Ningún nombre parecido.")
+                    + (f" Primeros archivos: {', '.join(presentes[:6])}."
+                       if presentes else "")
+                    + "\nCausas posibles: el archivo se borró o se movió "
+                      "después del TTS (antivirus, sincronización en la nube, "
+                      "borrado manual); o el storyboard cambió después del TTS. "
+                      "Si el archivo existe con otro nombre, renómbralo a "
+                    f"{au.name}. Si está corrupto, bórralo y usa «🛠 Reparar "
+                      "faltantes» con la escena en «Forzar».",
+                    [], None)
         adur = _probe_duration(au)
         if adur <= 0:
             return False, f"No pude leer la duración de {au.name}.", [], None
@@ -2338,7 +2471,7 @@ def segmento_de_escena(job, sid):
     t = 0.0
     sid = sid.strip().lower()
     for it in items:
-        au = job / "audio" / f"{it['id'].lower()}.mp3"
+        au = _audio_path(job, it["id"])
         dur = _probe_duration(au) if au.exists() else 0.0
         if it["id"].lower() == sid:
             return (t, t + dur)

@@ -314,15 +314,46 @@ elif view == "🎬 Proyectos":
                 st.session_state[f"verif_ok{pid}"] = rep["ok"]
                 rerun()
         with vc2:
+            forzar = st.text_input(
+                "Forzar regeneración de audios (ej: s34, s35)",
+                key=f"forz{pid}",
+                help="Borra esos mp3 antes de reparar: útil si un audio "
+                     "existe pero está corrupto y el TTS lo omite por "
+                     "«ya existía».",
+                disabled=bool(_running))
             if st.button("🛠 Reparar faltantes", key=f"rep{pid}",
                          disabled=bool(_running)):
                 job = pipeline.job_dir_of(p)
+                # v26: forzar = borrar primero (el TTS omite lo existente).
+                # v27: solo se aceptan ids de escena (s34); el resto se ignora.
+                forzados = []
+                for tok in (forzar or "").replace(",", " ").split():
+                    tok = tok.strip().lower()
+                    if not re.fullmatch(r"s\d+", tok):
+                        continue
+                    au = pipeline._audio_path(job, tok)
+                    if au.exists():
+                        au.unlink()
+                    forzados.append(tok.upper())
                 rep = pipeline.verificar_elementos(p, job)["detalle"]
                 msgs = []
+                if forzados:
+                    msgs.append(f"forzados para regenerar: "
+                                f"{', '.join(forzados)}.")
                 # 1) vo.json desactualizado -> se sincroniza solo
                 if not rep["vo_json"]["ok"]:
-                    n, origen = pipeline.build_vo_json(p, job)
+                    n, origen, sin_voz = pipeline.build_vo_json(p, job)
                     msgs.append(f"vo.json sincronizado ({n} líneas).")
+                    # v27: escenas sin VOZ legible = la reparación NO puede
+                    # arreglarlas (antes: loop infinito silencioso)
+                    if sin_voz:
+                        lista = ", ".join(s.upper() for s in sin_voz[:10])
+                        if len(sin_voz) > 10:
+                            lista += f" (+{len(sin_voz) - 10} más)"
+                        msgs.append(f"⚠️ {len(sin_voz)} escenas sin VOZ "
+                                    f"legible ({lista}): edita STORYBOARD.md "
+                                    f"con formato 'VOZ: ...' o re-ejecuta la "
+                                    f"etapa 5; ningún botón las puede generar.")
                 # 2) audios faltantes -> etapa 6 (omite los existentes)
                 if not rep["audios"]["ok"]:
                     ok, log, arts, _ = pipeline.run_tts_stage(p, job)
@@ -338,7 +369,25 @@ elif view == "🎬 Proyectos":
                                 "etapa 7 (omite solas las ya hechas).")
                 if not msgs:
                     msgs.append("Nada que reparar: todo completo. ✅")
-                st.session_state["run_msg"] = ("ok", " ".join(msgs))
+                # v26: re-verificar DESPUÉS de reparar — no declarar éxito
+                # si algo sigue roto (el caso S34: el TTS decía "omitidos:
+                # 82" pero el ensamblado seguía sin el archivo).
+                rep2 = pipeline.verificar_elementos(p, job)
+                if not rep2["ok"]:
+                    falt = []
+                    for k in ("vo_json", "audios", "videos"):
+                        f = rep2["detalle"][k]["faltan"]
+                        if f:
+                            falt.append(f"{k}: "
+                                        f"{', '.join(i.upper() for i in f[:6])}")
+                    msgs.append("⚠️ SIGUE INCOMPLETO tras reparar: "
+                                + "; ".join(falt) + ". Revisa el mensaje: "
+                                "si un audio «existe» pero falla, usa "
+                                "«Forzar» con esa escena.")
+                    st.session_state["run_msg"] = ("warning",
+                                                   " ".join(msgs))
+                else:
+                    st.session_state["run_msg"] = ("ok", " ".join(msgs))
                 rerun()
         if f"verif_rep{pid}" in st.session_state:
             rep_txt = st.session_state.pop(f"verif_rep{pid}")
