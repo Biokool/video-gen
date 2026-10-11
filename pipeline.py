@@ -29,7 +29,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 
-PANEL_VERSION = "v24"  # se muestra en el pie del sidebar; subir en cada release
+PANEL_VERSION = "v29"  # se muestra en el pie del sidebar; subir en cada release
 # Dos layouts soportados:
 #  - anidado: panel/ dentro de zenn-factory/ (jobs/ y thumbnails/ en el padre)
 #  - plano:   todo dentro de video-gen/ (jobs/ y thumbnails/ junto a app.py)
@@ -432,12 +432,25 @@ def _bloques_escena(text):
             re.finditer(r"(?m)^###\s*S\d+.*?(?=^###\s*S\d+|\Z)", text, re.S)]
 
 
-def _pat_campo(nombre):
-    """Marcadores que los modelos usan: VOZ: / **VOZ:** / **[VOZ]**: /
-    **[VOZ:** / [VOZ]: (igual para VISUAL)."""
-    return (rf"(?m)^\s*(?:\*\*\[{nombre}\]\*\*:|\*\*\[{nombre}:\*\*|"
-            rf"\*\*\[{nombre}:|\*\*{nombre}:\*\*|\[{nombre}\]:|{nombre}:)"
-            rf"\s*(.+?)\s*$")
+def _valor_campo_linea(linea, nombre):
+    """Si `linea` es un marcador VOZ:/VISUAL:, devuelve su valor crudo.
+
+    v28: matcher tolerante (sustituye la regex monolítica case-sensitive de
+    `_pat_campo`, que solo conocía 6 variantes y dejaba fuera formatos
+    reales de los modelos). Gramática aceptada, insensible a
+    mayúsculas/minúsculas:
+
+        [viñeta/cita] [envoltorio] NOMBRE [envoltorio] : valor
+
+    El envoltorio (`*`, `**`, `[`, `]`) puede ir antes o después del nombre
+    y los dos puntos pueden ir dentro o fuera del bold. Cubre:
+      VOZ: / **VOZ:** / **[VOZ]**: / **[VOZ:** / **[VOZ: / [VOZ]: /
+      **VOZ**: / *VOZ:* / ***VOZ***: / VOZ : / Voz: / - VOZ: / > VOZ:
+    (igual para VISUAL). Devuelve None si la línea no es un marcador.
+    """
+    m = re.match(rf"(?i)^[\s>\-–•\*\[\]]*{nombre}[\s\*\[\]]*:(?:\*+)?(.*)$",
+                 linea.strip())
+    return m.group(1) if m else None
 
 
 def _limpia_valor(val):
@@ -451,19 +464,67 @@ def _limpia_valor(val):
 
 def _campo(bloque, nombre):
     """Extrae VOZ:/VISUAL: tolerando las variantes de formato de los
-    modelos débiles. Devuelve el texto limpio."""
-    m = re.search(_pat_campo(nombre), bloque)
-    return _limpia_valor(m.group(1)) if m else ""
+    modelos. Devuelve el texto limpio; "" si no hay marcador.
+
+    Si el marcador quedó con la línea vacía (el modelo puso el texto en la
+    línea siguiente), toma la primera línea no vacía que siga, siempre que
+    no sea otro marcador ni un encabezado de escena.
+    """
+    lineas = bloque.splitlines()
+    for i, ln in enumerate(lineas):
+        v = _valor_campo_linea(ln, nombre)
+        if v is None:
+            continue
+        v = _limpia_valor(v)
+        if not v:
+            for sig in lineas[i + 1:]:
+                s = sig.strip()
+                if not s or s.startswith("#"):
+                    continue
+                if _valor_campo_linea(s, "VOZ") is None \
+                        and _valor_campo_linea(s, "VISUAL") is None:
+                    v = _limpia_valor(s)
+                break
+        return v
+    return ""
 
 
 def _normalizar_campos(text):
-    """Reescribe las variantes **[VOZ]**: / **VOZ:** / **[VISUAL:** ... al
-    formato estándar VOZ: / VISUAL: para que el archivo quede limpio."""
-    for nombre in ("VOZ", "VISUAL"):
-        text = re.sub(_pat_campo(nombre),
-                      lambda m: f"{nombre}: {_limpia_valor(m.group(1))}",
-                      text)
-    return text
+    """Reescribe cualquier variante de marcador al formato estándar
+    VOZ: / VISUAL: para que el archivo quede limpio.
+
+    v28: usa el mismo matcher tolerante de `_campo`, así lo que se parsea
+    es exactamente lo que se normaliza (antes había dos definiciones que
+    podían divergir). Si el marcador tenía la línea vacía, jala la primera
+    línea de contenido siguiente.
+    """
+    lineas = text.splitlines()
+    consumidas = set()
+    out = []
+    for i, ln in enumerate(lineas):
+        if i in consumidas:
+            continue
+        nuevo = None
+        for nombre in ("VOZ", "VISUAL"):
+            v = _valor_campo_linea(ln, nombre)
+            if v is None:
+                continue
+            v = _limpia_valor(v)
+            if not v:
+                for j in range(i + 1, len(lineas)):
+                    s = lineas[j].strip()
+                    if not s or s.startswith("#"):
+                        continue
+                    if _valor_campo_linea(s, "VOZ") is None \
+                            and _valor_campo_linea(s, "VISUAL") is None:
+                        v = _limpia_valor(s)
+                        consumidas.add(j)
+                    break
+            nuevo = f"{nombre}: {v}"
+            break
+        out.append(nuevo if nuevo is not None else ln)
+    cola = "\n" if text.endswith("\n") else ""
+    return "\n".join(out) + cola
 
 
 def _voz_words(text):
@@ -1706,6 +1767,247 @@ def verificar_elementos(p, job):
     return {"ok": ok, "detalle": det, "resumen": " · ".join(partes)}
 
 
+def reparar_faltantes(p, job, forzar="", conn=None, pid=None):
+    """Repara los artefactos incompletos de un proyecto (lo que hacía el
+    botón "🛠 Reparar faltantes" en app.py).
+
+    v28: la lógica vive aquí (no en el UI) para poder probarla punta a punta
+    sin Streamlit. `forzar` = "s34, s35": borra esos mp3 antes de reparar
+    (el TTS omite lo existente). Si se dan conn/pid se actualiza la etapa
+    "tts" en la BD. Devuelve (kind, texto) con kind en {"ok", "warning"}.
+    """
+    job = Path(job)
+    # v26/v27: forzar = borrar primero; solo se aceptan ids de escena.
+    # v28: se parte por comas, punto y coma y espacios; se ignora el resto
+    # (el usuario pega texto del error como "s34, s35; audios: s34").
+    forzados = []
+    for tok in re.split(r"[,\s;]+", (forzar or "")):
+        tok = tok.strip().lower().strip(".;:")
+        if not re.fullmatch(r"s\d+", tok):
+            continue
+        au = _audio_path(job, tok)
+        if au.exists():
+            au.unlink()
+        if tok.upper() not in forzados:
+            forzados.append(tok.upper())
+    rep = verificar_elementos(p, job)["detalle"]
+    msgs = []
+    # v28: los audios ilegibles (truncados) se regeneran solos. El TTS los
+    # omitiría por "ya existían", así que se borran aquí: son archivos
+    # generados e inservibles, no trabajo del usuario.
+    for i in rep["audios"].get("ilegibles", []):
+        au = _audio_path(job, i)
+        if au.exists():
+            au.unlink()
+            msgs.append(f"audio corrupto {str(i).upper()} borrado para "
+                        f"regenerar.")
+    if forzados:
+        msgs.append(f"forzados para regenerar: {', '.join(forzados)}.")
+    # 1) vo.json desactualizado -> se sincroniza solo
+    if not rep["vo_json"]["ok"]:
+        n, origen, sin_voz = build_vo_json(p, job)
+        msgs.append(f"vo.json sincronizado ({n} líneas).")
+        # v27: escenas sin VOZ legible = la reparación NO puede arreglarlas
+        if sin_voz:
+            lista = ", ".join(s.upper() for s in sin_voz[:10])
+            if len(sin_voz) > 10:
+                lista += f" (+{len(sin_voz) - 10} más)"
+            msgs.append(f"⚠️ {len(sin_voz)} escenas sin VOZ legible ({lista}): "
+                        f"edita STORYBOARD.md con formato 'VOZ: ...' o "
+                        f"re-ejecuta la etapa 5; ningún botón las puede generar.")
+    # 2) audios faltantes -> etapa 6 (omite los existentes)
+    if not rep["audios"]["ok"]:
+        ok, log, arts, _ = run_tts_stage(p, job)
+        if conn is not None and pid is not None:
+            import db as _db
+            _db.set_stage(conn, pid, "tts", "ok" if ok else "fallo", log, arts)
+        msgs.append(("audios regenerados: " if ok else "TTS falló: ") + log[:200])
+    # 3) videos faltantes -> se informa (etapa 7 es asistida)
+    if not rep["videos"]["ok"]:
+        fs = ", ".join(i.upper() for i in rep["videos"]["faltan"][:10])
+        msgs.append(f"videos faltantes ({fs}): re-ejecuta la etapa 7 "
+                    "(omite solas las ya hechas).")
+    if not msgs:
+        msgs.append("Nada que reparar: todo completo. ✅")
+    # v26: re-verificar DESPUÉS de reparar — no declarar éxito si algo sigue
+    # roto (el caso S34: el TTS decía "omitidos: 82" pero el ensamblado
+    # seguía sin el archivo).
+    rep2 = verificar_elementos(p, job)
+    if not rep2["ok"]:
+        falt = []
+        for k in ("vo_json", "audios", "videos"):
+            f = rep2["detalle"][k]["faltan"]
+            if f:
+                falt.append(f"{k}: {', '.join(i.upper() for i in f[:6])}")
+        sv = rep2["detalle"]["storyboard"].get("sin_voz") or []
+        if sv:
+            falt.append(f"storyboard sin VOZ: {', '.join(sv[:6])}")
+        msgs.append("⚠️ SIGUE INCOMPLETO tras reparar: " + "; ".join(falt)
+                    + ". Revisa el mensaje: si un audio «existe» pero falla, "
+                    "usa «Forzar» con esa escena.")
+        return "warning", " ".join(msgs)
+    return "ok", " ".join(msgs)
+
+
+def _cobertura_storyboard(p, job):
+    """(palabras_VOZ, palabras_guion) para el contrato de la etapa 5."""
+    sp = find_script(p)
+    guion_words = 0
+    if sp:
+        script = Path(sp).read_text(encoding="utf-8", errors="replace")
+        guion_words = len(re.sub(r"^#.*$", "", script, flags=re.M).split())
+    sb = Path(job) / "STORYBOARD.md"
+    voz_words = (_voz_words(sb.read_text(encoding="utf-8", errors="replace"))
+                 if sb.exists() else 0)
+    return voz_words, guion_words
+
+
+# v28 — contratos de etapa: lo que cada etapa DEBE dejar producido para que
+# la corrida pueda avanzar. Si el contrato no se cumple, la corrida no avanza
+# en silencio: repara una vez o se detiene con mensaje accionable.
+CONTRATO_ETAPAS = {
+    "storyboard": "STORYBOARD.md existe, sin escenas sin VOZ y cobertura ≥90% del guion",
+    "tts": "vo.json cubre el storyboard y cada escena tiene audio válido (existe, no vacío, duración legible)",
+    "animacion": "cada escena del storyboard tiene su mp4 válido",
+    "ensamblado": "video/final.mp4 existe y dura ≈ suma de audios (±15%)",
+}
+# Insumos obligatorios antes de arrancar cada etapa.
+_PRE_ETAPA = {
+    "tts": ["storyboard"],
+    "animacion": ["tts"],
+    "ensamblado": ["tts", "animacion"],
+}
+
+
+def validar_etapa(stage, p, job):
+    """Verifica el contrato de salida de una etapa. Devuelve (ok, detalle).
+
+    Es la pieza que faltaba: antes cada etapa "terminaba" y la siguiente
+    asumía que todo estaba bien (origen de los loops S34/S48). Ahora el
+    avance es contractual.
+    """
+    job = Path(job)
+    det = verificar_elementos(p, job)["detalle"]
+    if stage == "storyboard":
+        if not (job / "STORYBOARD.md").exists():
+            return False, "no existe STORYBOARD.md"
+        sv = det["storyboard"].get("sin_voz") or []
+        if sv:
+            return False, (f"{len(sv)} escenas sin VOZ legible "
+                           f"({', '.join(sv[:8])})")
+        vw, gw = _cobertura_storyboard(p, job)
+        if gw > 0 and vw < 0.9 * gw:
+            return False, f"cobertura {vw}/{gw} palabras (<90%)"
+        return True, (f"{det['storyboard']['total']} escenas, "
+                      f"cobertura {vw}/{gw}")
+    if stage == "tts":
+        if det["vo_json"]["faltan"]:
+            return False, ("vo.json no cubre: "
+                           + ", ".join(det["vo_json"]["faltan"][:8]))
+        if det["audios"]["faltan"]:
+            return False, ("audios faltan/ilegibles: "
+                           + ", ".join(str(x).upper()
+                                       for x in det["audios"]["faltan"][:8]))
+        return True, (f"{det['audios']['tienen']}/{det['audios']['total']} "
+                      "audios válidos")
+    if stage == "animacion":
+        if det["videos"]["faltan"]:
+            return False, ("videos faltan: "
+                           + ", ".join(det["videos"]["faltan"][:8]))
+        return True, (f"{det['videos']['tienen']}/{det['videos']['total']} "
+                      "videos")
+    if stage == "ensamblado":
+        final = job / "video" / "final.mp4"
+        if not (final.exists() and final.stat().st_size > 0):
+            return False, "no existe video/final.mp4"
+        try:
+            items = json.loads((job / "vo.json").read_text(encoding="utf-8"))
+            suma = sum(_probe_duration(_audio_path(job, it.get("id", "")))
+                       for it in items)
+        except Exception:
+            suma = 0
+        dur = _probe_duration(final)
+        if suma > 0 and dur > 0 and abs(dur - suma) > 0.15 * suma:
+            return False, (f"final.mp4 dura {dur:.0f}s pero los audios suman "
+                           f"{suma:.0f}s (se esperaba ±15%)")
+        return True, f"final.mp4 {dur:.0f}s"
+    return True, "etapa sin contrato: vale el resultado de execute_stage"
+
+
+def _auto_reparar(stage, p, job, generate_fn):
+    """UN intento de reparación automática tras un contrato incumplido."""
+    if stage == "storyboard":
+        vw, gw = _cobertura_storyboard(p, job)
+        sv = verificar_elementos(p, job)["detalle"]["storyboard"].get("sin_voz")
+        if sv:
+            return ("sin auto-reparación: hay escenas sin VOZ legible "
+                    "(formato); lo debe arreglar un humano en STORYBOARD.md")
+        if gw > 0 and vw < 0.9 * gw and generate_fn:
+            ok, log, _, _ = run_continuar_storyboard(generate_fn, p, job)
+            return f"continuación automática: {'ok' if ok else 'falló'}"
+        return "sin auto-reparación aplicable"
+    if stage in ("tts", "ensamblado"):
+        kind, txt = reparar_faltantes(p, job)
+        return f"reparar_faltantes ({kind})"
+    if stage == "animacion":
+        return "reintento (omite las ya renderizadas)"
+    return "sin auto-reparación"
+
+
+def correr_etapa_garantizada(p, stage, generate_fn=None, progress=None):
+    """v28 — algoritmo de corrida garantizada para una etapa.
+
+    1) PRE: valida los insumos (contratos de las etapas previas). Si un
+       insumo está roto, no arranca: fallar aquí es mejor que un error
+       críptico 3 etapas después.
+    2) Ejecuta (execute_stage).
+    3) POST: valida el contrato de salida.
+    4) Si la etapa dijo "ok" pero el contrato no se cumple: UNA
+       auto-reparación y reintento.
+    5) Veredicto final honesto (nunca "ok" con productos rotos).
+
+    Tiempos: no hay timeouts agresivos; cada etapa corre "con el tiempo
+    necesario" (los subprocess usan sus propios límites generosos: TTS 3600s
+    por lote, ffmpeg 900s por escena, HTTP 300s). Si un backend agota su
+    cuota gratuita, llm.generate rota al siguiente ANTES de rendirse y la
+    etapa continúa (no se trunca: la validación por partes + continuación
+    automática aplica al texto venga del modelo que venga).
+    Devuelve (ok, log, arts, sugg) como execute_stage.
+    """
+    job = job_dir_of(p)
+    for pre in _PRE_ETAPA.get(stage, []):
+        ok0, det0 = validar_etapa(pre, p, job)
+        if not ok0:
+            return (False,
+                    f"⛔ Etapa '{stage}' no arranca: su insumo '{pre}' no "
+                    f"cumple el contrato ({det0}). Completa '{pre}' primero; "
+                    f"las etapas corren en orden.",
+                    [], None)
+    ok, log, arts, sugg = execute_stage(p, stage, generate_fn,
+                                        progress=progress)
+    vok, vdet = validar_etapa(stage, p, job)
+    if ok and vok:
+        return True, log + f"\n[contrato '{stage}': {vdet}]", arts, sugg
+    if not ok:
+        # La etapa ya falló fuerte con mensaje accionable: se respeta.
+        return ok, log, arts, sugg
+    # ok pero contrato roto: una auto-reparación y reintento.
+    rep_txt = _auto_reparar(stage, p, job, generate_fn)
+    ok2, log2, arts2, sugg2 = execute_stage(p, stage, generate_fn,
+                                            progress=progress)
+    vok2, vdet2 = validar_etapa(stage, p, job)
+    if ok2 and vok2:
+        return (True,
+                log + f"\n[contrato '{stage}' incumplido ({vdet}); "
+                f"auto-reparación: {rep_txt}; reintento validado: {vdet2}]",
+                arts2, sugg2 or sugg)
+    return (False,
+            f"⛔ Etapa '{stage}': terminó pero su contrato no se cumple "
+            f"({vdet}). Auto-reparación: {rep_txt}. Tras reintento: {vdet2}. "
+            f"Log: {log[-600:]}",
+            [], None)
+
+
 def _temas_cubiertos(text, tope=10):
     """Nombres propios y title_cards ya usados en el storyboard.
     Se pasan al prompt de continuación para PROHIBIR que el modelo los
@@ -2641,8 +2943,10 @@ def run_all(conn, p, generate_fn, on_step=None, on_progress=None):
             if pget(p, "kind", "largo") == "largo" and \
                _db.get_approval(conn, pid, "miniatura")["status"] != "aprobado":
                 return "gate", "miniatura"
-        ok, log, arts, sugg = execute_stage(p, name, generate_fn,
-                                                   progress=on_progress)
+        # v28: corrida garantizada — valida insumos, ejecuta, valida productos,
+        # auto-repara una vez y da veredicto honesto (nunca "ok" con rotos).
+        ok, log, arts, sugg = correr_etapa_garantizada(
+            p, name, generate_fn, progress=on_progress)
         _db.set_stage(conn, pid, name,
                       sugg or ("ok" if ok else "fallo"), log, arts)
         if on_step:

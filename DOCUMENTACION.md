@@ -1033,3 +1033,139 @@ Nota: si el usuario pega la muestra del formato no reconocido, se agrega la
 variante a `_pat_campo()` (como se hizo en v23 con las 4 anteriores).
 
 *Versión del panel: v27 (sin descarte silencioso de escenas).*
+
+## 38. Cambios v28 (2026-10-10) — parser VOZ/VISUAL tolerante (familia markdown completa)
+
+Contexto: v27 falla fuerte y pide pegar la muestra del formato no
+reconocido (la 5ª variante de las 29 escenas del proyecto 35). v28 no
+espera la muestra: el matcher de marcadores se reescribió para tragar
+toda la familia realista de variantes markdown, así que si el formato del
+usuario está en esa familia, la etapa 6 simplemente funciona (vo.json de
+111 líneas) sin que tenga que pegar nada.
+
+Cambio técnico: se eliminó `_pat_campo()` (regex monolítica,
+case-sensitive, 6 variantes hardcodeadas) y se sustituyó por
+`_valor_campo_linea(linea, nombre)`: matcher por línea, insensible a
+mayúsculas, con gramática `[viñeta/cita] [envoltorio] NOMBRE [envoltorio]
+: valor`. Cubre: `VOZ:` / `**VOZ:**` / `**[VOZ]**:` / `**[VOZ:**` /
+`**[VOZ:` / `[VOZ]:` (las 6 viejas) más `**VOZ**:` (dos puntos fuera del
+bold — la variante markdown más natural y la principal sospechosa de la
+5ª), `*VOZ:*`, `***VOZ***:`, `VOZ :`, `Voz:`, `voz:`, `- VOZ:`, `> VOZ:`.
+`_campo()` y `_normalizar_campos()` usan el mismo matcher (antes había
+dos definiciones que podían divergir); además, si el marcador quedó con
+la línea vacía, se toma la primera línea de contenido siguiente (antes lo
+hacía el `\s*` de la regex; se preserva el comportamiento).
+
+Verificación: prueba sintética con las 13 variantes (extracción exacta,
+sin falsos positivos en líneas como "Vozarrón..." o "VOZES:", fallback de
+línea vacía, `build_vo_json` con 13/13 escenas y 0 `sin_voz`,
+`_normalizar_campos` idempotente en canónico). Nota honesta: si el formato
+real del usuario está FUERA de esta familia (p. ej. otra etiqueta como
+`NARRACIÓN:`), v28 no lo adivina — el fail fuerte de v27 con la muestra
+sigue vigente y entonces sí se agrega la variante.
+
+*Versión del panel: v28 (parser tolerante; PANEL_VERSION por fin refleja la
+versión real — estaba estancada en v24 desde ese release).*
+
+## 39. Cambios v29 (2026-10-10) — corrida garantizada + test punta a punta
+
+Contexto: el usuario reportó que "no dejan de salir errores" y pidió (1) un
+test punta a punta que demuestre que el panel funciona, y (2) un algoritmo
+que garantice la corrida en orden, con el tiempo necesario, y con
+validaciones al rotar de modelo cuando se agota la capa gratuita (sin
+truncar). La auditoría encontró la causa concreta de su último error:
+**el ZIP v27/v28 traía `re.fullmatch` en app.py (botón "Reparar faltantes",
+línea 332) sin `import re` a nivel de módulo** — cualquier texto en el campo
+"Forzar" tumbaba la página con `NameError: name 're' is not defined`. El
+arreglo ya existía en el workspace (lógica movida a
+`pipeline.reparar_faltantes`, con `re` importado) pero nunca se había
+empaquetado: el ZIP iba detrás del código. v29 cierra esa brecha y, desde
+ahora, **el test punta a punta se corre contra el ZIP extraído** (se prueba
+lo que se envía, no solo el workspace).
+
+Algoritmo de corrida garantizada (`correr_etapa_garantizada`, usado por
+"Correr todo"):
+1. PRE: valida el contrato de los insumos (`_PRE_ETAPA`: tts exige
+   storyboard, animación exige tts, ensamblado exige tts+animación). Sin
+   insumos válidos la etapa no arranca — mejor un bloqueo claro que un error
+   críptico 3 etapas después (origen de los loops S34/S48).
+2. Ejecuta la etapa (`execute_stage`).
+3. POST: valida el contrato de salida (`validar_etapa` + `CONTRATO_ETAPAS`):
+   storyboard (existe, sin escenas sin VOZ, cobertura ≥90% del guion), tts
+   (vo.json cubre el storyboard, cada escena con audio válido: existe, no
+   vacío, duración legible), animación (mp4 por escena), ensamblado
+   (final.mp4 existe y dura ≈ suma de audios ±15%).
+4. Si la etapa dijo "ok" pero el contrato no se cumple: UNA auto-reparación
+   (`_auto_reparar`: continuación automática si el storyboard quedó corto,
+   `reparar_faltantes` si faltan audios/vo.json desactualizado) y reintento.
+5. Veredicto honesto: nunca "ok" con productos rotos; el mensaje dice qué
+   contrato falló y qué se intentó.
+
+Orden y tiempo: las etapas corren estrictamente en orden; "Correr todo"
+reabre sola la etapa tts si el storyboard creció después (verificación
+previa en `run_all`). Tiempos: sin timeouts agresivos — cada etapa corre con
+el tiempo necesario (TTS 3600s por lote, ffmpeg 900s por escena, HTTP 300s,
+generación de escena 600s); cada etapa registra "⏱ Duración" en su log.
+
+Rotación sin truncar: `llm.generate` rota de modelo/backend cuando detecta
+cuota agotada (429/quota/tpd → "skip": no reintenta el mismo, salta al
+siguiente; al final rota de backend entre los gratuitos con key). Cada
+llamada es una generación completa nueva: **la rotación nunca pega un
+fragmento truncado**. Si un texto sale cortado por límite de tokens, la
+etapa 5 lo detecta por cobertura (<90%) y la continuación automática lo
+completa desde el último punto bueno — validado en el test S3.
+
+Test punta a punta (`tests/test_panel_e2e.py`, 25 checks, todo verde en v29):
+S1 happy path storyboard→tts→animación→ensamblado con contratos; S2
+rotación de backend al agotarse la cuota (y LLMError fuerte si todos caen);
+S3 storyboard truncado → continuación automática hasta ≥90%; S4 escenas sin
+VOZ → falla fuerte sin loop infinito; S5 audio corrupto → se detecta, borra
+y regenera solo; S6 storyboard editado tras TTS → pre-flight del ensamblado
+con diff exacto (adiós al críptico "Falta el audio"); S7 pyflakes: cero
+nombres indefinidos en pipeline.py/app.py (regresión del bug `re` de
+v27/v28); S8 la corrida no arranca sin insumos. El LLM se mockea
+(determinista), TTS/render usan ffmpeg real; lo que SÍ es código real:
+verificación, contratos, reparación, rotación, continuación y pre-flight.
+Uso: `python3 tests/test_panel_e2e.py` (sale 1 si algo falla).
+
+*Versión del panel: v29 (corrida garantizada; PANEL_VERSION = "v29").*
+
+## 38. Cambios v28 (2026-10-10) — corrida garantizada + prueba punta a punta
+
+Reporte: "no dejan de salir errores... debes hacer un test punta a punta...
+revisa y crea el algoritmo para garantizar la corrida y la ejecución
+correcta en orden". Además, v27 trajo un `NameError: name 're' is not
+defined` en app.py (el campo "Forzar" usaba `re.fullmatch` sin importar
+`re`): parche sin prueba, el bug exacto que se quería eliminar.
+
+Fix:
+- `pipeline.reparar_faltantes(p, job, forzar="", conn=None, pid=None)`:
+  la lógica del botón "🛠 Reparar faltantes" vive en pipeline (testeable
+  sin Streamlit); app.py solo la invoca. Elimina el NameError de raíz.
+  Además borra automáticamente los audios "ilegibles" (truncados): el TTS
+  los omitiría por "ya existían".
+- Contratos de etapa (`CONTRATO_ETAPAS` + `validar_etapa()`): storyboard
+  (existe, sin VOZ ilegible, cobertura ≥90%), tts (vo.json cubre + audios
+  válidos), animacion (mp4 por escena), ensamblado (final.mp4 dura ≈ suma
+  de audios ±15%).
+- `correr_etapa_garantizada()`: el algoritmo pedido — 1) PRE: valida
+  insumos (no arranca tts sin storyboard completo, etc.); 2) ejecuta;
+  3) POST: valida el contrato; 4) si dijo "ok" pero el contrato falla, UNA
+  auto-reparación y reintento; 5) veredicto honesto (nunca "ok" con rotos).
+  `run_all` la usa en su ruta genérica: las etapas corren en orden
+  contractual.
+- Tiempos: sin timeouts agresivos nuevos; cada etapa corre "con el tiempo
+  necesario" (subprocess: TTS 3600s/lote, ffmpeg 900s/escena, HTTP 300s).
+  Si un backend agota su cuota gratuita, `llm.generate` rota al siguiente
+  ANTES de rendirse y la etapa continúa sin truncarse (la validación por
+  partes + continuación automática aplica venga del modelo que venga).
+- `tests/test_panel_e2e.py`: 31 checks en 9 escenarios, sin keys ni red
+  (LLM mockeado, TTS/render con ffmpeg real): happy path completo,
+  rotación real de `llm.generate` ante 429/quota (mockeando solo el nivel
+  HTTP), truncado→continuación automática, sin_voz→fallo fuerte sin loop,
+  audio corrupto→auto-regeneración, drift→pre-flight con diff, pyflakes sin
+  nombres indefinidos (regresión del bug `re`), pre-check que bloquea sin
+  insumos, y `run_all` verde de 8 etapas. Se corre con
+  `python tests/test_panel_e2e.py` (pide ffmpeg; pyflakes opcional).
+
+*Versión del panel: v28 (corrida garantizada + E2E).*
