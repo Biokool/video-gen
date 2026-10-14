@@ -1169,3 +1169,41 @@ Fix:
   `python tests/test_panel_e2e.py` (pide ffmpeg; pyflakes opcional).
 
 *Versión del panel: v28 (corrida garantizada + E2E).*
+
+## 40. Cambios v29.1 (2026-10-13) — cobertura contra narración + TTS Edge 403
+
+Reporte (proyecto 12 / `jobs/35`, «¿Por qué eres zurdo o diestro?»):
+- **Etapa 5**: «⛔ STORYBOARD TRUNCADO: cubre ~934 palabras de 1338 del
+  guion (mínimo 90%)» aun con **44 escenas**. 
+- **Etapa 6**: «TTS terminó pero estos audios quedaron inválidos: S34…
+  S51 (sin archivo)».
+
+Causa raíz doble (las dos medidas en `jobs/35`):
+
+1. **Cobertura contra el guion CRUDO.** `run_storyboard`/`_cobertura_storyboard`
+   contaban las palabras del guion ENTERO, incluido el markup de producción
+   que nunca se narra: encabezados `## BLOQUE`, notas `[VISUAL: ...]`,
+   timecodes `(0:30–2:00)` y las secciones `FUENTES`/`MINIATURAS`. Eso inflaba
+   el denominador (1338 «palabras» cuando la narración real era ~1083) y
+   volvía el 90% **imposible**: ~237 de esas palabras son instrucciones. Peor:
+   `_partir_guion` partía también esa basura, así que la 3ª parte era solo la
+   sección FUENTES. Ahora `_narracion_guion()` extrae SOLO lo narrable
+   (quita encabezados, `[...]`, timecodes y secciones no narradas) y esa es
+   la referencia de cobertura y el texto que se parte.
+
+2. **TTS Edge con 403 → mp3 de 0 bytes.** `edge-tts` 7.2.8 devolvía
+   `403 Invalid response status` en `bing.com` en TODAS las voces (Microsoft
+   cambió el handshake `Sec-MS-GEC`): el runner creaba cada `sNN.mp3` vacío,
+   la etapa 6 reportaba «NN/NN» con archivos de 0 bytes y el ensamblado decía
+   «sin archivo». Fix: (a) `tts_runner.gen_edge` traduce el 403 a una acción
+   clara («actualiza edge-tts o usa piper/kokoro») y borra el mp3 vacío para
+   no dejarlo como «existe pero inválido»; (b) el `edge-tts` del entorno se
+   actualizó (7.2.8 → 7.3.1), que resuelve el 403.
+
+Proyecto 12 además: el storyboard tenía **basura de continuaciones**
+(S10 con `**Voz (20` truncado y S25–S27 re-contaban el bloque 2 = repetición
+del proyecto 37) y un **duplicado** S41/S42. Se limpió (fuera S10, S25–S27,
+S42), se continuó el final real que faltaba (pianista + PAYOFF + cierre,
+~258 palabras) y se renumeró S01–S48 continua; luego TTS 48/48.
+
+*Versión del panel: v29.1 (cobertura real + TTS edge a prueba de 403).*

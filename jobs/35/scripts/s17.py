@@ -5,25 +5,35 @@ class S17(Scene):
     def construct(self):
         self.add(fondo(CREMA))
         
-        prota = protagonista(
-            pos=DOWN*1.2 + LEFT*3.8,
-            playera=PLAYERA_AZUL,
-            altura=2.4,
-            expresion="pensando",
-            pose="de_pie"
+        titulo = banda_titulo("McManus, I. C. (2002). Harvard University Press", color=TEAL)
+        self.play(
+            FadeIn(titulo),
+            run_time=0.5
         )
         
-        self.play(FadeIn(prota), run_time=0.8)
+        prota = protagonista(
+            pos=DOWN * 1.5 + LEFT * 3.5,
+            playera=PLAYERA_ROJA,
+            altura=2.5,
+            expresion="alegria_pura",
+            pose="senalando"
+        )
+        self.play(FadeIn(prota), run_time=1.0)
         
-        t = banda_titulo("El entorno prenatal y el desarrollo", color=AZUL_MARINO)
-        self.add(t)
+        c = caja(etiqueta="Libro Clásico", pos=RIGHT * 3.2 + UP * 0.2, width=3.0)
+        self.play(Create(c), run_time=1.0)
         
-        m = matraz(pos=RIGHT*3.0 + DOWN*0.2, escala=1.2, liquido=TEAL)
-        a = adn(pos=RIGHT*3.0 + UP*1.6, escala=0.8, color=TEAL)
+        txt_ref = etiqueta("Right Hand, Left Hand", pos=RIGHT * 3.2 + UP * 0.2, color=INK, font_size=32)
+        self.play(Write(txt_ref), run_time=1.0)
         
-        self.play(Create(m), FadeIn(a), run_time=1.0)
+        cambiar_cara(prota, "feliz")
         
-        c = etiqueta("Ambiente intrauterino crucial", pos=RIGHT*3.2+UP*0.8, color=ORANGE)
-        self.play(FadeIn(c), run_time=0.8)
+        self.wait(2.0)
         
-        self.wait(2.6)
+        self.play(
+            FadeOut(prota),
+            FadeOut(c),
+            FadeOut(txt_ref),
+            FadeOut(titulo),
+            run_time=0.5
+        )

@@ -5,162 +5,190 @@
  },
  {
   "id": "s02",
-  "text": "¿Por qué hay zurdos y diestros, y no todos somos iguales? Tal vez crees que es solo una preferencia, pero la verdad es que es una batalla silenciosa"
+  "text": "¿Por qué hay zurdos y diestros, y no todos somos iguales? Tal vez crees que es solo una preferencia, pero la verdad es que es una batalla silenciosa librada en tu propio cerebro,"
  },
  {
   "id": "s03",
-  "text": "librada en tu propio cerebro, una que se decide mucho antes de que tú siquiera supieras que existías."
+  "text": "una que se decide mucho antes de que tú siquiera supieras que existías. La mayoría de nosotros simplemente agarra un lápiz con la mano que nos resulta más cómoda."
  },
  {
   "id": "s04",
-  "text": "La mayoría de nosotros simplemente agarra un lápiz con la mano que nos resulta más cómoda. ¡Boom! Eres diestro. O quizás no."
+  "text": "¡Boom! Eres diestro. O quizás no. Para un 10% del planeta, esa mano cómoda es la izquierda. Y esto no es una moda, ni una elección consciente."
  },
  {
   "id": "s05",
-  "text": "Para un 10% del planeta, esa mano cómoda es la izquierda. Y esto no es una moda, ni una elección consciente."
+  "text": "La ciencia nos dice que esta preferencia, la lateralidad, se gesta en las profundidades del útero. ¿Cómo ocurre? No hay un único \"gen del zurdo\" o \"gen del diestro\"."
  },
  {
   "id": "s06",
-  "text": "La ciencia nos dice que esta preferencia, la lateralidad, se gesta en las profundidades del útero."
+  "text": "Es más complejo. Piensa en ello como una orquesta con muchos músicos, cada uno tocando una nota diferente. Los investigadores han identificado más de 40 genes que parecen influir en nuestra lateralidad."
  },
  {
   "id": "s07",
-  "text": "¿Cómo ocurre? No hay un único \"gen del zurdo\" o \"gen del diestro\". Es más complejo. Piensa en ello como una orquesta con muchos músicos,"
- },
- {
-  "id": "s08",
-  "text": "cada uno tocando una nota diferente. Los investigadores han identificado más de 40 genes que parecen influir en nuestra lateralidad."
- },
- {
-  "id": "s09",
   "text": "(Héca, D., et al., 2014, Frontiers in Psychology). Pero estos genes no te dicen \"sé zurdo\". Más bien, inclinan la balanza."
  },
  {
+  "id": "s08",
+  "text": "Y aquí viene lo interesante: la genética es solo una parte de la historia. El entorno prenatal, lo que sucede dentro del vientre materno, también juega un papel crucial."
+ },
+ {
+  "id": "s09",
+  "text": "¿Te imaginas que la posición de tu madre, o incluso las hormonas que flotaban a tu alrededor, pudieran influir en qué mano usarías toda tu vida?"
+ },
+ {
   "id": "s10",
-  "text": "Y aquí viene lo interesante: la genética es solo una parte de la historia. El entorno prenatal, lo que sucede dentro del vientre materno,"
+  "text": "A medida que el cerebro se organiza, el hemisferio izquierdo toma control del lenguaje, mientras el derecho dirige la motricidad espacial; esta división crea una preferencia natural por una mano, y pequeñas diferencias en la actividad neuronal pueden consolidar esa inclinación para siempre en cada individuo."
  },
  {
   "id": "s11",
-  "text": "también juega un papel crucial. ¿Te imaginas que la posición de tu madre, o incluso las hormonas que flotaban a tu alrededor,"
+  "text": "¿Pero cómo exactamente estos factores genéticos y ambientales se unen para decidir si serás zurdo o diestro? ¿Y qué tiene esto que ver con la forma en que funciona tu cerebro?"
  },
  {
   "id": "s12",
-  "text": "pudieran influir en qué mano usarías toda tu vida?"
+  "text": "Aquí está el primer gran pico de información: tu cerebro no es un espejo perfecto. Está dividido en dos hemisferios, izquierdo y derecho, y no son iguales en su función ni en su estructura."
  },
  {
   "id": "s13",
-  "text": "A medida que el feto crece, la asimetría cerebral se establece, y una hemisferio se vuelve dominante. Esa dominancia determina la mano motora principal."
- },
- {
-  "id": "s14",
-  "text": "La posición del feto y los niveles de testosterona durante el segundo trimestre pueden inclinar la lateralidad hacia la izquierda o derecha."
- },
- {
-  "id": "s15",
-  "text": "¿Pero cómo exactamente estos factores genéticos y ambientales se unen para decidir si serás zurdo o diestro?"
- },
- {
-  "id": "s16",
-  "text": "¿Y qué tiene esto que ver con la forma en que funciona tu cerebro?"
- },
- {
-  "id": "s17",
-  "text": "Aquí está el primer gran pico de información: tu cerebro no es un espejo perfecto."
- },
- {
-  "id": "s18",
-  "text": "Está dividido en dos hemisferios, izquierdo y derecho, y no son iguales en su función ni en su estructura."
- },
- {
-  "id": "s19",
   "text": "Esta asimetría es clave para entender la lateralidad."
  },
  {
-  "id": "s20",
+  "id": "s14",
   "text": "Generalmente, el hemisferio izquierdo controla el lado derecho del cuerpo, y el hemisferio derecho controla el lado izquierdo."
  },
  {
-  "id": "s21",
+  "id": "s15",
   "text": "Si eres diestro, es muy probable que tu hemisferio izquierdo sea el dominante para el lenguaje y el control motor fino."
  },
  {
-  "id": "s22",
+  "id": "s16",
   "text": "Si eres zurdo, ¡sorpresa!, a menudo es tu hemisferio derecho el que toma las riendas, al menos para el movimiento de la mano."
  },
  {
-  "id": "s23",
+  "id": "s17",
+  "text": "(McManus, I. C., 2002, Harvard University Press)."
+ },
+ {
+  "id": "s18",
   "text": "Pero no es tan simple. La lateralidad es un espectro."
  },
  {
-  "id": "s24",
+  "id": "s19",
   "text": "Algunas personas zurdas tienen una dominancia izquierda para el lenguaje, como la mayoría de los diestros. Y viceversa."
  },
  {
-  "id": "s25",
+  "id": "s20",
   "text": "Es como si hubiera una batalla interna, una negociación constante entre los dos lados de tu cerebro."
  },
  {
-  "id": "s26",
+  "id": "s21",
   "text": "Esta asimetría cerebral no solo afecta a las manos. Piensa en cómo te ríes, cómo procesas las emociones, incluso cómo te mueves."
  },
  {
-  "id": "s27",
+  "id": "s22",
   "text": "Todo está influenciado por la especialización de los hemisferios."
  },
  {
-  "id": "s28",
-  "text": "Entonces, ¿qué empuja a un hemisferio a ser más dominante que el otro?"
+  "id": "s23",
+  "text": "Entonces, ¿qué empuja a un hemisferio a ser más dominante que el otro? ¿Es algo que se activa de repente, o es un proceso gradual?"
  },
  {
-  "id": "s29",
-  "text": "¿Es algo que se activa de repente, o es un proceso gradual?"
+  "id": "s24",
+  "text": "Volvamos al útero. Los científicos creen que la exposición a hormonas, como la testosterona, durante el desarrollo fetal, podría tener un impacto en la organización del cerebro"
  },
  {
-  "id": "s34",
-  "text": "Volvamos al útero. Los científicos creen que la exposición a hormonas, como la testosterona, durante el desarrollo fetal, podría tener un impacto en la organización del cerebro y, por ende, en la lateralidad."
+  "id": "s25",
+  "text": "y, por ende, en la lateralidad. (Corballis, M. C., 2017, Nature Ecology & Evolution). Una mayor exposición a testosterona en etapas tempranas podría, en algunos casos,"
  },
  {
-  "id": "s35",
-  "text": "(Corballis, M. C., 2017, Nature Ecology & Evolution). Una mayor exposición a testosterona en etapas tempranas podría, en algunos casos, favorecer la dominancia del hemisferio derecho, llevando a una mayor probabilidad de ser zurdo."
+  "id": "s26",
+  "text": "favorecer la dominancia del hemisferio derecho, llevando a una mayor probabilidad de ser zurdo."
  },
  {
-  "id": "s36",
+  "id": "s27",
   "text": "Pero aquí viene otro giro: el azar. Sí, el azar. A veces, los factores genéticos y hormonales no son suficientes para inclinar la balanza de forma definitiva."
  },
  {
-  "id": "s37",
+  "id": "s28",
   "text": "La forma en que las neuronas se conectan, la aleatoriedad en el desarrollo, puede ser el factor decisivo."
  },
  {
+  "id": "s29",
+  "text": "Piensa en ello como lanzar una moneda. Los genes y las hormonas pueden hacer que la moneda esté un poco cargada hacia un lado,"
+ },
+ {
+  "id": "s30",
+  "text": "pero el resultado final, cara o cruz, puede depender de ese instante de pura casualidad."
+ },
+ {
+  "id": "s31",
+  "text": "Y si miramos aún más atrás, a la evolución, la lateralidad podría tener ventajas. La asimetría cerebral, y por ende la especialización de las manos,"
+ },
+ {
+  "id": "s32",
+  "text": "está presente en otros animales, aunque no tan marcada como en humanos. (Corballis, M. C., 2017, Nature Ecology & Evolution). Se especula que esta especialización"
+ },
+ {
+  "id": "s33",
+  "text": "podría haber permitido el desarrollo de habilidades más complejas, como el uso de herramientas o la comunicación."
+ },
+ {
+  "id": "s34",
+  "text": "¿Entonces, tu mano dominante es una lotería biológica influenciada por tus padres, tu madre, e incluso por la suerte?"
+ },
+ {
+  "id": "s35",
+  "text": "¿O hay algo más que la ciencia aún no ha descubierto?"
+ },
+ {
+  "id": "s36",
+  "text": "Aquí viene el segundo pico de información, y es desconcertante: tu cerebro, el órgano que crees que te conoce mejor,"
+ },
+ {
+  "id": "s37",
+  "text": "¡puede mentirte sobre tu propia mano dominante!"
+ },
+ {
   "id": "s38",
-  "text": "Piensa en ello como lanzar una moneda. Los genes y las hormonas pueden hacer que la moneda esté un poco cargada hacia un lado, pero el resultado final, cara o cruz, puede depender de ese instante de pura casualidad."
- },
- {
-  "id": "s39",
-  "text": "Y si miramos aún más atrás, a la evolución, la lateralidad podría tener ventajas. La asimetría cerebral, y por ende la especialización de las manos, está presente en otros animales, aunque no tan marcada como en humanos."
- },
- {
-  "id": "s40",
-  "text": "(Corballis, M. C., 2017, Nature Ecology & Evolution). Se especula que esta especialización podría haber permitido el desarrollo de habilidades más complejas, como el uso de herramientas o la comunicación."
- },
- {
-  "id": "s41",
-  "text": "¿Entonces, tu mano dominante es una lotería biológica influenciada por tus padres, tu madre, e incluso por la suerte? ¿O hay algo más que la ciencia aún no ha descubierto?"
- },
- {
-  "id": "s42",
-  "text": "Aquí viene el segundo pico de información, y es desconcertante: tu cerebro, el órgano que crees que te conoce mejor, ¡puede mentirte sobre tu propia mano dominante!"
- },
- {
-  "id": "s43",
   "text": "¿Cómo es posible? Bueno, a veces, la forma en que \"sentimos\" que somos zurdos o diestros no coincide exactamente con cómo nuestro cerebro está organizado."
  },
  {
+  "id": "s39",
+  "text": "Puede haber factores sociales, culturales o incluso de aprendizaje que influyan en nuestra autopercepción."
+ },
+ {
+  "id": "s40",
+  "text": "Por ejemplo, si creciste en una época o lugar donde ser zurdo era mal visto, o incluso castigado, es posible que hayas aprendido a usar tu mano derecha, aunque tu cerebro tuviera una predisposición natural hacia la izquierda."
+ },
+ {
+  "id": "s41",
+  "text": "O viceversa. Tu propia conciencia puede estar adaptándose a las circunstancias."
+ },
+ {
+  "id": "s42",
+  "text": "Piensa en un pianista que, tras años de práctica intensiva, desarrolla una habilidad casi igual en ambas manos, a pesar de tener una dominancia cerebral clara."
+ },
+ {
+  "id": "s43",
+  "text": "¿Qué es más \"tú\"? ¿La predisposición natural o la habilidad adquirida?"
+ },
+ {
   "id": "s44",
-  "text": "La testosterona prenatal puede inclinar la balanza cerebral hacia la derecha."
+  "text": "El dato demoledor es este: aunque la genética y las hormonas sientan las bases, la lateralidad se manifiesta y se afianza a través del movimiento, desde las primeras patadas en el útero."
  },
  {
   "id": "s45",
-  "text": "El azar también decide."
+  "text": "Los estudios muestran que la preferencia manual ya es observable en fetos. No es solo algo que *eres*, es algo que tu cuerpo *hace*."
+ },
+ {
+  "id": "s46",
+  "text": "Y ese hacer, esa práctica, refuerza las conexiones neuronales. Tu cerebro se adapta a lo que usas."
+ },
+ {
+  "id": "s47",
+  "text": "Esto fue Indaga. Nos vemos en el próximo video... para la siguiente indagación."
+ },
+ {
+  "id": "s48",
+  "text": "Si te gustó este viaje al interior de tu cerebro, ¡considera suscribirte para no perderte ninguna de nuestras respuestas!"
  }
 ]

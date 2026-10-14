@@ -3,22 +3,36 @@ from zenn_rig import *
 
 class S13(Scene):
     def construct(self):
-        self.add(fondo(AZUL_MARINO))
+        self.add(fondo(CREMA))
         
-        # Título superior seguro con banda (usando el objeto devuelto con FadeIn)
-        tb = banda_titulo("Una orquesta de notas", color=MOSTAZA)
-        self.play(FadeIn(tb))
+        titulo = banda_titulo("Lateralidad y Asimetría", color=AZUL_MARINO)
+        self.play(
+            FadeIn(titulo),
+            run_time=0.5
+        )
         
-        # Protagonista abajo a la izquierda con expresión pensativa
-        prota = protagonista(pos=DOWN*1.2+LEFT*3.5, playera=PLAYERA_AZUL, altura=2.4, expresion="pensando", pose="de_pie")
-        self.play(FadeIn(prota))
+        prota = protagonista(
+            pos=DOWN * 1.2 + LEFT * 3.5,
+            playera=PLAYERA_AZUL,
+            altura=2.6,
+            expresion="alegria_pura",
+            pose="senalando"
+        )
         
-        # Grupo de monigotes simulando músicos a la derecha
-        musicos = stick_group(n=3, center=RIGHT*3.5+DOWN*0.5, spacing=1.2, height=2.0, color=WHITE)
-        self.play(FadeIn(musicos))
+        cerebro_icono = matraz(pos=RIGHT * 3.2 + DOWN * 1.2, escala=1.2, liquido=TEAL)
         
-        # Uso de etiqueta() en lugar de callout para evitar llamadas redundantes de texto destacado
-        c = etiqueta("Cada uno con su tono", pos=RIGHT*3.5+UP*1.2, color=CORAL, font_size=40)
-        self.play(FadeIn(c))
+        self.play(
+            FadeIn(prota),
+            FadeIn(cerebro_icono),
+            run_time=1.0
+        )
         
-        self.wait(2.5)
+        cambiar_cara(prota, "decidido")
+        self.wait(2.0)
+        
+        self.play(
+            FadeOut(prota),
+            FadeOut(cerebro_icono),
+            FadeOut(titulo),
+            run_time=0.5
+        )

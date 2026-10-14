@@ -41,6 +41,22 @@ def normalize(mp3):
         tmp.unlink()
 
 
+def _edge_error_hint(msg):
+    """Convierte el críptico 403 de Edge en una acción concreta.
+
+    Microsoft cambió el handshake (token Sec-MS-GEC): las versiones viejas de
+    edge-tts devuelven '403 Invalid response status' en TODAS las voces. Es
+    lo que dejó los 48 mp3 del proyecto 35 en 0 bytes y el mensaje parecía
+    «sin archivo». Aquí se explica qué hacer.
+    """
+    m = str(msg)
+    if "403" in m and "bing.com" in m:
+        return (m[:160] + " → Edge cambió su handshake: ACTUALIZA edge-tts "
+                "(uv pip install -U edge-tts) o cambia la voz a un motor "
+                "local (piper/kokoro) en el panel.")
+    return m[:200]
+
+
 def gen_edge(items, voice, rate="+0%"):
     import edge_tts
 
@@ -58,7 +74,7 @@ def gen_edge(items, voice, rate="+0%"):
                     await one(it)
                     ok.append(it["id"])
                 except Exception as e2:
-                    fail[it["id"]] = str(e2)[:200]
+                    fail[it["id"]] = _edge_error_hint(e2)
     asyncio.run(run_all())
 
 
@@ -174,5 +190,11 @@ for it in items:
         else:
             ok.remove(it["id"])
             fail[it["id"]] = "archivo vacío"
+    # Los fallos pueden dejar un mp3 de 0 bytes: bórralo para que no quede
+    # como «existe pero inválido» y la UI lo lea como «sin archivo».
+    else:
+        p = Path(it["out"])
+        if p.exists() and p.stat().st_size == 0:
+            p.unlink(missing_ok=True)
 
 print(json.dumps({"ok": ok, "fail": fail}, ensure_ascii=False))

@@ -5,13 +5,32 @@ class S18(Scene):
     def construct(self):
         self.add(fondo(CREMA))
         
-        prota = protagonista(pos=DOWN*1.4+LEFT*3.5, playera=PLAYERA_AZUL, altura=2.4, expresion='sorpresa', pose='senalando')
+        self.add(banda_titulo("LA LATERALIDAD ES UN ESPECTRO", color=ORANGE))
         
-        hormona1 = fuego(pos=UP*1.0+RIGHT*1.0, escala=0.8)
-        hormona2 = fuego(pos=UP*0.2+RIGHT*2.5, escala=0.8)
+        prota = protagonista(
+            pos=DOWN*1.3 + LEFT*3.8, 
+            playera=PLAYERA_AMARILLA, 
+            altura=2.4, 
+            expresion='confundido', 
+            pose='de_pie'
+        )
+        self.add(prota)
         
-        c = callout("¿Zurdo o diestro?\nInfluencia prenatal", color=AZUL_MARINO, pos=RIGHT*3.2+UP*1.5)
+        c = curva(pos=RIGHT*2.5 + UP*0.2, ancho=5.0, alto=2.2, color=INK, acento=TEAL)
+        self.add(c)
         
-        self.play(FadeIn(prota), FadeIn(hormona1), FadeIn(hormona2), Create(c), run_time=1.5)
-        cambiar_cara(prota, 'mente_explotada')
-        self.wait(6.5)
+        etic = etiqueta("Espectro continuo", pos=RIGHT*2.5 + DOWN*1.5)
+        self.add(etic)
+        
+        self.play(
+            FadeIn(c, shift=UP*0.3),
+            run_time=1.0
+        )
+        self.play(
+            FadeIn(etic, shift=UP*0.2),
+            run_time=1.0
+        )
+        
+        cambiar_cara(prota, 'pensando')
+        
+        self.wait(3.5)

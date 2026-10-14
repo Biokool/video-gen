@@ -3,24 +3,28 @@ from zenn_rig import *
 
 class S16(Scene):
     def construct(self):
-        self.add(fondo_papel())
-        
-        titulo = banda_titulo("LA GENÉTICA ES SOLO UNA PARTE", color=AZUL_MARINO)
-        self.play(FadeIn(titulo))
+        self.add(fondo(CREMA))
         
         prota = protagonista(
-            pos=DOWN*1.2+LEFT*3.5, 
-            playera=PLAYERA_AZUL, 
+            pos=DOWN*1.2 + LEFT*3.5, 
+            playera=PLAYERA_ROJA, 
             altura=2.6, 
-            expresion="sorpresa", 
-            pose="senalando"
+            expresion='sorpresa', 
+            pose='senalando'
         )
-        self.play(FadeIn(prota))
         
-        dna = adn(pos=RIGHT*3.0+UP*0.3, escala=1.2, color=TEAL)
-        self.play(FadeIn(dna))
+        cerebro = planeta(pos=RIGHT*3.0 + UP*0.5, radio=1.2, color=CORAL)
+        etq = etiqueta("Hemisferio izq/der", (3.0, -1.2))
         
-        lbl = etiqueta("¡Historia completa!", pos=RIGHT*3.2+DOWN*1.5, color=ORANGE, font_size=40)
-        self.play(FadeIn(lbl))
+        msg = callout("¡Sorpresa en el hemisferio derecho!", color=ORANGE, pos=RIGHT*3.0 + UP*2.2)
         
-        self.wait(3.0)
+        self.play(
+            FadeIn(prota),
+            FadeIn(cerebro),
+            FadeIn(etq),
+            FadeIn(msg),
+            run_time=1.5
+        )
+        
+        cambiar_cara(prota, 'alegria_pura')
+        self.wait(5.5)

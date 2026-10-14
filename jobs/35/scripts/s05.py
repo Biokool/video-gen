@@ -3,16 +3,22 @@ from zenn_rig import *
 
 class S05(Scene):
     def construct(self):
-        self.add(fondo_papel())
-        
-        prota = protagonista(pos=DOWN*1.2+LEFT*3.5, playera=PLAYERA_NARANJA, altura=2.4, expresion='confundido', pose='de_pie')
-        
-        self.play(FadeIn(prota), run_time=0.8)
-        
-        c_callout = callout("¿Por qué hay zurdos y diestros?", color=ORANGE, pos=RIGHT*3.2+UP*1.0)
-        self.play(Create(c_callout), run_time=1.0)
-        
-        cambiar_cara(prota, 'sorpresa')
-        self.play(prota.animate.shift(UP*0.2), run_time=0.5)
-        
-        self.wait(1.7)
+        self.add(fondo(INK))
+        self.add(estrellas(n=42, seed=7, color=WHITE))
+
+        protagonista_principal = version_prota(1, pos=DOWN*1.2+LEFT*3.5)
+        self.play(FadeIn(protagonista_principal))
+
+        adn_obj = adn(pos=ORIGIN, escala=0.8, color=TEAL)
+
+        self.play(FadeIn(adn_obj, shift=UP))
+        self.wait(1)
+
+        callout_text = "No hay un único gen del zurdo o diestro."
+        callout_obj = callout(callout_text, color=ORANGE, pos=RIGHT*3.4+UP*1)
+        self.play(FadeIn(callout_obj))
+        self.wait(3)
+
+        self.play(FadeOut(callout_obj), FadeOut(adn_obj))
+        self.play(FadeOut(protagonista_principal))
+        self.wait(1)

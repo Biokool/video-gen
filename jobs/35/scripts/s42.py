@@ -3,22 +3,43 @@ from zenn_rig import *
 
 class S42(Scene):
     def construct(self):
-        # Banda de título (única)
-        banda = titulo_seguro("El Porqué", color=INK)
-        self.add(banda)
-
-        # Protagonista abajo a la izquierda
+        self.add(fondo_papel())
+        
         prota = protagonista(
-            pos=DOWN*1.2 + LEFT*3.5,
-            playera=PLAYERA_NARANJA,
-            altura=2.5,
-            expresion="feliz",
+            pos=DOWN * 1.5 + LEFT * 3.5,
+            playera=PLAYERA_MORADA,
+            altura=2.4,
+            expresion="pensando",
             pose="de_pie"
         )
-        # Prop: sol a la derecha
-        sol_obj = sol(color=YELLOW, radius=0.7, pos=RIGHT*2.5 + UP*0.5)
-
-        self.play(FadeIn(prota), FadeIn(sol_obj), run_time=1.0)
-        self.wait(1.2)
-        self.play(prota.animate.shift(RIGHT*0.3), run_time=0.5)
-        self.wait(0.8)
+        
+        caja_piano = caja("PIANO", pos=RIGHT * 2.5 + DOWN * 0.5, width=3.2)
+        
+        self.play(
+            FadeIn(prota),
+            Create(caja_piano),
+            run_time=1.0
+        )
+        
+        cambiar_cara(prota, "alegria_pura")
+        self.wait(0.5)
+        
+        callout_texto = callout(
+            "Simetría bilateral en el cerebro",
+            color=CORAL,
+            pos=RIGHT * 3.0 + UP * 1.2
+        )
+        
+        self.play(
+            FadeIn(callout_texto),
+            run_time=1.0
+        )
+        
+        self.wait(5.0)
+        
+        self.play(
+            FadeOut(prota),
+            FadeOut(caja_piano),
+            FadeOut(callout_texto),
+            run_time=1.0
+        )

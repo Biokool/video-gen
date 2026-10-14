@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prueba PUNTA A PUNTA del panel Zenn Factory (v28).
+"""Prueba PUNTA A PUNTA del panel Zenn Factory (v29.1).
 
 Valida el algoritmo de corrida garantizada SIN necesitar keys de LLM ni
 red: el LLM se mockea (respuestas deterministas), y el TTS y el render usan
@@ -389,9 +389,48 @@ def s9_run_all_verde():
         shutil.rmtree(work, ignore_errors=True)
 
 
+def s10_cobertura_ignora_markup():
+    print("\n[S10] cobertura mide la narración, no el markup de producción")
+    p, tmp = nuevo_proyecto("s10")
+    # Guion con markup (headers, [VISUAL:], timecodes) y secciones que NO se
+    # narran (FUENTES/MINIATURAS). v29.1: ese texto no debe contar.
+    narracion = [f"narracion{i}" for i in range(100)]
+    guion = (
+        "# Guion de prueba\n\n"
+        "## APERTURA (0:00–0:30)\n"
+        "[VISUAL: saludo_fijo, banda_titulo, personaje(stick_point)]\n"
+        + " ".join(narracion) + "\n\n"
+        "[VISUAL: matraz, reloj_montage(feto_desarrollo)]\n\n"
+        "## FUENTES\n"
+        "- Autor, A. (2020). Un título de fuente que no se narra jamás. Journal.\n"
+        "- Otro, B. (2021). Otra fuente larga que tampoco se narra nunca. J.\n\n"
+        "## MINIATURAS (3 ideas)\n"
+        "1. Texto: monigote con dos cerebros y flechas de colores.\n")
+    (tmp / "GUION.md").write_text(guion, encoding="utf-8")
+    try:
+        n = P.count_words(P._narracion_guion(guion))
+        check("la narración excluye [VISUAL]/headers/timecodes/FUENTES",
+              n == len(narracion), f"narracion={n} esperado={len(narracion)}")
+        # cuadrado: un storyboard que cubra esa narración da ≥90%
+        esc = []
+        i = 0
+        while i < len(narracion):
+            esc.append(f"### S{len(esc)+1:02d}\nVOZ: "
+                       f"{' '.join(narracion[i:i+25])}\nVISUAL: x.")
+            i += 25
+        (tmp / "STORYBOARD.md").write_text("\n\n".join(esc), encoding="utf-8")
+        vw, gw = P._cobertura_storyboard(p, tmp)
+        check(f"cobertura real ≥90% ({vw}/{gw})",
+              gw == len(narracion) and vw >= 0.9 * gw)
+        ok, det = P.validar_etapa("storyboard", p, tmp)
+        check("contrato storyboard ok (sin falso TRUNCADO)", ok, det)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def main():
     print("=" * 64)
-    print("E2E Zenn Factory v28 — ffmpeg:", FFMPEG)
+    print("E2E Zenn Factory v29.1 — ffmpeg:", FFMPEG)
     print("=" * 64)
     s1_happy_path()
     s2_rotacion_por_cuota()
@@ -402,6 +441,7 @@ def main():
     s7_sin_nombres_indefinidos()
     s8_precheck_bloquea()
     s9_run_all_verde()
+    s10_cobertura_ignora_markup()
     print("\n" + "=" * 64)
     fallos = [r for r in RESULTS if not r[1]]
     print(f"{len(RESULTS) - len(fallos)}/{len(RESULTS)} checks pasaron")

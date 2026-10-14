@@ -5,15 +5,25 @@ class S09(Scene):
     def construct(self):
         self.add(fondo(CREMA))
         
-        prota = protagonista(pos=DOWN*1.2+LEFT*3.5, playera=PLAYERA_AZUL, altura=2.6, expresion='sorpresa', pose='senalando')
-        self.add(prota)
+        prota = protagonista(
+            pos=DOWN*1.3+LEFT*4.0, 
+            playera=PLAYERA_VERDE, 
+            altura=2.5, 
+            expresion='pensando', 
+            pose='senalando'
+        )
         
-        et = etiqueta("¿Zurdo?", pos=RIGHT*3.0+UP*1.5, color=INK)
-        self.add(et)
+        titulo = banda_titulo("¿Influencia materna y hormonas en la lateralidad?", color=TEAL)
         
-        c = lapida(texto='10%', pos=RIGHT*3.0+DOWN*0.5, ancho=2.0)
-        self.add(c)
+        adn_obj = adn(pos=RIGHT*3.5+DOWN*1.5, escala=0.8, color=TEAL)
         
-        self.play(FadeIn(c), run_time=1.0)
-        self.wait(5.0)
-        self.play(FadeOut(prota), FadeOut(c), FadeOut(et), run_time=1.0)
+        self.play(
+            FadeIn(prota),
+            FadeIn(titulo),
+            Create(adn_obj),
+            run_time=1.5
+        )
+        
+        cambiar_cara(prota, 'sorpresa')
+        
+        self.wait(6.5)

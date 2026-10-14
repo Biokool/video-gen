@@ -3,37 +3,31 @@ from zenn_rig import *
 
 class S14(Scene):
     def construct(self):
-        self.add(fondo(AZUL_MARINO))
+        self.add(fondo(CREMA))
         
-        self.play(
-            FadeIn(banda_titulo("MÁS DE 40 GENES IDENTIFICADOS", color=TEAL)),
-            run_time=0.8
-        )
+        self.add(banda_titulo("Hemisferios cerebrales", color=TEAL))
         
         prota = protagonista(
-            pos=DOWN*1.2 + LEFT*3.5, 
-            playera=PLAYERA_AZUL, 
-            altura=2.5, 
-            expresion='mente_explotada', 
-            pose='senalando'
+            pos=DOWN * 1.5 + LEFT * 3.8,
+            playera=PLAYERA_VERDE,
+            altura=2.4,
+            expresion="sorpresa",
+            pose="senalando"
         )
-        self.play(FadeIn(prota), run_time=0.8)
+        self.add(prota)
         
-        dna = adn(pos=RIGHT*2.5 + UP*0.3, escala=1.2, color=TEAL)
-        self.play(Create(dna), run_time=1.0)
+        cerebro = red_seguridad(width=3.0, height=1.5, pos=UP * 0.5 + RIGHT * 2.5)
+        self.add(cerebro)
         
-        box = caja(etiqueta="40+ GENES", pos=RIGHT*2.5 + DOWN*1.5, width=2.0)
-        self.play(FadeIn(box), run_time=0.8)
+        fig = stick_idle(pos=DOWN * 1.5 + RIGHT * 3.5, height=2.2, color=INK)
+        self.add(fig)
         
-        e = etiqueta("Héca et al., 2014", pos=RIGHT*3.2 + UP*1.8, color=WHITE, font_size=36)
-        self.play(FadeIn(e), run_time=0.8)
+        flecha1 = arrow(UP * 0.2 + RIGHT * 1.8, DOWN * 0.8 + RIGHT * 2.8, color=RED, width=8)
+        flecha2 = arrow(UP * 0.2 + RIGHT * 3.2, DOWN * 0.8 + RIGHT * 2.2, color=BLUE, width=8)
+        self.add(flecha1, flecha2)
         
-        self.wait(5.0)
+        txt_dato = etiqueta("Cruzado", pos=UP * 1.8 + LEFT * 2.5, color=ORANGE, font_size=40)
+        self.add(txt_dato)
         
-        self.play(
-            FadeOut(prota),
-            FadeOut(dna),
-            FadeOut(box),
-            FadeOut(e),
-            run_time=0.8
-        )
+        cambiar_cara(prota, "alegria_pura")
+        self.wait(2.5)

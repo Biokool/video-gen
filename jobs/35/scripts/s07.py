@@ -3,61 +3,36 @@ from zenn_rig import *
 
 class S07(Scene):
     def construct(self):
-        # Fondo
         self.add(fondo(CREMA))
-
-        # Título de la escena
-        banda = banda_titulo("Una decisión previa", color=ORANGE)
-        self.play(FadeIn(banda, shift=DOWN))
-        self.wait(0.5)
-
-        # Protagonista (versión 5 = pregunta amarilla)
-        prota = version_prota(
-            5,
-            pos=DOWN * 1.2 + LEFT * 3.0,
-            altura=2.6,
+        
+        self.add(banda_titulo("Genes y Probabilidad", color=ORANGE))
+        
+        prota = protagonista(
+            pos=DOWN*1.2 + LEFT*3.5,
+            playera=PLAYERA_VERDE,
+            altura=2.4,
+            expresion="pensando",
+            pose="senalando"
         )
-        self.play(FadeIn(prota, shift=UP))
-        self.wait(0.5)
-
-        # Ojo grande (feto) – se escala antes de la animación
-        feto = ojo_grande(
-            pos=UP * 0.5 + RIGHT * 1.5,
-            escala=1.2,
-            iris=ORANGE,
+        
+        balanza = moneda_dorada(texto="⚖", pos=RIGHT*3.0 + UP*0.2, radio=1.2)
+        
+        ref_texto = etiqueta(
+            "Héca et al., 2014\nFrontiers in Psych.", 
+            pos=RIGHT*3.0 + DOWN*1.8, 
+            font_size=28
         )
-        feto.scale(0.5)                     # escala correcta antes de la animación
-        self.play(FadeIn(feto))
-        self.wait(0.5)
-
-        # Monigote secundario
-        stick = stick_idle(
-            pos=RIGHT * 4.5 + DOWN * 0.5,
-            height=1.8,
-            color=INK,
+        
+        flecha = arrow(start=LEFT*1.8 + UP*0.5, end=RIGHT*1.5 + UP*0.5, color=INK, width=6)
+        
+        self.play(
+            FadeIn(prota),
+            FadeIn(balanza),
+            Create(flecha),
+            FadeIn(ref_texto),
+            run_time=1.5
         )
-        self.play(FadeIn(stick))
-        self.wait(0.5)
-
-        # Cambio de expresión del protagonista
-        cambiar_cara(prota, "sorpresa")
-        self.wait(0.5)
-
-        # Texto secundario (etiqueta)
-        etiqueta_txt = etiqueta(
-            "Antes de que existieras",
-            pos=RIGHT * 3.2 + UP * 1.2,
-            color=ORANGE,
-            font_size=40,
-            ancho_max=5.5,
-        )
-        self.play(FadeIn(etiqueta_txt))
-        self.wait(0.5)
-
-        # El monigote señala al ojo grande
-        # stick_point necesita la posición del objetivo, no el Mobject
-        stick_point(stick, feto.get_center())
-        self.wait(0.8)
-
-        # Fin de la escena
-        self.wait(1)
+        
+        cara_nueva = cambiar_cara(prota, "alegria_pura")
+        self.play(FadeIn(cara_nueva), run_time=0.5)
+        self.wait(9.0)

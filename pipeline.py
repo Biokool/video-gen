@@ -29,7 +29,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 
-PANEL_VERSION = "v29"  # se muestra en el pie del sidebar; subir en cada release
+PANEL_VERSION = "v29.1"  # se muestra en el pie del sidebar; subir en cada release
 # Dos layouts soportados:
 #  - anidado: panel/ dentro de zenn-factory/ (jobs/ y thumbnails/ en el padre)
 #  - plano:   todo dentro de video-gen/ (jobs/ y thumbnails/ junto a app.py)
@@ -128,6 +128,50 @@ def run(cmd, cwd=BASE, timeout=3600):
 
 def count_words(text):
     return len(re.findall(r"[A-Za-zÁÉÍÓÚáéíóúÑñüÜ]+", text))
+
+
+# v29.1 — secciones del guion que NO se narran (no cuentan para cobertura).
+_GUION_SECCION_NO_NARRADA = re.compile(
+    r"^\s*#{1,6}\s*\**\s*(FUENTES|MINIATURAS|RECURSOS|CR[EÉ]DITOS|"
+    r"NOTAS DE PRODUCCI|T[IÍ]TULOS|DESCRIPCI|TAGS|HASHTAGS|M[UÚ]SICA|"
+    r"ANEXOS?)\b", re.IGNORECASE)
+_GUION_LINEA_NO_NARRADA = re.compile(
+    r"^\s*(\[VISUAL\b|\[IMAGEN\b|\[ESCENA\b|\[PLANO\b|#{1,6}\s|"
+    r"---+$)", re.IGNORECASE)
+_GUION_TIMECODE = re.compile(
+    r"\(\s*\d{1,2}:\d{2}\s*[–\-—]\s*\d{1,2}:\d{2}\s*\)")
+
+
+def _narracion_guion(text):
+    """Devuelve SOLO la narración de un guion (lo que el TTS lee en voz alta).
+
+    v29.1: la cobertura del storyboard se medía contra el guion CRUDO, que
+    incluye el markup de producción (encabezados `## BLOQUE`, notas
+    `[VISUAL: ...]`, timecodes `(0:30–2:00)` y las secciones FUENTES/
+    MINIATURAS). Ese texto nunca se narra: cuenta palabras de más y vuelve el
+    umento del 90% imposible, así que la etapa 5 marcaba un FALSO «STORYBOARD
+    TRUNCADO» (proyecto 35: 1338 «palabras» cuando la narración real era
+    ~1163) y partía el guion dejando una 3ª parte que era solo la sección
+    FUENTES. Aquí se quita todo eso: el resultado es lo que se narra.
+    """
+    out = []
+    skip = False
+    for ln in text.splitlines():
+        s = ln.strip()
+        if not s:
+            continue
+        if _GUION_SECCION_NO_NARRADA.match(s):
+            skip = True            # FUENTES/MINIATURAS/...: fuera hasta el
+            continue               # próximo encabezado
+        if re.match(r"^\s*#{1,6}\s", s):
+            skip = False           # encabezado de bloque narrativo: sigue
+            continue
+        if skip or _GUION_LINEA_NO_NARRADA.match(s):
+            continue
+        s = _GUION_TIMECODE.sub("", s).strip()
+        if s:
+            out.append(s)
+    return "\n\n".join(out)
 
 
 def estimate_minutes(words, wpm=155):
@@ -462,13 +506,40 @@ def _limpia_valor(val):
     return val
 
 
-def _campo(bloque, nombre):
+def _buscar_en_guion(guion, frag, min_pal=3):
+    """Recupera del guion el texto que empieza con `frag` (que quedó partido).
+
+    v29.1: probado para el caso S10 del proyecto 35 (número «40» partido
+    entre párrafos). Se conserva como utilidad, pero el llamador automático
+    se descartó: era frágil (abreviaturas como «McManus, I. C.»). La
+    recuperación efectiva para ese job se hace en reparar_faltantes (coser
+    la VOZ partida con la escena siguiente).
+    """
+    frag = (frag or "").strip()
+    if len(frag.split()) < min_pal or not guion:
+        return ""
+    pos = guion.find(frag)
+    if pos < 0:
+        return ""
+    resto = guion[pos:pos + 1200]
+    frases = re.split(r"(?<=[.!?])\s+", resto)
+    salida = frases[0] if frases else ""
+    if salida and salida[-1] not in ".!?" and len(frases) > 1:
+        salida += " " + frases[1]
+    return salida.strip()
+
+
+def _campo(bloque, nombre, guion=""):
     """Extrae VOZ:/VISUAL: tolerando las variantes de formato de los
     modelos. Devuelve el texto limpio; "" si no hay marcador.
 
     Si el marcador quedó con la línea vacía (el modelo puso el texto en la
     línea siguiente), toma la primera línea no vacía que siga, siempre que
     no sea otro marcador ni un encabezado de escena.
+
+    v29.1: si el valor queda demasiado corto (señal de que el párrafo se
+    partió y el resto vive en la escena siguiente), intenta recuperarlo del
+    guion con `guion` (texto de referencia). Sin guion, no hace nada.
     """
     lineas = bloque.splitlines()
     for i, ln in enumerate(lineas):
@@ -527,9 +598,14 @@ def _normalizar_campos(text):
     return "\n".join(out) + cola
 
 
-def _voz_words(text):
-    """Palabras totales en los campos VOZ: del storyboard."""
-    return sum(len(_campo(b, "VOZ").split()) for b in _bloques_escena(text))
+def _voz_words(text, guion=""):
+    """Palabras totales en los campos VOZ: del storyboard.
+
+    v29.1: `guion` (narración de referencia) permite recuperar VOZ partidas
+    igual que `_campo`, para que la cobertura no cuente de menos.
+    """
+    return sum(len(_campo(b, "VOZ", guion).split())
+               for b in _bloques_escena(text))
 
 
 def _limpiar_parte(text):
@@ -610,7 +686,10 @@ def run_storyboard(generate_fn, p, job):
     if not sp:
         return False, "Sin guion: primero genera el borrador (etapa guion).", [], None
     script = Path(sp).read_text(encoding="utf-8", errors="replace")
-    guion_words = len(re.sub(r"^#.*$", "", script, flags=re.M).split())
+    # v29.1: se cuenta y se parte SOLO la narración (sin markup de producción
+    # ni secciones FUENTES/MINIATURAS): ver _narracion_guion.
+    narracion = _narracion_guion(script)
+    guion_words = count_words(narracion)
     # Anti-truncado ESTRUCTURAL (3 capas): además del chequeo de cobertura,
     # los guiones largos se generan POR PARTES. Un storyboard completo de
     # ~1800 palabras no cabe en la salida de los modelos gratis y el modelo
@@ -624,7 +703,7 @@ def run_storyboard(generate_fn, p, job):
     except Exception:
         mt = 8192
     trozo = 350 if mt <= 1000 else 650
-    partes = (_partir_guion(script, trozo) if guion_words > 1000
+    partes = (_partir_guion(narracion, trozo) if guion_words > 1000
               else [script])
     textos, model, siguiente = [], "", 1
     for i, parte in enumerate(partes):
@@ -694,7 +773,7 @@ def run_storyboard(generate_fn, p, job):
     # Anti-truncado ESTRUCTURAL: si el storyboard no cubre el guion, la etapa
     # FALLA (no avisa y sigue). Un storyboard cortado = video cortado.
     # Umbral 90%: con 70% un guion de 1300 palabras pierde ~400 (casi 3 min).
-    voz_words = _voz_words(text)
+    voz_words = _voz_words(text, narracion)
     if guion_words > 0 and voz_words < 0.9 * guion_words:
         return False, (
             f"⛔ STORYBOARD TRUNCADO: cubre ~{voz_words} palabras de "
@@ -727,6 +806,9 @@ def run_continuar_storyboard(generate_fn, p, job):
     n = max(nums)
     sp = find_script(p)
     script = Path(sp).read_text(encoding="utf-8", errors="replace") if sp else ""
+    # v29.1: continuar también en lenguaje de NARRACIÓN (sin markup), para que
+    # el modelo no re-cree bloques de producción ni la sección FUENTES.
+    narracion = _narracion_guion(script) if script else ""
     # Anti-repetición: el modelo tiende a re-contar la parte más narrable
     # (proyecto 37: Wagner 4 veces). Se le prohíben los temas ya cubiertos.
     temas = _temas_cubiertos(text)
@@ -741,7 +823,7 @@ def run_continuar_storyboard(generate_fn, p, job):
         f"REGLAS: escenas de 8-12s (~25-35 palabras de VOZ); PROTAGONISTA en "
         f"todas; NO repitas escenas ya existentes.{no_repetir}\n"
         f"STORYBOARD EXISTENTE (referencia, no lo repitas):\n{text[-6000:]}\n\n"
-        f"GUION COMPLETO:\n{script[:12000]}")
+        f"GUION (narración):\n{narracion[:12000]}")
     try:
         new_text, model = generate_fn(
             prompt, system="Eres director de animación minimalista.")
@@ -764,7 +846,7 @@ def run_continuar_storyboard(generate_fn, p, job):
     # Revalida cobertura
     full = sb.read_text(encoding="utf-8", errors="replace")
     voz_words = _voz_words(full)
-    guion_words = len(re.sub(r"^#.*$", "", script, flags=re.M).split())
+    guion_words = count_words(narracion)
     if guion_words > 0 and voz_words < 0.7 * guion_words:
         return False, (
             f"Se agregaron {len(nuevos)} escenas (total S{total:02d}) pero la "
@@ -990,8 +1072,9 @@ def build_vo_json(p, job):
     sb = job / "STORYBOARD.md"
     if sb.exists():
         text = sb.read_text(encoding="utf-8", errors="replace")
+        guion = _narracion_job(job)
         for m in re.finditer(r"###\s*(S\d+)(.*?)(?=###\s*S\d+|\Z)", text, re.S):
-            voz = _campo(m.group(2), "VOZ")
+            voz = _campo(m.group(2), "VOZ", guion)
             sid = m.group(1).lower()
             if voz:
                 items.append({"id": sid, "text": voz})
@@ -1001,7 +1084,8 @@ def build_vo_json(p, job):
         sp = find_script(p)
         if sp:
             raw = Path(sp).read_text(encoding="utf-8", errors="replace")
-            raw = re.sub(r"^#.*$", "", raw, flags=re.M)
+            # v29.1: sin el markup de producción (ver _narracion_guion).
+            raw = _narracion_guion(raw)
             paras = [q.strip() for q in raw.split("\n") if len(q.strip()) > 40]
             chunks = []
             for para in paras:
@@ -1014,6 +1098,16 @@ def build_vo_json(p, job):
             items = [{"id": f"s{i + 1:02d}", "text": c}
                      for i, c in enumerate(chunks)]
     if items:
+        # v29.1: dedupe de ids repetidos (S41/S42 del proyecto 35: el modelo
+        # repitió una escena). Se conserva la primera aparición para no narrar
+        # dos veces ni pisar el mismo mp3.
+        vistos, uniq = set(), []
+        for it in items:
+            if it["id"] in vistos:
+                continue
+            vistos.add(it["id"])
+            uniq.append(it)
+        items = uniq
         (job / "vo.json").write_text(
             json.dumps(items, ensure_ascii=False, indent=1), encoding="utf-8")
         return len(items), ("storyboard" if sb.exists() else "guion"), sin_voz
@@ -1040,10 +1134,11 @@ def run_tts_stage(p, job, progress=None):
         if not n:
             return (False, "Sin vo.json ni storyboard/guion para crearlo. "
                            "Genera primero el storyboard (etapa 5).", [], None)
-        # v27: si hay escenas sin VOZ legible, fallar FUERTE aquí con la lista
-        # y una muestra del formato real — antes se descartaban en silencio y
-        # la reparación entraba en loop infinito (vo.json siempre con menos
-        # líneas, TTS omitiendo todo, ensamblado fallando).
+        # v27: escenas sin VOZ legible -> fallar FUERTE con la lista y una
+        # muestra del formato real. No en silencio (eso causaba el loop S34:
+        # vo.json con menos líneas -> TTS omite -> ensamblado falla). El
+        # contrato de la etapa 5 también exige 0 escenas sin VOZ, así que no
+        # tiene sentido narrar un storyboard que va a quedar bloqueado.
         if sin_voz:
             muestra = _bloque_crudo(job, sin_voz[0])
             lista = ", ".join(s.upper() for s in sin_voz[:12])
@@ -1632,15 +1727,26 @@ def _rig_source():
     return None
 
 
+def _narracion_job(job):
+    """Narración del guion de un job (para recuperar VOZ partidas)."""
+    for name in ("GUION.md", "GUION_PILOTO.md", "guion.md"):
+        c = Path(job) / name
+        if c.exists():
+            return _narracion_guion(
+                c.read_text(encoding="utf-8", errors="replace"))
+    return ""
+
+
 def _parse_storyboard(job):
     sb = job / "STORYBOARD.md"
     scenes = []
     if not sb.exists():
         return scenes
     text = sb.read_text(encoding="utf-8", errors="replace")
+    guion = _narracion_job(job)
     for m in re.finditer(r"###\s*(S\d+)(.*?)(?=###\s*S\d+|\Z)", text, re.S):
         scenes.append({"id": m.group(1).lower(),
-                       "voz": _campo(m.group(2), "VOZ"),
+                       "voz": _campo(m.group(2), "VOZ", guion),
                        "visual": _campo(m.group(2), "VISUAL")})
     return scenes
 
@@ -1853,12 +1959,16 @@ def _cobertura_storyboard(p, job):
     """(palabras_VOZ, palabras_guion) para el contrato de la etapa 5."""
     sp = find_script(p)
     guion_words = 0
+    narracion = ""
     if sp:
         script = Path(sp).read_text(encoding="utf-8", errors="replace")
-        guion_words = len(re.sub(r"^#.*$", "", script, flags=re.M).split())
+        # v29.1: cobertura contra la NARRACIÓN del guion, no contra el guion
+        # crudo con markup (incluirlo volvía el 90% imposible -> falso TRUNCADO).
+        narracion = _narracion_guion(script)
+        guion_words = count_words(narracion)
     sb = Path(job) / "STORYBOARD.md"
-    voz_words = (_voz_words(sb.read_text(encoding="utf-8", errors="replace"))
-                 if sb.exists() else 0)
+    voz_words = (_voz_words(sb.read_text(encoding="utf-8", errors="replace"),
+                            narracion) if sb.exists() else 0)
     return voz_words, guion_words
 
 

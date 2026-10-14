@@ -3,21 +3,32 @@ from zenn_rig import *
 
 class S46(Scene):
     def construct(self):
-        self.add(fondo(CREMA))
+        self.add(fondo(INK))
+        self.add(estrellas(n=30, color=WHITE))
+        
+        self.add(banda_titulo("TU CEREBRO SE ADAPTA A LO QUE USAS", color=TEAL))
+        
+        prota = protagonista(
+            pos=DOWN*1.2 + LEFT*3.5,
+            playera=PLAYERA_TEAL,
+            altura=2.6,
+            expresion='mente_explotada',
+            pose='senalando'
+        )
+        self.add(prota)
+        
+        cerebro_adn = adn(pos=RIGHT*3.2 + UP*0.2, escala=1.2, color=TEAL)
+        self.add(cerebro_adn)
+        
+        arr = arrow(start=LEFT*1.8 + UP*0.2, end=RIGHT*1.8 + UP*0.2, color=WHITE, width=6)
+        self.add(arr)
         
         self.play(
-            FadeIn(
-                banda_titulo("¡Hora de programar con estilo!", color=ORANGE)
-            )
+            FadeIn(cerebro_adn),
+            Create(arr),
+            run_time=1.5
         )
         
-        prota = version_prota(1, pos=DOWN*1.3+LEFT*3.2)
-        self.play(FadeIn(prota))
+        cambiar_cara(prota, 'alegria_pura')
         
-        c = reloj_pared(radius=1.2, pos=RIGHT*3.0+UP*0.5, hora_3=True)
-        self.play(Create(c))
-        
-        texto_dato = etiqueta("¡Rápido y eficiente!", pos=RIGHT*3.2+DOWN*1.2, color=AZUL_MARINO)
-        self.play(FadeIn(texto_dato))
-        
-        self.wait(2.0)
+        self.wait(5.5)

@@ -3,23 +3,32 @@ from zenn_rig import *
 
 class S31(Scene):
     def construct(self):
-        self.add(fondo_papel())
+        self.add(fondo(CREMA))
         
-        self.play(FadeIn(banda_titulo("¿Qué empuja la dominancia?", color=TEAL)))
+        titulo = banda_titulo("EVOLUCIÓN Y ASIMETRÍA", color=TEAL)
+        self.play(
+            FadeIn(titulo),
+            run_time=0.8
+        )
         
         prota = protagonista(
-            pos=DOWN*1.2+LEFT*3.5, 
-            playera=PLAYERA_VERDE, 
-            altura=2.6, 
-            expresion="pensando", 
+            pos=DOWN*1.3 + LEFT*4.0,
+            playera=PLAYERA_VERDE,
+            altura=2.5,
+            expresion="pensando",
             pose="senalando"
         )
-        self.play(FadeIn(prota))
         
-        cerebro = digitos(pos=RIGHT*3.0+UP*0.5, size=1.8)
-        self.play(Create(cerebro))
+        d = dino(pos=DOWN*1.3 + RIGHT*3.5, color=TEAL, escala=0.9)
+        cerebro = adn(pos=UP*0.5 + RIGHT*3.5, escala=0.8, color=CORAL)
         
-        c = etiqueta("¿Hemisferio dominante?", pos=RIGHT*3.2+UP*1.8, color=ORANGE, font_size=40)
-        self.play(FadeIn(c))
+        self.play(
+            FadeIn(prota),
+            FadeIn(d),
+            FadeIn(cerebro),
+            run_time=1.2
+        )
         
-        self.wait(5)
+        cambiar_cara(prota, "alegria_pura")
+        
+        self.wait(7.7)

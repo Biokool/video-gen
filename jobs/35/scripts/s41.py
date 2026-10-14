@@ -5,30 +5,45 @@ class S41(Scene):
     def construct(self):
         self.add(fondo_papel())
         
+        # Título superior seguro para la escena (ÚNICA llamada a banda/título/callout principal)
+        self.add(banda_titulo("Tu conciencia se adapta", color=ORANGE))
+        
+        # Protagonista abajo a la izquierda para evitar solapes
         prota = protagonista(
-            pos=DOWN*1.2 + LEFT*3.5,
-            playera=PLAYERA_AZUL,
-            altura=2.4,
-            expresion="sorpresa",
-            pose="senalando"
+            pos=DOWN * 1.5 + LEFT * 3.5, 
+            playera=PLAYERA_NARANJA, 
+            altura=2.6, 
+            expresion='pensando', 
+            pose='de_pie'
         )
         
-        self.play(FadeIn(prota))
+        # Prop adicional con color para acompañar la escena (una lupa para observar)
+        prop_lupa = lupa(pos=RIGHT * 3.0 + DOWN * 0.5, escala=1.2)
         
+        # Usamos etiqueta() en lugar de callout para evitar duplicidad de elementos principales de texto
+        aviso = etiqueta("O viceversa...", pos=RIGHT * 3.2 + UP * 1.2, color=INK, font_size=40)
+        
+        # Animaciones de entrada
         self.play(
-            FadeIn(
-                callout(
-                    "¡Increíble descubrimiento!",
-                    color=ORANGE,
-                    pos=RIGHT*3.2 + UP*1.0
-                )
-            ),
+            FadeIn(prota, shift=UP),
+            FadeIn(prop_lupa, shift=RIGHT),
             run_time=1.0
         )
         
-        diamante = moneda_dorada(texto="★", pos=RIGHT*3.2 + DOWN*1.0, radio=0.9)
-        self.play(Create(diamante), run_time=1.0)
+        # Cambio de expresión a sorpresa y aparición de la etiqueta
+        cambiar_cara(prota, 'sorpresa')
+        self.play(
+            FadeIn(aviso, shift=LEFT),
+            run_time=1.0
+        )
         
-        cambiar_cara(prota, "alegria_pura")
+        # Breve pausa para la asimilación del concepto
+        self.wait(3.0)
         
-        self.wait(1.5)
+        # Salida limpia
+        self.play(
+            FadeOut(prota),
+            FadeOut(prop_lupa),
+            FadeOut(aviso),
+            run_time=1.0
+        )

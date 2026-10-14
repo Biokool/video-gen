@@ -6,22 +6,36 @@ class S02(Scene):
         self.add(fondo(INK))
         self.add(estrellas(n=42, seed=7, color=WHITE))
 
-        titulo = banda_titulo("¿Por qué eres zurdo o diestro?", color=ORANGE)
-        self.play(Create(titulo))
+        protagonista_principal = version_prota(1, pos=DOWN*1.2+LEFT*3.5, altura=2.6)
+        self.play(FadeIn(protagonista_principal))
 
-        prota = protagonista(
-            pos=DOWN * 1.2 + LEFT * 3.5,
-            altura=2.6,
-            playera=PLAYERA_NARANJA,
-            expresion="pensando",
-            pose="de_pie"
+        mano_roja = Line(ORIGIN, DOWN*1.5, stroke_color=RED, stroke_width=15)
+        mano_azul = Line(ORIGIN, DOWN*1.5, stroke_color=BLUE, stroke_width=15)
+        mano_roja.move_to(RIGHT*2)
+        mano_azul.move_to(LEFT*2)
+
+        self.play(
+            protagonista_principal.animate.set_expression("pensando"),
+            Create(mano_roja),
+            Create(mano_azul)
         )
-        self.play(FadeIn(prota))
+        self.wait(1)
 
-        callout_text = "¿Casi nadie lo sabe!"
-        # Se cambió callout a etiqueta para evitar el solapamiento con banda_titulo
-        # callout_obj = callout(callout_text, color=ORANGE, pos=RIGHT * 3.4 + UP * 1)
-        callout_obj = etiqueta(callout_text, pos=RIGHT * 3.4 + UP * 1, color=ORANGE, font_size=40)
+        callout_texto = "¿Por qué hay zurdos y diestros?"
+        callout_obj = callout(callout_texto, color=ORANGE, pos=RIGHT*3.4+UP*1)
         self.play(FadeIn(callout_obj))
-
         self.wait(3)
+
+        self.play(
+            protagonista_principal.animate.set_expression("mente_explotada"),
+            FadeOut(mano_roja),
+            FadeOut(mano_azul),
+            FadeOut(callout_obj)
+        )
+        self.wait(2)
+
+        self.play(
+            protagonista_principal.animate.set_expression("normal"),
+            FadeOut(protagonista_principal)
+        )
+        self.wait(1)

@@ -5,33 +5,40 @@ class S21(Scene):
     def construct(self):
         self.add(fondo(CREMA))
         
-        # Banda de título superior (ÚNICA llamada de título en la escena)
-        self.play(Write(banda_titulo("LOS DOS HEMISFERIOS", color=TEAL)))
+        # Título seguro superior y protagonista abajo
+        titulo = banda_titulo("ASIMETRÍA CEREBRAL")
+        self.play(
+            FadeIn(titulo),
+            run_time=0.5
+        )
         
-        # Protagonista abajo a la izquierda (evitando zona de banda y subtítulos)
-        prota = protagonista(pos=DOWN*1.3+LEFT*3.8, playera=PLAYERA_VERDE, altura=2.4, expresion="pensando", pose="de_pie")
-        self.play(FadeIn(prota))
+        prota = protagonista(
+            pos=DOWN*1.2 + LEFT*3.5,
+            playera=PLAYERA_TEAL,
+            altura=2.6,
+            expresion='alegria_pura',
+            pose='de_pie'
+        )
+        self.play(FadeIn(prota), run_time=0.8)
         
-        # Dos cerebros o un split/curva que representa la división hemisférica
-        cerebro_izq = matraz(pos=LEFT*0.8+UP*0.2, escala=1.1, liquido=CORAL)
-        cerebro_der = matraz(pos=RIGHT*1.8+UP*0.2, escala=1.1, liquido=AZUL_MARINO)
-        
-        etq_izq = etiqueta("Izquierdo", (-0.8, -1.0))
-        etq_der = etiqueta("Derecho", (1.8, -1.0))
+        # Props complementarios con color en el lado derecho
+        corazon = moneda_dorada('♥', pos=RIGHT*3.2 + DOWN*1.3, radio=0.6)
+        huella = hueso(pos=RIGHT*5.2 + DOWN*1.3, escala=0.8)
         
         self.play(
-            FadeIn(cerebro_izq),
-            FadeIn(cerebro_der),
-            FadeIn(etq_izq),
-            FadeIn(etq_der),
+            Create(corazon),
+            FadeIn(huella),
             run_time=1.0
         )
         
-        # Cambio de expresión del protagonista para indicar revelación
-        cambiar_cara(prota, "sorpresa")
-        
-        # Usamos etiqueta() en lugar de callout con coordenadas flotantes correctas (tupla x, y)
-        c = etiqueta("¡No son iguales!", pos=(3.6, 1.2), color=ORANGE, font_size=50)
-        self.play(FadeIn(c))
-        
+        # Animación de cambio de expresión para dinamismo
+        cambiar_cara(prota, 'feliz')
         self.wait(5.0)
+        
+        self.play(
+            FadeOut(prota),
+            FadeOut(corazon),
+            FadeOut(huella),
+            FadeOut(titulo),
+            run_time=0.5
+        )

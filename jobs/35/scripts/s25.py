@@ -3,24 +3,37 @@ from zenn_rig import *
 
 class S25(Scene):
     def construct(self):
-        self.add(fondo_papel())
+        self.add(fondo(CREMA))
         
-        titulo = banda_titulo("¡Hemisferio derecho al mando!", color=TEAL)
+        titulo = banda_titulo("Lateralidad y Testosterona", color=AZUL_MARINO)
         self.play(FadeIn(titulo))
         
-        prota = protagonista(pos=DOWN*1.2+LEFT*3.5, playera=PLAYERA_VERDE, altura=2.4, expresion='sorpresa', pose='senalando')
+        prota = protagonista(
+            pos=DOWN*1.3 + LEFT*3.8,
+            playera=PLAYERA_AZUL,
+            altura=2.4,
+            expresion="pensando",
+            pose="senalando"
+        )
         self.play(FadeIn(prota))
         
-        cerebro = planeta(pos=RIGHT*3.0+UP*0.3, radio=1.4, color=TEAL)
-        self.play(FadeIn(cerebro))
+        lab_matraz = matraz(pos=RIGHT*2.0 + DOWN*0.5, escala=1.2, liquido=ORANGE)
+        cerebro_curva = curva(pos=RIGHT*3.0 + UP*1.2, ancho=3.0, alto=2.0, color=AZUL_MARINO, acento=RED)
         
-        nota = etiqueta("¡Sorpresa para zurdos!", pos=RIGHT*3.2+UP*1.8, color=ORANGE, font_size=40)
-        self.play(FadeIn(nota))
+        self.play(Create(lab_matraz), Create(cerebro_curva))
         
-        self.wait(3.0)
+        flecha = arrow(start=RIGHT*1.2 + DOWN*0.5, end=RIGHT*2.2 + UP*0.5, color=INK, width=6)
+        self.play(Create(flecha))
         
-        cambiar_cara(prota, 'alegria_pura')
-        self.play(prota.animate.shift(UP*0.2), run_time=0.5)
-        self.wait(2.0)
+        cara_nueva = cambiar_cara(prota, "sorpresa")
+        acento_rojo = red_accent(lab_matraz, scale=1.15)
+        self.play(
+            FadeIn(cara_nueva),
+            FadeIn(acento_rojo),
+            run_time=1.0
+        )
         
-        self.play(FadeOut(prota), FadeOut(cerebro), FadeOut(nota), FadeOut(titulo))
+        e = etiqueta("Efecto temprano", pos=RIGHT*3.5 + DOWN*1.5, color=ORANGE, font_size=40, ancho_max=5.5)
+        self.play(FadeIn(e))
+        
+        self.wait(3.5)

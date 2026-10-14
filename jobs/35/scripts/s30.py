@@ -3,16 +3,37 @@ from zenn_rig import *
 
 class S30(Scene):
     def construct(self):
-        prota = protagonista(pos=LEFT*3.5+DOWN*1.2, playera="verde", altura=2.6, expresion='feliz', pose='de_pie')
-        stick_laugh = stick_idle(pos=RIGHT*3+UP*2, height=2.2, color=TEAL)
-        stick_emocion = stick_idle(pos=RIGHT*3+0, height=2.2, color=TEAL)
-        stick_walk_fig = stick_idle(pos=RIGHT*3+DOWN*2, height=2.2, color=TEAL)
-
-        self.play(FadeIn(prota), FadeIn(stick_laugh), FadeIn(stick_emocion), FadeIn(stick_walk_fig), run_time=1.5)
-        self.wait(0.5)
-
-        self.play(FadeIn(stick_point(stick_laugh, prota.get_center()+UP*0.5)), run_time=1.0)
-        self.play(FadeIn(stick_point(stick_emocion, prota.get_center())), run_time=1.0)
-        self.play(FadeIn(expresion(stick_emocion, tipo='normal')), run_time=0.8)
-        self.play(stick_walk(stick_walk_fig, target=LEFT*4, run_time=2.0, steps=6), run_time=2.0)
+        self.add(fondo(CREMA))
+        
+        prota = protagonista(
+            pos=DOWN * 1.3 + LEFT * 3.5,
+            playera=PLAYERA_AMARILLA,
+            altura=2.5,
+            expresion='sorpresa',
+            pose='de_pie'
+        )
+        
+        moneda = moneda_dorada(texto='?', pos=UP * 0.5 + RIGHT * 2.5, radio=1.2)
+        
+        c = callout(
+            "¡Pura casualidad!",
+            color=ORANGE,
+            pos=RIGHT * 3.4 + UP * 1.0
+        )
+        
+        self.play(
+            FadeIn(prota, shift=UP),
+            FadeIn(moneda, shift=DOWN),
+            FadeIn(c, shift=RIGHT),
+            run_time=1.0
+        )
+        
+        self.play(
+            moneda.animate.rotate(2 * PI),
+            run_time=3.0,
+            rate_func=linear
+        )
+        
+        cambiar_cara(prota, 'mente_explotada')
+        
         self.wait(2.0)

@@ -5,28 +5,25 @@ class S08(Scene):
     def construct(self):
         self.add(fondo_papel())
         
-        prota = protagonista(
-            pos=DOWN*1.2+LEFT*3.5, 
-            playera=PLAYERA_AZUL, 
-            altura=2.6, 
-            expresion='alegria_pura', 
-            pose='senalando'
-        )
+        titulo = banda_titulo("ENTORNO PRENATAL", color=TEAL)
+        self.play(FadeIn(titulo))
         
-        lap = lapida(texto='LÁPIZ', pos=RIGHT*2.5+UP*0.5)
+        prota = protagonista(pos=DOWN*1.2+LEFT*3.8, playera=PLAYERA_VERDE, altura=2.4, expresion='pensando', pose='senalando')
+        self.play(FadeIn(prota))
         
-        av = arrow(start=LEFT*2.0+UP*0.5, end=RIGHT*1.2+UP*0.5, color=INK)
+        dna = adn(pos=RIGHT*2.5+UP*0.5, escala=1.0, color=TEAL)
+        mat = matraz(pos=RIGHT*2.5+DOWN*1.5, escala=1.0, liquido=TEAL)
         
-        c = callout("¡Boom! Eres diestro.", color=ORANGE, pos=RIGHT*3.0+UP*1.8)
+        flecha1 = arrow(LEFT*1.5+UP*0.5, RIGHT*1.2+UP*0.5, color=INK, width=8)
+        flecha2 = arrow(LEFT*1.5+DOWN*0.5, RIGHT*1.2+DOWN*0.5, color=INK, width=8)
         
         self.play(
-            FadeIn(prota),
-            Create(lap),
-            run_time=1.0
-        )
-        self.play(
-            Create(av),
-            FadeIn(c),
+            FadeIn(dna),
+            FadeIn(mat),
+            FadeIn(flecha1),
+            FadeIn(flecha2),
             run_time=1.5
         )
-        self.wait(5.5)
+        
+        cambiar_cara(prota, 'sorpresa')
+        self.wait(4.0)

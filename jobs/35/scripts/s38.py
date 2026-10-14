@@ -3,18 +3,37 @@ from zenn_rig import *
 
 class S38(Scene):
     def construct(self):
-        self.add(fondo(CREMA))
+        self.add(fondo_papel())
         
-        self.play(
-            FadeIn(banda_titulo("¡MUNDO SECRETO!", color=CORAL)),
-            FadeIn(protagonista(pos=DOWN*1.2+LEFT*3.5, playera=PLAYERA_AZUL, altura=2.6, expresion="sorpresa", pose="de_pie"))
+        prota = protagonista(
+            pos=DOWN * 1.3 + LEFT * 3.5,
+            playera=PLAYERA_AZUL,
+            altura=2.6,
+            expresion="confundido",
+            pose="de_pie"
         )
         
-        p_derecho = perro(pos=RIGHT*3.5+DOWN*1.2, color='#C98A4B', escala=1.2)
-        self.play(FadeIn(p_derecho, shift=UP))
+        self.play(FadeIn(prota), run_time=0.8)
         
-        self.play(
-            FadeIn(etiqueta("¡Sorpresa canina!", pos=RIGHT*3.2+UP*1.0, color=ORANGE, font_size=40, ancho_max=5.5))
+        c = matraz(pos=RIGHT * 3.0 + UP * 0.5, escala=1.2, liquido=CORAL)
+        self.play(FadeIn(c), run_time=0.8)
+        
+        call = callout(
+            "¿Zurdo o diestro?",
+            color=ORANGE,
+            pos=RIGHT * 3.2 + UP * 2.0
         )
+        self.play(FadeIn(call), run_time=0.8)
         
-        self.wait(1.5)
+        cambiar_cara(prota, "pensando")
+        self.wait(0.5)
+        
+        flecha = arrow(
+            start=prota.get_top() + RIGHT * 0.5,
+            end=c.get_left(),
+            color=INK,
+            width=6
+        )
+        self.play(Create(flecha), run_time=0.8)
+        
+        self.wait(2.5)

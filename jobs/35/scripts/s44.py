@@ -3,11 +3,48 @@ from zenn_rig import *
 
 class S44(Scene):
     def construct(self):
-        banda = banda_titulo("¿Por qué el cielo es azul?", color=YELLOW)
-        self.play(FadeIn(banda), run_time=1)
-        prota = protagonista(pos=DOWN*1.2+LEFT*3.5, playera="naranja", altura=2.5, expresion="pensando", pose="senalando")
-        sol_obj = sol(color=YELLOW, radius=0.7, pos=DOWN*1.2+RIGHT*3.5)
-        self.play(FadeIn(prota), Create(sol_obj), run_time=1.5)
-        flecha = arrow(start=prota.get_center()+RIGHT*0.5, end=sol_obj.get_center()+LEFT*0.5, color=INK, width=8)
-        self.play(Create(flecha), run_time=1)
-        self.wait(0.5)
+        self.add(fondo(INK))
+        self.add(estrellas(n=35, seed=42, color=WHITE))
+        
+        prota = protagonista(
+            pos=DOWN*1.2 + LEFT*3.5, 
+            playera=PLAYERA_TEAL, 
+            altura=2.4, 
+            expresion='mente_explotada', 
+            pose='senalando'
+        )
+        
+        celestiales = VGroup(
+            planeta(pos=RIGHT*3.2 + UP*0.5, radio=1.2, color=TEAL),
+            adn(pos=RIGHT*2.5 + DOWN*1.5, escala=0.8, color=WHITE),
+            fuego(pos=RIGHT*4.2 + DOWN*1.5, escala=0.8)
+        )
+        
+        dato = callout(
+            "¡Movimiento fetal\ndefine la lateralidad!", 
+            color=ORANGE, 
+            pos=RIGHT*3.2 + UP*1.8
+        )
+        
+        self.play(
+            FadeIn(prota),
+            FadeIn(celestiales),
+            FadeIn(dato),
+            run_time=1.5
+        )
+        
+        self.play(
+            celestiales.animate.shift(UP*0.3),
+            run_time=2.0,
+            rate_func=there_and_back
+        )
+        
+        cambiar_cara(prota, 'alegria_pura')
+        self.wait(3.5)
+        
+        self.play(
+            FadeOut(prota),
+            FadeOut(celestiales),
+            FadeOut(dato),
+            run_time=1.0
+        )
