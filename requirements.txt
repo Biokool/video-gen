@@ -2,7 +2,7 @@ streamlit>=1.32
 requests>=2.31
 pillow>=10.0
 manim>=0.19
-edge-tts>=7.0
+edge-tts>=7.3.1
 piper-tts>=1.2
 soundfile>=0.12
 # Subida a YouTube (sección Publicar). Sin esto, el panel funciona igual;

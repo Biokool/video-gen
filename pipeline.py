@@ -29,7 +29,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 
-PANEL_VERSION = "v29.1"  # se muestra en el pie del sidebar; subir en cada release
+PANEL_VERSION = "v29.2"  # se muestra en el pie del sidebar; subir en cada release
 # Dos layouts soportados:
 #  - anidado: panel/ dentro de zenn-factory/ (jobs/ y thumbnails/ en el padre)
 #  - plano:   todo dentro de video-gen/ (jobs/ y thumbnails/ junto a app.py)

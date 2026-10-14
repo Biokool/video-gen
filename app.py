@@ -165,11 +165,6 @@ st.sidebar.caption(f"Panel {pipeline.PANEL_VERSION} · Zenn Factory")
 gen_fn = make_generate_fn(backend, model_id)
 
 
-def apply_stage_result(pid, stage, ok, log, arts, sugg):
-    db.set_stage(conn, pid, stage, sugg or ("ok" if ok else "fallo"),
-                 log, arts)
-
-
 # ============================================================ BANDEJA
 if view == "📥 Bandeja de temas":
     st.title("📥 Bandeja de temas")

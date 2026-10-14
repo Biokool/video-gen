@@ -1207,3 +1207,34 @@ S42), se continuó el final real que faltaba (pianista + PAYOFF + cierre,
 ~258 palabras) y se renumeró S01–S48 continua; luego TTS 48/48.
 
 *Versión del panel: v29.1 (cobertura real + TTS edge a prueba de 403).*
+
+## 41. Cambios v29.2 (2026-10-13) — auditoría de calidad: fixes de arranque y saneamiento
+
+Auditoría completa del repo (todos los `.py`, `.bat`, `.ps1`, `requirements.txt`).
+Los fixes aplicados:
+
+1. **`INICIAR.bat` no arrancaba Ollama** (bug real): buscaba
+   `ARRANCAR_OLLAMA.bat` pero el archivo se llama `_____ARRANCAR_OLLAMA.bat`
+   (renombrado para ordenarlo en el explorador) → nunca se auto-arrancaba.
+   Ahora acepta ambos nombres.
+2. **`requirements.txt`**: `edge-tts>=7.0` → `>=7.3.1`. El fix del 403
+   (sección 40) vivía solo en el entorno instalado; una instalación nueva
+   con 7.2.8 lo sufriría de nuevo.
+3. **`app.py`**: `apply_stage_result()` estaba definido DOS veces
+   (idéntico, líneas 70 y 168) — eliminado el duplicado.
+4. **Marca en `INICIAR.bat`**: el banner decía «El Porque» (nombre anterior
+   del canal); ahora dice «Indaga», consistente con `marca.py`.
+
+Conclusiones de la auditoría (sin acción inmediata, ver informe):
+- De ~50 `except`, solo 10 son `except: pass` silencioso y 7 son
+  intencionales (callbacks de progreso y fallbacks); el resto registra el
+  error en el log de la etapa.
+- Sin rutas absolutas hardcodeadas en `.py`/`.bat`/`.ps1` (todo relativo
+  a `%~dp0` / `Path(__file__)`); sin logs de claves/tokens.
+- `pipeline.py` sigue creciendo (3129 líneas): candidato a split por
+  dominios en v30.
+- Cobertura de tests: 1 solo archivo E2E (33 checks, LLM mockeado); faltan
+  unitarios de funciones puras (`_narracion_guion`, `build_vo_json`,
+  `cut_vertical`).
+
+*Versión del panel: v29.2 (auditoría: arranque Ollama, requirements y saneamiento).*

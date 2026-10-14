@@ -9,6 +9,7 @@ panel.db
 panel.db-journal
 panel.db-wal
 panel.db-shm
+usage.jsonl
 
 # Artefactos pesados de los jobs
 jobs/**/audio/

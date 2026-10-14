@@ -5,7 +5,7 @@ title Panel Zenn Factory - video-gen
 cd /d "%~dp0"
 
 echo ==========================================================
-echo    PANEL ZENN FACTORY  -  El Porque
+echo    PANEL ZENN FACTORY  -  Indaga
 echo    Carpeta: %~dp0
 echo ==========================================================
 echo.
@@ -74,6 +74,8 @@ if errorlevel 1 (
 
 if exist "%~dp0ARRANCAR_OLLAMA.bat" (
     call "%~dp0ARRANCAR_OLLAMA.bat"
+) else if exist "%~dp0_____ARRANCAR_OLLAMA.bat" (
+    call "%~dp0_____ARRANCAR_OLLAMA.bat"
 ) else (
     echo       INFO: sin ARRANCAR_OLLAMA.bat  ^(opcional, modelos locales^).
 )
