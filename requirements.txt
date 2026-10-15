@@ -9,3 +9,6 @@ soundfile>=0.12
 # solo la conexión con YouTube queda deshabilitada.
 google-api-python-client>=2.0
 google-auth-oauthlib>=1.2
+# Claves API en el almacén del SO (Credential Manager/macOS Keychain).
+# Sin esto, el panel sigue funcionando; las claves se guardan en SQLite.
+keyring>=24.0

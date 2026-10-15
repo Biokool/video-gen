@@ -26,6 +26,7 @@ if not (PANEL / "pipeline.py").exists():
     PANEL = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PANEL))
 import pipeline as P          # noqa: E402
+import pipe_anim              # noqa: E402
 import tts_engine             # noqa: E402
 import llm as _llm            # noqa: E402
 
@@ -152,7 +153,7 @@ def s1_happy_path():
     p, tmp = nuevo_proyecto("s1")
     words = escribe_guion(tmp)
     tts_engine.speak_batch = mock_speak_batch
-    P._generar_y_renderizar_escena = mock_render
+    pipe_anim._generar_y_renderizar_escena = mock_render
     subprocess.run = fake_subprocess_run
     try:
         llm = MockLLMStoryboard(words, modo="completo")
@@ -293,7 +294,7 @@ def s6_drift_preflight():
     p, tmp = nuevo_proyecto("s6")
     words = escribe_guion(tmp, 120)
     tts_engine.speak_batch = mock_speak_batch
-    P._generar_y_renderizar_escena = mock_render
+    pipe_anim._generar_y_renderizar_escena = mock_render
     subprocess.run = fake_subprocess_run
     try:
         llm = MockLLMStoryboard(words)
@@ -353,7 +354,7 @@ def s9_run_all_verde():
     import db as _db
     work = Path(tempfile.mkdtemp(prefix="e2e_runall_"))
     tts_engine.speak_batch = mock_speak_batch
-    P._generar_y_renderizar_escena = mock_render
+    pipe_anim._generar_y_renderizar_escena = mock_render
     subprocess.run = fake_subprocess_run
     try:
         conn = _db.connect(str(work / "t.db"))

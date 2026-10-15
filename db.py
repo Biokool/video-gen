@@ -13,7 +13,22 @@ import sqlite3
 import time
 from pathlib import Path
 
+try:  # keyring es opcional: si no está, guardamos en SQLite como antes
+    import keyring as _keyring
+    _HAVE_KEYRING = True
+except Exception:  # pragma: no cover - depende del entorno
+    _keyring = None
+    _HAVE_KEYRING = False
+
 DB_PATH = Path(__file__).resolve().parent / "panel.db"
+KEYRING_SERVICE = "zenn-video-gen"
+
+_SECRET_SUFFIXES = ("_key",)
+
+
+def _is_secret(key: str) -> bool:
+    """Los settings que son claves API (terminan en _key) van al almacén del SO."""
+    return isinstance(key, str) and key.endswith(_SECRET_SUFFIXES)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS topics (
@@ -81,11 +96,33 @@ def init_db(path=DB_PATH):
 
 # ---- settings ----
 def get_setting(conn, key, default=""):
+    if _is_secret(key) and _HAVE_KEYRING:
+        try:
+            v = _keyring.get_password(KEYRING_SERVICE, key)
+        except Exception:  # backend del SO roto: caemos al respaldo
+            v = None
+        if v is not None:
+            return v
     row = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
     return row["value"] if row else default
 
 
 def set_setting(conn, key, value):
+    if _is_secret(key) and _HAVE_KEYRING:
+        try:
+            if value:
+                _keyring.set_password(KEYRING_SERVICE, key, value)
+            else:
+                try:
+                    _keyring.delete_password(KEYRING_SERVICE, key)
+                except Exception:
+                    pass
+            # limpiamos el respaldo en claro para no dejar el secreto en SQLite
+            conn.execute("DELETE FROM settings WHERE key=?", (key,))
+            conn.commit()
+            return
+        except Exception:  # si el almacén falla, guardamos en claro (legacy)
+            pass
     conn.execute(
         "INSERT INTO settings(key, value) VALUES(?, ?) "
         "ON CONFLICT(key) DO UPDATE SET value=excluded.value",

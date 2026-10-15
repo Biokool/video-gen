@@ -1130,46 +1130,6 @@ Uso: `python3 tests/test_panel_e2e.py` (sale 1 si algo falla).
 
 *Versión del panel: v29 (corrida garantizada; PANEL_VERSION = "v29").*
 
-## 38. Cambios v28 (2026-10-10) — corrida garantizada + prueba punta a punta
-
-Reporte: "no dejan de salir errores... debes hacer un test punta a punta...
-revisa y crea el algoritmo para garantizar la corrida y la ejecución
-correcta en orden". Además, v27 trajo un `NameError: name 're' is not
-defined` en app.py (el campo "Forzar" usaba `re.fullmatch` sin importar
-`re`): parche sin prueba, el bug exacto que se quería eliminar.
-
-Fix:
-- `pipeline.reparar_faltantes(p, job, forzar="", conn=None, pid=None)`:
-  la lógica del botón "🛠 Reparar faltantes" vive en pipeline (testeable
-  sin Streamlit); app.py solo la invoca. Elimina el NameError de raíz.
-  Además borra automáticamente los audios "ilegibles" (truncados): el TTS
-  los omitiría por "ya existían".
-- Contratos de etapa (`CONTRATO_ETAPAS` + `validar_etapa()`): storyboard
-  (existe, sin VOZ ilegible, cobertura ≥90%), tts (vo.json cubre + audios
-  válidos), animacion (mp4 por escena), ensamblado (final.mp4 dura ≈ suma
-  de audios ±15%).
-- `correr_etapa_garantizada()`: el algoritmo pedido — 1) PRE: valida
-  insumos (no arranca tts sin storyboard completo, etc.); 2) ejecuta;
-  3) POST: valida el contrato; 4) si dijo "ok" pero el contrato falla, UNA
-  auto-reparación y reintento; 5) veredicto honesto (nunca "ok" con rotos).
-  `run_all` la usa en su ruta genérica: las etapas corren en orden
-  contractual.
-- Tiempos: sin timeouts agresivos nuevos; cada etapa corre "con el tiempo
-  necesario" (subprocess: TTS 3600s/lote, ffmpeg 900s/escena, HTTP 300s).
-  Si un backend agota su cuota gratuita, `llm.generate` rota al siguiente
-  ANTES de rendirse y la etapa continúa sin truncarse (la validación por
-  partes + continuación automática aplica venga del modelo que venga).
-- `tests/test_panel_e2e.py`: 31 checks en 9 escenarios, sin keys ni red
-  (LLM mockeado, TTS/render con ffmpeg real): happy path completo,
-  rotación real de `llm.generate` ante 429/quota (mockeando solo el nivel
-  HTTP), truncado→continuación automática, sin_voz→fallo fuerte sin loop,
-  audio corrupto→auto-regeneración, drift→pre-flight con diff, pyflakes sin
-  nombres indefinidos (regresión del bug `re`), pre-check que bloquea sin
-  insumos, y `run_all` verde de 8 etapas. Se corre con
-  `python tests/test_panel_e2e.py` (pide ffmpeg; pyflakes opcional).
-
-*Versión del panel: v28 (corrida garantizada + E2E).*
-
 ## 40. Cambios v29.1 (2026-10-13) — cobertura contra narración + TTS Edge 403
 
 Reporte (proyecto 12 / `jobs/35`, «¿Por qué eres zurdo o diestro?»):
@@ -1238,3 +1198,67 @@ Conclusiones de la auditoría (sin acción inmediata, ver informe):
   `cut_vertical`).
 
 *Versión del panel: v29.2 (auditoría: arranque Ollama, requirements y saneamiento).*
+
+## 42. Cambios v30 (2026-10-13) — split de pipeline + unitarios + YouTube + secretos en vault
+
+Objetivo: solventar los hallazgos de la auditoría de calidad, empezando por
+los de alta prioridad. `PANEL_VERSION = "v30"`.
+
+1. **Split de `pipeline.py` (3129 líneas)** — ALTO. Dividido por dominios
+   en módulos `pipe_*` + un facade delgado `pipeline.py` (~324 líneas) que
+   re-exporta todo lo que el resto del proyecto importa (sin cambios en
+   `app.py` ni en los tests):
+   - `pipe_core.py` — constantes, utilidades puras (`_narracion_guion`,
+     `_partir_guion`, `_renumerar_desde`, `_audio_path`, `_es_fallo_quota`).
+   - `pipe_guion.py` — etapa 1 (guion).
+   - `pipe_storyboard.py` — etapa 3 (storyboard) + `_temas_cubiertos`.
+   - `pipe_tts.py` — etapa 5 (TTS / vo.json).
+   - `pipe_anim.py` — etapa 7 (animación/render por escena).
+   - `pipe_verify.py` — verificación de elementos (audios/mp4).
+   - `pipe_thumbs.py` — miniaturas.
+   Orden de importación sin ciclos: `core ← guion ← storyboard ← tts ←
+   anim ← verify`; `thumbs` independiente. `execute_stage`,
+   `correr_etapa_garantizada`, `run_all` y los `propose_topics*` viven en
+   el facade. Se corrigieron 3 ciclos detectados moviendo `_temas_cubiertos`
+   (verify→storyboard) y `_audio_path` (tts→core), y ajustando imports.
+
+2. **Unitarios de las funciones puras** — ALTO. Nuevo
+   `tests/test_pipeline_unit.py` (46 checks, todo verde): `_narracion_guion`,
+   `_partir_guion`, `_renumerar_desde`, `_audio_path`, `_ids_con_archivo`,
+   `build_vo_json` (dedupe / escenas sin_voz), `verificar_elementos`
+   (ok / faltan / vacío / ilegible), `fmt_mmss`, `count_words`,
+   `estimate_minutes`. Aíslan la lógica crítica sin LLM ni ffmpeg (el probe
+   de duración se parchea).
+
+3. **Conector YouTube** — MEDIO. `propose_topics_youtube(youtube_key,
+   niche)` en el facade (YouTube Data API v3: `search` + `videos/statistics`).
+   El botón de `app.py` quedó conectado (input de nicho, spinner, manejo de
+   error/resultado). Sin clave, el botón se omite sin romper.
+
+4. **Secretos en el almacén del SO (keyring)** — MEDIO. `db.get_setting`/
+   `set_setting` ahora envían los settings que terminan en `_key` (backends
+   LLM + `youtube_key`) a `keyring` (Windows Credential Manager /
+   Keychain), servicio `zenn-video-gen`; al escribir se borra el respaldo en
+   claro de SQLite. `keyring` es **opcional**: si no está instalado o el
+   backend del SO falla, todo sigue funcionando en SQLite como antes
+   (cero regresión). La lectura también cae a SQLite si el vault no tiene
+   la clave (migración de claves previas). `keyring>=24.0` añadido a
+   `requirements.txt`.
+
+5. **`except` silenciosos** — MEDIO/BAJO. `_wrap_generate_fn` y `run_all`
+   (medidor de uso y pre-check de tts) ahora imprimen el diagnóstico a
+   stderr sin interrumpir. Los `except` de `scripts/zenn_rig.py` (3) y
+   `thumbnails/generate_thumbnails.py` (2) son fallbacks defensivos
+   intencionales en render/gráficos (degradan con gracia) → sin cambio.
+
+6. **Misceláneo** — BAJO. Nuevo `constraints.txt` (`uv pip freeze`, 98
+   líneas) para instalaciones reproducibles (`-c constraints.txt`);
+   docstring de `app.py` actualizado a `uv pip install`; eliminada la
+   sección `## 38` duplicada de este documento (borrador redundante de la
+   39).
+
+Verificación: `pyflakes` limpio en los 8 módulos `pipe_*` + facade + `db.py`
++ `app.py` (sin nombres indefinidos); E2E (`tests/test_panel_e2e.py`) y
+unitarios en verde.
+
+*Versión del panel: v30 (split de pipeline, unitarios, YouTube, secretos en vault).*

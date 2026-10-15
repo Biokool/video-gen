@@ -2,7 +2,7 @@
 """Panel Zenn Factory — tablero visual del pipeline de videos.
 
 Uso:
-    pip install -r requirements.txt
+    uv pip install -r requirements.txt   (o INICIAR.bat, que lo hace solo)
     python3 seed.py        # solo la primera vez
     streamlit run app.py  # abre http://localhost:8501
 
@@ -194,11 +194,35 @@ if view == "📥 Bandeja de temas":
             except Exception as e:
                 st.error(str(e))
         yt = get("youtube_key")
+        niche = st.text_input(
+            "Nicho para buscar en YouTube",
+            key="yt_niche", label_visibility="collapsed",
+            placeholder="Nicho o tema (ej: curiosidades de ciencia)",
+            help="Busca videos largos populares del nicho y usa sus títulos "
+                 "como candidatos de tema.")
         if st.button("📺 Sugerir desde YouTube"):
             if not yt:
                 st.warning("Configura YOUTUBE_API_KEY en Configuración.")
+            elif not niche.strip():
+                st.warning("Escribe un nicho o tema para buscar.")
             else:
-                st.info("Conector YouTube: pendiente de implementar con tu key.")
+                try:
+                    with st.spinner(f"Buscando «{niche.strip()}» en YouTube…"):
+                        topics, err = pipeline.propose_topics_youtube(
+                            yt, niche.strip())
+                    if err:
+                        st.error(err)
+                    elif not topics:
+                        st.info("Sin resultados para ese nicho.")
+                    else:
+                        for t in topics:
+                            db.add_topic(conn, t["question"], t["angle"],
+                                         t["source"], t["signals"])
+                        st.success(f"{len(topics)} temas añadidos desde "
+                                   "YouTube.")
+                        rerun()
+                except Exception as e:
+                    st.error(str(e))
 
     st.divider()
     filtro = st.selectbox("Estado", ["propuesto", "aprobado", "rechazado", "archivado"])
